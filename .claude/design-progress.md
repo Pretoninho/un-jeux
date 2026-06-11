@@ -24,6 +24,7 @@
 | Vocabulaire : jargon conservé + tooltips 2 niveaux | §12 | v0.4 |
 | **Objectif : jeu web, solo-first, multi WebSockets phase 2** | §13 | v0.5 |
 | **Tours abstraits numérotés, fin par victoire ou 3 cycles, score tiebreaker** | §15 | v0.6 |
+| **IA : pool unifié 9 profils + Banque centrale, choix des adversaires, max 3** | §16 | v0.7 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
@@ -33,14 +34,12 @@
 
 Par ordre de priorité (feuille de route §16) :
 
-1. **Solo vs multijoueur** — implications IA à approfondir
-3. **IA concurrentes** — 5-6 archétypes avec fonctions de réaction simples
-4. **Signaux concrets de la jauge** — lesquels, à quel coût, quel niveau de bruit
-5. **Définition du MVP web** — périmètre exact de la première version jouable
-6. **Structure détaillée de l'arbre de compétences**
-7. **Génération procédurale de la carte** (phase 2)
-8. **2 archétypes manquants** à définir
-9. **Noms in-game définitifs** des archétypes
+1. **Signaux concrets de la jauge** — lesquels, à quel coût, quel niveau de bruit
+2. **Définition du MVP web** — périmètre exact de la première version jouable
+3. **Structure détaillée de l'arbre de compétences**
+4. **Génération procédurale de la carte** (phase 2)
+5. **2 archétypes manquants** à définir
+6. **Noms in-game définitifs** des archétypes
 
 ---
 

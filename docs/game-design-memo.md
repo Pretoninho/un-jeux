@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.6 — 11 juin 2026.
+> Document de référence vivant. Version 0.7 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -349,7 +349,56 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 16. Références à étudier
+## 16. IA concurrentes et choix des adversaires
+
+### Système de profils unifié
+
+Un seul pool de profils utilisables par les humains ou par l'IA — pas deux systèmes séparés.
+
+**Profils jouables** *(humain ou IA — les 5 archétypes de §6)*
+L'IA en joue une version rule-based ; le joueur humain apporte la profondeur stratégique. Le comportement IA suit la logique naturelle de l'archétype.
+
+**Profils IA exclusifs** *(pure market actor, sans condition de victoire)*
+
+| Profil | Comportement | Rôle systémique |
+| --- | --- | --- |
+| Suiveur de momentum | Achète ce qui monte, vend ce qui baisse | Crée le crowding, amplifie les bulles |
+| Fonds leveragé | Maximise le rendement via levier agressif | Principal contributeur à la fragilité |
+| Value patient | Achète les actifs décotés, ignore le bruit | Stabilise le marché, absorbe les chocs |
+| Passif géant | AUM énorme, mouvements rares mais massifs | Déplace les prix, prévisible à anticiper |
+
+**IA de contrainte** *(toujours présente, non sélectionnable)*
+
+- **Banque centrale** : réagit à l'état agrégé — hausse des taux si fragilité haute, assouplissement en récession, injection en crise. Météo régulatoire, pas un compétiteur.
+
+### Choix des adversaires en début de partie
+
+Le joueur configure sa table avant le lancement :
+
+```
+Archétype joueur  → [choix libre]
+Badges            → [draft partiel]
+Adversaires (2-3) → [sélection dans le pool de 9 profils]
+Banque centrale   → [toujours présente]
+```
+
+**Configurations prédéfinies (optionnel)** : présélections suggérées pour les joueurs qui ne veulent pas composer — "Marché euphorique" (Suiveur × 2 + Fonds leveragé), "Table de prédateurs" (3 archétypes joueurs en IA), "Marché défensif" (Value patient + Passif géant), etc.
+
+### Fonction de réaction IA (3 paramètres)
+
+1. **Signal d'entrée** : ce qui déclenche une action (prix, rendement, fragilité, comportement visible du joueur)
+2. **Seuil de tolérance au risque** : jusqu'où l'IA s'expose avant de réduire
+3. **Réaction au joueur** : copie, concurrence directe, ou ignore
+
+### Prototype
+
+- Pool complet : **9 profils sélectionnables + Banque centrale**
+- Maximum **3 adversaires** par partie
+- IA rule-based pour le prototype, affinable sans refonte de l'architecture
+
+---
+
+## 17. Références à étudier
 
 ### 1830: Railways & Robber Barons (Francis Tresham, 1986) — référence n°1
 - Joueur = investisseur, pas la compagnie. Directeur = actionnaire majoritaire → conflit d'intérêts principal-agent institutionnalisé.
@@ -372,11 +421,11 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 17. Points à éclaircir — feuille de route
+## 18. Points à éclaircir — feuille de route
 
 ### Niveau 1 — La vision
 1. ~~**Le fantasme du joueur**~~ — **TRANCHÉ (v0.4)** : 5 archétypes définis + 2 à venir (§6)
-2. **Solo vs multijoueur** — posé : solo-first, multi WebSockets en phase 2. À approfondir pour les implications IA.
+2. ~~**Solo vs multijoueur**~~ — **TRANCHÉ (v0.7)** : solo-first, 3 adversaires IA max, multi WebSockets en phase 2 (§16)
 3. ~~**Historique vs procédural**~~ — **TRANCHÉ (v0.3)** : cadre atemporel.
 
 ### Niveau 2 — Le cœur mécanique
@@ -386,21 +435,20 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 7. ~~**Design de la défaite**~~ — **TRANCHÉ (v0.5)** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes (§14)
 
 ### Niveau 3 — Les systèmes
-8. **IA concurrentes (priorité haute)** : 5–6 archétypes avec fonctions de réaction simples.
-9. **Banque centrale / régulateur** : posé comme nœud réglementaire (§11). Comportement IA à définir.
+8. ~~**IA concurrentes**~~ — **TRANCHÉ (v0.7)** : pool unifié 9 profils + Banque centrale, choix des adversaires en début de partie (§16)
+9. ~~**Banque centrale / régulateur**~~ — **TRANCHÉ (v0.7)** : IA de contrainte permanente, règle de Taylor gamifiée (§16)
 10. **Signaux concrets de la jauge** : combien, lesquels, à quel coût, quel niveau de bruit.
 
 ### Niveau 4 — La réalité du projet
 11. ~~**Objectif du projet**~~ — **TRANCHÉ (v0.5)** : jeu web, solo-first, multijoueur en phase 2 (§13)
 12. **Le test minimal** : MVP web — carte fixe, 1 archétype jouable, 2–3 IA simples, jauge de fragilité active.
 
-**Ordre d'attaque restant : 2 (implications IA), 8, 10, 12**
+**Ordre d'attaque restant : 10, 12**
 
 ---
 
-## 18. Questions ouvertes
+## 19. Questions ouvertes
 
-- [ ] IA concurrentes : archétypes et fonctions de réaction
 - [ ] Signaux bruités de la jauge : lesquels, à quel coût, quel niveau de bruit/retard
 - [ ] Structure détaillée de l'arbre de compétences
 - [ ] Génération procédurale de la carte (phase 2)
@@ -410,7 +458,7 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 19. Journal des décisions
+## 20. Journal des décisions
 
 | Date | Décision |
 |---|---|
@@ -429,3 +477,4 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 | 2026-06-11 | **Objectif** : jeu web, solo-first, multijoueur WebSockets en phase 2 |
 | 2026-06-11 | **Design de la défaite** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes |
 | 2026-06-11 | **Échelle et horizon** : tours abstraits numérotés, fin par condition de victoire ou 3 cycles épuisés, score tiebreaker |
+| 2026-06-11 | **IA concurrentes** : pool unifié 9 profils (5 archétypes jouables + 4 exclusifs IA) + Banque centrale permanente, choix des adversaires en début de partie, max 3 adversaires |
