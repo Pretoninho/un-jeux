@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.7 — 11 juin 2026.
+> Document de référence vivant. Version 0.8 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -398,7 +398,41 @@ Banque centrale   → [toujours présente]
 
 ---
 
-## 17. Références à étudier
+## 17. Signaux de la jauge de fragilité
+
+La jauge de fragilité est toujours cachée. Le joueur l'infère à partir de **signaux bruités et retardés**.
+
+**Prototype : Option A** — signaux universels, identiques pour tous les joueurs.
+**Évolution prévue : Option B** — signaux différenciés par archétype (le Sismographe lit mieux les signaux macro, l'Architecte lit mieux les comportements d'initiés).
+
+### Les 4 signaux du prototype
+
+| Signal | Précision | Délai | Coût d'accès |
+| --- | --- | --- | --- |
+| **Volatilité du marché** | Faible | 0 tour | Gratuit — toujours visible |
+| **Écart de crédit** | Moyenne | 1 tour | 1 PA LIRE ou analyste permanent en hex crédit |
+| **Conditions de financement** | Haute | 2 tours | Desk au nœud liquidité |
+| **Comportement des initiés** | Haute | 1 tour | Investissement branche Analyse (arbre techno) |
+
+### Acquisition et dégradation
+
+- **Ponctuel** : action LIRE (1 PA) → lecture valable 1 tour
+- **Permanent** : analyste dans le bon hex → signal continu tant que l'analyste est présent
+- **Structurel** : investissement arbre techno → qualité améliorée, permanent
+
+Un signal non rafraîchi perd en précision chaque tour.
+
+### La triangulation comme skill central
+
+Plusieurs signaux simultanés permettent d'inférer l'état de la jauge. Volatilité haute + écart de crédit large + financement tendu → jauge probablement en zone rouge depuis 1-2 tours → action : réduire le levier, commencer à réserver.
+
+### Post-mortem
+
+Après une crise, l'historique réel de la jauge est révélé, superposé aux signaux vus par le joueur. Apprentissage par l'observation, pas par tutoriel.
+
+---
+
+## 18. Références à étudier
 
 ### 1830: Railways & Robber Barons (Francis Tresham, 1986) — référence n°1
 - Joueur = investisseur, pas la compagnie. Directeur = actionnaire majoritaire → conflit d'intérêts principal-agent institutionnalisé.
@@ -421,7 +455,7 @@ Banque centrale   → [toujours présente]
 
 ---
 
-## 18. Points à éclaircir — feuille de route
+## 19. Points à éclaircir — feuille de route
 
 ### Niveau 1 — La vision
 1. ~~**Le fantasme du joueur**~~ — **TRANCHÉ (v0.4)** : 5 archétypes définis + 2 à venir (§6)
@@ -437,17 +471,17 @@ Banque centrale   → [toujours présente]
 ### Niveau 3 — Les systèmes
 8. ~~**IA concurrentes**~~ — **TRANCHÉ (v0.7)** : pool unifié 9 profils + Banque centrale, choix des adversaires en début de partie (§16)
 9. ~~**Banque centrale / régulateur**~~ — **TRANCHÉ (v0.7)** : IA de contrainte permanente, règle de Taylor gamifiée (§16)
-10. **Signaux concrets de la jauge** : combien, lesquels, à quel coût, quel niveau de bruit.
+10. ~~**Signaux concrets de la jauge**~~ — **TRANCHÉ (v0.8)** : 4 signaux (Volatilité / Écart crédit / Financement / Initiés), option A universelle pour prototype, option B par archétype prévue (§17)
 
 ### Niveau 4 — La réalité du projet
 11. ~~**Objectif du projet**~~ — **TRANCHÉ (v0.5)** : jeu web, solo-first, multijoueur en phase 2 (§13)
 12. **Le test minimal** : MVP web — carte fixe, 1 archétype jouable, 2–3 IA simples, jauge de fragilité active.
 
-**Ordre d'attaque restant : 10, 12**
+**Ordre d'attaque restant : 12 (MVP)**
 
 ---
 
-## 19. Questions ouvertes
+## 20. Questions ouvertes
 
 - [ ] Signaux bruités de la jauge : lesquels, à quel coût, quel niveau de bruit/retard
 - [ ] Structure détaillée de l'arbre de compétences
@@ -458,7 +492,7 @@ Banque centrale   → [toujours présente]
 
 ---
 
-## 20. Journal des décisions
+## 21. Journal des décisions
 
 | Date | Décision |
 |---|---|
@@ -478,3 +512,4 @@ Banque centrale   → [toujours présente]
 | 2026-06-11 | **Design de la défaite** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes |
 | 2026-06-11 | **Échelle et horizon** : tours abstraits numérotés, fin par condition de victoire ou 3 cycles épuisés, score tiebreaker |
 | 2026-06-11 | **IA concurrentes** : pool unifié 9 profils (5 archétypes jouables + 4 exclusifs IA) + Banque centrale permanente, choix des adversaires en début de partie, max 3 adversaires |
+| 2026-06-11 | **Signaux** : 4 signaux (Volatilité gratuit / Écart crédit LIRE / Financement nœud / Initiés techno), option A universelle pour prototype, B par archétype prévu |
