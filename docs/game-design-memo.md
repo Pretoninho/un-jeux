@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.2 — 11 juin 2026.
+> Document de référence vivant. Version 1.3 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -617,6 +617,12 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 - [ ] Deux archétypes jouables restants à définir
 - [ ] Noms in-game définitifs des archétypes
 - [ ] Définition du MVP web (périmètre exact de la première version jouable)
+- [ ] **Moteur de prix** : arbitrer la proposition §25 (niveau vs rendements, melt-up, ratio systématique/idiosyncratique, carry) + recevoir les points du concepteur
+- [ ] **Score Sharpe gameable** (#1, §26.3) — corriger l'optimum dégénéré : la fonction-objectif du MVP
+- [ ] **RÉSERVER** triple-récompense gratuite + levier individuel sur `F` (#2, §26.3)
+- [ ] **Clarté des signaux achetable** via nœuds (#3, §26.3) — plancher de bruit irréductible
+- [ ] **Levier** = option morte sous Sharpe (#4, §26.3)
+- [ ] **Bonus phase-3 du Vautour** redondant/fragile à retirer (#5, §26.3)
 
 ---
 
@@ -645,6 +651,9 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Modèle numérique de la jauge (MVP)** : jauge cachée `F∈[0,1]`, accumulation à 3 termes, déclencheur hybride (zone morte / roulette quadratique / plafond déterministe), reset post-crise quasi-total, signaux bruités-retardés, corrélation `ρ→1` en crise (§23) |
 | 2026-06-11 | **Cascade de crise** : la crise n'est pas un choc unique mais une séquence chute → rebond (bull trap) → vraie jambe baissière. Le rebond fait mentir les signaux (piège épistémique côté short). Reset reporté en fin de phase 3. Manipulation émergente (short-covering) + active (Prédateur, hors MVP) (§24) |
 | 2026-06-11 | **Principe anti-script (audit v1.2)** : rien n'est temporellement scripté. (a) Régimes émergents, dérivés de `F` + tendance des prix, pas une séquence garantie par cycle ; cycle = budget de tours, nb de crises émergent (§15). (b) Cascade = morphologie à paramètres stochastiques par instance ; le rebond n'est pas toujours un piège (~30 % de vrais planchers) ; jamais de durées/ampleurs constantes (§24). Grammaire connue, instance imprévisible (§4.4) |
+| 2026-06-11 | **Neutralité archétypale (v1.3)** : le marché est une physique neutre, les archétypes sont des lentilles dessus — pas la cible du design. Le même moteur offre un edge distinct à chaque archétype. Garde-fou « le hoarder peut perdre » : pas de crise = la réserve à 0 sous-performe (§26.1, §26.2) |
+| 2026-06-11 | **Moteur de prix — PROPOSITION (v1.3, non verrouillé)** : structure à facteurs (corrélation émergente, `ρ→1` par domination du facteur marché), niveau de prix réversif autour d'une ancre (contrarian réel), facteur marché piloté par `F` avec melt-up en tension et bull trap en P&L. En attente des points du concepteur (§25) |
+| 2026-06-11 | **Audit script stratégique (v1.3) — 5 défauts à corriger** : (1) Sharpe gameable [priorité], (2) RÉSERVER gratuit triple-récompense + levier individuel sur `F`, (3) clarté des signaux achetable, (4) levier = option morte sous Sharpe, (5) bonus phase-3 du Vautour redondant. Motif commun : appliquer aux mécaniques la règle « friction, pas synergie » (§7). NON ENCORE CORRIGÉS — chantier ouvert (§26.3, §26.5) |
 
 ---
 
@@ -785,3 +794,114 @@ Quand le rebond *est* un trap, `F` reste haute mais les **signaux bruités-retar
 - Détente des signaux en phase 2 : retour en zone « ambre » alors que `F` est rouge.
 
 Tout est tiré par instance. **Aucune de ces valeurs ne doit être observable ou constante d'une partie à l'autre.**
+
+---
+
+## 25. Moteur de prix et de rendements — PROPOSITION (non verrouillé)
+
+> Statut : proposition de design, **pas encore tranchée**. En attente des points complémentaires du concepteur.
+> Comble le trou identifié à l'audit : la jauge (§23) régule un marché dont la physique n'était pas spécifiée.
+> Contrainte impérative : **physique neutre** (§26), **rien de scripté** (§4, §15, §24) — paramètres stochastiques par instance.
+
+### 25.1 Structure à facteurs (corrélation émergente)
+
+```
+r_i(t) = β_i · M(t)  +  γ_i · C_cluster(t)  +  ε_i(t)
+```
+
+- `M(t)` = facteur marché commun à tous les hexes · `C_cluster(t)` = facteur de cluster (Actions / Crédit / Alternatifs) · `ε_i(t)` = idiosyncratique propre à l'hexe.
+- La corrélation **émerge** du partage des facteurs : même cluster → partagent `M` et `C` (forte corrélation) ; clusters différents → ne partagent que `M`. Réalise §11 sans coder de matrice `ρ`.
+- **`ρ→1` en crise tombe tout seul** : on gonfle la variance de `M` et on écrase l'idiosyncratique → le facteur commun domine → tout bouge ensemble (mécanique réelle des corrélations en crise). Plus besoin de « forcer » `ρ`.
+
+### 25.2 Niveau de prix avec ancre (le contrarian devient réel)
+
+Chaque hexe a :
+- une **ancre fondamentale** `A_i` — lente, stable (la « juste valeur ») ;
+- une **valorisation** `V_i` qui oscille autour de `A_i`, poussée vers le haut par les flux (levier, crowding, momentum), rappelée par la **réversion à la moyenne**.
+
+Rendement d'une position ≈ variation de `V_i` + un **carry** (portage/dividende). Conséquences :
+- **« Acheter bas » paie structurellement** : après un krach `V_i < A_i` → la réversion le fait remonter. Cette récompense est **neutre** — ouverte à tout profil, pas une faveur au Vautour (§26).
+- **Le carry pressure la réserve** : une réserve sèche rapporte ~0 pendant que les positions ouvertes touchent leur carry → le coût d'opportunité de l'attente est chiffré.
+
+### 25.3 Facteur marché piloté par `F` (et le bull trap en P&L)
+
+`M(t) = μ(régime) + σ(régime)·z`, `z` aléatoire. Régimes **émergents** (§15), valeurs = distributions, jamais des constantes :
+
+| Régime | drift `μ` | vol `σ` | Rôle |
+| --- | --- | --- | --- |
+| Bull (F basse) | léger + | bas | gains réguliers → coût d'opportunité de la réserve |
+| Tension (F monte) | **+ accentué (melt-up)** | moyen | euphorie : les meilleurs rendements *juste avant* la chute → le piège d'être en avance |
+| Crise jambe 1 | fort − | haut | la chute |
+| Crise rebond | + | haut | **le bull trap matérialisé en P&L** (§24) |
+| Crise vraie jambe | très fort − | très haut | contagion, `ρ→1` |
+| Recovery | léger + | moyen | réversion qui paie l'acheteur du creux |
+
+Le **melt-up de la phase tension** est central : le moment le plus fragile vient d'offrir les *meilleurs* rendements récents → c'est ce qui rend la réserve si dure à tenir et le redéploiement au rebond si tentant. La tension est dans les chiffres, pas dans un texte.
+
+### 25.4 La boucle macro (neutre — réécrite sans clause archétype)
+
+```
+flux (levier + crowding) → V_i s'étire au-dessus de A_i
+   → « valorisation tendue » alimente F (§23.2)
+      → crise plus probable
+         → V_i s'effondre sous A_i
+            → dislocation exploitable par PLUSIEURS profils (§26)
+               → recovery : réversion V→A
+```
+
+Moteur de prix et jauge ne sont qu'**un seul système**. La dislocation post-crise n'est la récompense de personne en particulier — voir neutralité archétypale (§26).
+
+### 25.5 Boutons ouverts (en attente d'arbitrage)
+
+- **Niveau `V` (avec ancre) vs rendements purs** : le niveau est nécessaire pour un vrai contrarian, mais plus lourd. *Penche pour le niveau.*
+- **Melt-up en tension** : drift qui accélère avant le krach (le piège) vs drift constant (plus lisible).
+- **Part systématique vs idiosyncratique** : beaucoup de `M`/cluster = jeu de timing macro ; beaucoup d'`ε` = jeu de sélection d'hexes (récompense LIRE). Le ratio **définit l'identité du jeu**.
+- **Carry comme revenu séparé** : récompense la détention, punit la réserve à 0.
+
+---
+
+## 26. Neutralité archétypale et défauts de script stratégique à corriger
+
+> Deuxième sens de « script » identifié à l'audit : non plus un script *temporel* (§15, §24) mais un script *stratégique* — une physique réglée pour qu'**une seule stratégie prédéterminée gagne**, transformant le jeu en puzzle résolu.
+
+### 26.1 Principe de neutralité archétypale (DÉCISION)
+
+**Le marché est une physique neutre. Les archétypes sont des lentilles posées dessus, jamais la cible de son design.** Le même moteur (§25) doit offrir un edge *distinct* à chacun :
+
+| Archétype | Exploite la **même** physique par… |
+| --- | --- |
+| Vautour | acheter les dislocations (`V≪A`) après le krach |
+| Compounder | ignorer le cycle, détenir sans levier, composer carry+drift sur l'horizon long |
+| Sismographe | lire `M`, parier *leveragé* sur le retournement de régime — il shorte le sommet, gagne *grâce* à la crise |
+| Architecte | réduire l'idiosyncratique `ε` (meilleurs signaux) → alpha de sélection, pas de timing |
+| Prédateur | manipuler `V` localement (crowding, squeeze) → dislocations provoquées |
+
+Le Vautour est un **locataire** du monde, pas son architecte. Le creux post-crise est une dislocation que plusieurs profils exploitent différemment.
+
+### 26.2 Garde-fou « le hoarder peut perdre » (DÉCISION, vital au MVP)
+
+Si **aucune crise n'arrive** (table prudente, §15), le Vautour qui a thésaurisé sa réserve à 0 **sous-performe et peut perdre** au score contre quelqu'un d'investi. Sans cette branche, le MVP (Vautour seul) serait un puzzle résolu (« réserve, attends le krach, déploie »). **La patience doit être un pari, pas une recette.**
+
+### 26.3 Défauts de script stratégique à corriger
+
+| # | Mécanique | Stratégie résolue / option morte | Piste de correction |
+| --- | --- | --- | --- |
+| 1 | **Score Sharpe** (unique victoire MVP, §9 spec) | optimum dégénéré : récolter le carry de l'hexe le moins volatil et ne plus bouger → Sharpe énorme, risque de queue caché (« ramasser des pièces devant le rouleau compresseur ») | pénaliser le risque de queue dans le score, **ou** combiner Sharpe avec un seuil de rendement absolu |
+| 2 | **RÉSERVER** (§23.3, spec §5) | action **gratuite (0 PA) à triple récompense** : baisse `F`, accumule la ressource, sans coût réel ; de plus `−0.05` individuel = levier personnel fort sur un `F` censé systémique (grignote la tragédie des communs §4.3) | donner un coût/contrepartie à RÉSERVER ; **plafonner ou diluer** l'effet individuel sur `F` |
+| 3 | **Clarté des signaux achetable** (nœuds INFO/LIQ, §11) | camper les nœuds → signaux quasi-nets permanents → l'inférence sous bruit, *qui est le jeu*, s'évapore | les nœuds *améliorent* sans *fiabiliser* : garder un **plancher de bruit irréductible**, surtout près du déclenchement |
+| 4 | **Levier** (§10, §23.2) | sous victoire au Sharpe, le levier gonfle la vol et se fait raser → *toujours* mauvais pour le joueur solo → **option morte** (design gaspillé) | garantir qu'il soit *parfois correct* (le pari leveragé du Sismographe sur un retournement) ; surveiller au MVP Vautour-only |
+| 5 | **Bonus « achat phase 3 » du Vautour** (spec §6) | (a) redondant : la réversion `V→A` (§25.2) paie déjà le creux ; (b) branché sur un **état caché** (la phase) → invisible donc invisible, ou révélé donc re-scripté | **supprimer le bonus explicite** ; laisser la physique neutre payer le creux |
+
+### 26.4 Le motif commun
+
+Quatre de ces cinq défauts viennent de la même erreur : **une métrique ou une ressource qui récompense un comportement de façon trop propre et unilatérale.** Règle à appliquer désormais à *nos propres* mécaniques, comme on l'a fait pour les badges (§7 : « friction, pas synergie ») : **chaque levier doit porter un coût symétrique qui crée un dilemme.**
+
+### 26.5 Actions de modification en attente
+
+- [ ] Réécrire la boucle macro **partout sans clause Vautour** (fait en §25.4 ; vérifier toute formulation centrée Vautour ailleurs).
+- [ ] Corriger le score (#1) — **priorité, c'est la fonction-objectif du MVP**.
+- [ ] Re-tarifer RÉSERVER et borner son effet sur `F` (#2).
+- [ ] Définir le plancher de bruit irréductible des signaux (#3).
+- [ ] Statuer sur le levier au MVP (#4).
+- [ ] Retirer le bonus phase-3 du Vautour de la spec (#5).
+- [ ] Inscrire la neutralité archétypale + « le hoarder peut perdre » comme contraintes du moteur de prix (§25).

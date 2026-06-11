@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-11 — v1.1
+> Dernière mise à jour : 2026-06-11 — v1.3
 
 ---
 
@@ -30,6 +30,7 @@
 | **Modèle numérique de la jauge : déclencheur hybride, reset quasi-total, signaux chiffrés** | §23 | v1.0 |
 | **Cascade de crise : morphologie (chute → rebond → vraie jambe), signaux qui mentent** | §24 | v1.1 |
 | **Anti-script : régimes émergents (pas de séquence garantie), cascade à paramètres stochastiques** | §15, §24 | v1.2 |
+| **Neutralité archétypale : marché = physique neutre, archétypes = lentilles ; « le hoarder peut perdre »** | §26 | v1.3 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
@@ -46,6 +47,24 @@ Par ordre de priorité (feuille de route §16) :
 5. **Noms in-game définitifs** des archétypes
 
 > Prochaine étape concrète : valider `docs/mvp-spec.md` (§13) → démarrer le code (jalons §12).
+
+---
+
+## Chantier ouvert — moteur de prix & défauts de script stratégique (v1.3)
+
+**Moteur de prix (§25) — PROPOSITION, non verrouillé.** Structure à facteurs + niveau de prix réversif + facteur marché piloté par `F`. En attente des points complémentaires du concepteur, puis arbitrage des boutons (niveau vs rendements, melt-up, ratio systématique/idiosyncratique, carry).
+
+**5 défauts de script stratégique à corriger (§26.3) — NON ENCORE CORRIGÉS :**
+
+| # | Défaut | Priorité |
+| --- | --- | --- |
+| 1 | Score Sharpe gameable (optimum dégénéré) — fonction-objectif du MVP | **haute** |
+| 2 | RÉSERVER gratuit triple-récompense + levier individuel sur `F` | moyenne |
+| 3 | Clarté des signaux achetable via nœuds (le skill central se contourne) | moyenne |
+| 4 | Levier = option morte sous Sharpe | moyenne |
+| 5 | Bonus phase-3 du Vautour redondant/fragile | basse |
+
+Principe directeur ajouté : **chaque levier doit porter un coût symétrique** (appliquer aux mécaniques la règle des badges §7 : friction, pas synergie). Liste d'actions complète en §26.5.
 
 ---
 
