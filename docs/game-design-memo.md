@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.1 — 11 juin 2026.
+> Document de référence vivant. Version 1.2 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -343,7 +343,15 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 **Horizon de partie — modèle hybride (DÉCISION)** : la partie se termine dès qu'une condition de victoire est atteinte **ou** au terme du dernier cycle. Le score départage si personne n'a gagné.
 
-**Cycles** : unités de structure de jeu (marqueurs de progression, pas unités de temps). Le joueur voit "Cycle 2 sur 3". Chaque cycle traverse les phases : bull → tension → crise → recovery.
+**Cycles** : **budget de tours** et marqueurs de progression — *pas* une séquence d'événements garantie. Le joueur voit "Cycle 2 sur 3" comme une barre d'avancement, rien de plus. Un cycle ne « contient » pas une crise programmée.
+
+**Régimes émergents (DÉCISION — anti-script)** : les régimes (bull / tension / crise / recovery) ne sont **pas un scénario fixe que chaque cycle déroule**. Ce sont des **lectures de l'état endogène** — dérivées de `F` (§23) et de la tendance des prix :
+- *bull* = `F` basse + prix en hausse · *tension* = `F` qui grimpe · *crise* = déclencheur franchi (§23.4) · *recovery* = post-reset.
+
+L'arc « bull → tension → crise → recovery » est l'évolution **typique** d'un système qu'on laisse chauffer, pas une garantie. Conséquences :
+- Une partie prudente (peu de levier agrégé) peut traverser un cycle entier **sans aucune crise** — `F` ne monte jamais assez.
+- Une table imprudente peut crasher **deux fois** dans le même budget de tours.
+- Le nombre de crises dans une partie est **émergent**, jamais fixé d'avance. C'est ce qui interdit le métagame de mémoire (§5) et reste cohérent avec le rail conditionnel (§4.2).
 
 **Prototype : 3 cycles.** Nombre définitif pour le MVP à déterminer ultérieurement.
 
@@ -636,6 +644,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Wireframes** : 4 écrans définis — configuration, vue principale, détail hex, post-mortem (§18) |
 | 2026-06-11 | **Modèle numérique de la jauge (MVP)** : jauge cachée `F∈[0,1]`, accumulation à 3 termes, déclencheur hybride (zone morte / roulette quadratique / plafond déterministe), reset post-crise quasi-total, signaux bruités-retardés, corrélation `ρ→1` en crise (§23) |
 | 2026-06-11 | **Cascade de crise** : la crise n'est pas un choc unique mais une séquence chute → rebond (bull trap) → vraie jambe baissière. Le rebond fait mentir les signaux (piège épistémique côté short). Reset reporté en fin de phase 3. Manipulation émergente (short-covering) + active (Prédateur, hors MVP) (§24) |
+| 2026-06-11 | **Principe anti-script (audit v1.2)** : rien n'est temporellement scripté. (a) Régimes émergents, dérivés de `F` + tendance des prix, pas une séquence garantie par cycle ; cycle = budget de tours, nb de crises émergent (§15). (b) Cascade = morphologie à paramètres stochastiques par instance ; le rebond n'est pas toujours un piège (~30 % de vrais planchers) ; jamais de durées/ampleurs constantes (§24). Grammaire connue, instance imprévisible (§4.4) |
 
 ---
 
@@ -720,45 +729,59 @@ Le signal « Initiés » (§17) dépend de l'arbre techno, **coupé au MVP** →
 
 ## 24. Cascade de crise — le bull trap (MVP)
 
-> Amende §23.5. La crise n'est pas un choc instantané mais une **séquence multi-phases**.
+> Amende §23.5. La crise n'est pas un choc instantané mais une **morphologie multi-phases**.
 > Inspiration : le bear-market rally / dead-cat bounce qui sort les late shorts avant la vraie jambe baissière.
+> **Principe directeur (§4) : structurel, jamais scripté.** La *grammaire* est connue, l'*instance* est imprévisible.
 
-### 24.1 Les quatre phases
+### 24.1 La morphologie (grammaire connue, instance imprévisible)
 
-Une fois le déclencheur franchi (§23.4), la partie entre dans une cascade scénarisée :
+Une fois le déclencheur franchi (§23.4), la crise se déroule selon une morphologie typique — **mais aucune de ses caractéristiques n'est fixe ni mémorisable** :
 
 | Phase | Nom | Marché | `F` réelle | Ce que voient les signaux |
 | --- | --- | --- | --- | --- |
 | 0 | Déclenchement | — | au seuil | rouge (volatilité explose) |
-| 1 | Première jambe | chute sèche | élevée, stable | rouge net |
-| 2 | **Rebond (bull trap)** | hausse rapide | **inchangée (toujours haute)** | **se détendent — volatilité retombe, écart de crédit se resserre** |
-| 3 | Vraie jambe | chute profonde, `ρ→1`, contagion | maximale | rouge extrême (trop tard) |
+| 1 | Première jambe | chute | élevée | rouge net |
+| 2 | **Rebond** (peut être un bull trap) | hausse rapide | **inchangée si trap** | **se détendent — paraissent verts** |
+| 3 | Vraie jambe *(pas toujours)* | chute profonde, `ρ→1`, contagion | maximale | rouge extrême (trop tard) |
 
-Le **reset** de `F` (§23.5) n'a lieu qu'**en fin de phase 3**, jamais avant.
+Le **reset** de `F` (§23.5) n'a lieu qu'**à la résolution finale** de la cascade, jamais avant.
 
-### 24.2 Le piège épistémique (cœur de la mécanique)
+### 24.2 Ce qui rend l'instance imprévisible (anti-script)
 
-En phase 2, `F` reste haute mais les **signaux bruités-retardés** (§23.6) se détendent : la volatilité retombe, l'écart de crédit se resserre. Le joueur lit *« c'est fini, le marché rebondit »* — alors que le combustible est intact. Le skill devient :
+Le joueur sait que les crises *peuvent* faire un faux rebond (connaissance structurelle, autorisée §4.4). Il ne peut jamais savoir, pour *cette* crise :
 
-- **Ne pas racheter son short / ne pas redéployer la réserve sèche pendant le rebond.**
-- Transpose « être en avance, c'est être dans le tort » (§4.5) côté **short** : le late short qui se couvre au rebond se fait sortir juste avant la vraie chute.
+1. **Durées de phase** — tirées dans des plages, pas constantes (jamais « toujours 2 tours »).
+2. **Ampleur du rebond** — distribution, pas une valeur fixe.
+3. **CRITIQUE — le rebond n'est pas toujours un piège.** Une fraction des crises **creuse au rebond** : la première jambe *était* tout le mouvement, le rebond est un vrai plancher, il n'y a pas de phase 3. Si tout rebond était un piège, le joueur apprendrait « ne jamais racheter le rebond » et la phase 2 serait résolue. Il faut qu'**on ne puisse pas distinguer un vrai plancher d'un faux trap pendant qu'on y est**.
 
-Le rebond est le moment où les signaux *mentent le plus légitimement* — pas un bug, la dynamique réelle d'un marché en détresse.
+Conséquence : le skill n'est **jamais** « compter les tours après le trigger ». C'est toujours « inférer un état caché à partir de signaux bruités » (§4.4, §5). Aucune partie ne reproduit la précédente.
 
-### 24.3 Manipulation du rebond
+### 24.3 Le piège épistémique (cœur de la mécanique)
 
-- **Émergente (gratuite, réaliste)** : tout acteur qui **couvre son short** en phase 2 alimente le rebond. Le bull trap se creuse de lui-même via le short-covering agrégé — aucune règle spéciale, ça émerge des positions.
-- **Active (hors MVP)** : un acteur au palier **Dominance** (§11) ou le **Prédateur** (§6) peut acheter délibérément dans la panique pour forcer le squeeze, sortir les shorts, puis dumper en phase 3. Le **short squeeze** (déjà au kit du Prédateur, §10) devient une manœuvre de timing sur la cascade, pas un bouton isolé.
+Quand le rebond *est* un trap, `F` reste haute mais les **signaux bruités-retardés** (§23.6) se détendent : la volatilité retombe, l'écart de crédit se resserre. Le joueur lit *« c'est fini »* — alors que le combustible est intact. Mais comme parfois le rebond est un vrai plancher (§24.2.3), se couvrir n'est pas toujours une erreur : c'est un **pari sous incertitude**, pas une règle à apprendre.
 
-### 24.4 Garde-fou contre l'exploit
+- Transpose « être en avance, c'est être dans le tort » (§4.5) côté **short** : le late short qui se couvre se fait parfois sortir juste avant la vraie chute — parfois il a raison.
+- Le rebond est le moment où les signaux *mentent le plus légitimement* — pas un bug, la dynamique réelle d'un marché en détresse.
+
+### 24.4 Manipulation du rebond
+
+- **Émergente (gratuite, réaliste)** : tout acteur qui **couvre son short** en phase 2 alimente le rebond. Le bull trap se creuse de lui-même via le short-covering agrégé — aucune règle spéciale, ça émerge des positions. Cette boucle de rétroaction est aussi ce qui rend l'instance imprévisible : la suite dépend des réactions réelles des acteurs, pas d'un script.
+- **Active (hors MVP)** : un acteur au palier **Dominance** (§11) ou le **Prédateur** (§6) peut acheter délibérément dans la panique pour forcer le squeeze, sortir les shorts, puis dumper. Le **short squeeze** (déjà au kit du Prédateur, §10) devient une manœuvre de timing sur la cascade, pas un bouton isolé.
+
+### 24.5 Garde-fou contre l'exploit
 
 `F` reste **agrégée et non-possédée** (§4.3) : aucun joueur seul ne contrôle le dégonflement. On peut *pousser* `F` vers le bas en se désendettant, ou *fabriquer* un rebond local en phase 2, mais le combustible systémique appartient à tous les acteurs — pas d'exploit « bulle saine infinie ».
 
-### 24.5 Périmètre MVP
+### 24.6 Périmètre MVP
 
-- **Activé au MVP** : les 4 phases scriptées + le mensonge des signaux en phase 2 + la manipulation **émergente** (short-covering).
+- **Activé au MVP** : la morphologie (phases à paramètres stochastiques) + le rebond parfois-piège-parfois-plancher + le mensonge des signaux + la manipulation **émergente** (short-covering).
 - **Reporté (post-MVP)** : la manipulation **active** du rebond (arrive avec le Prédateur et le palier Dominance).
 
-### 24.6 Paramètres à calibrer
+### 24.7 Paramètres à calibrer (des plages, jamais des constantes)
 
-Durée de chaque phase (proto : 1 / 2 / 2 / 2 tours) · ampleur du rebond phase 2 (proto : récupère ~40 % de la jambe 1) · niveau de détente des signaux en phase 2 (proto : retour en zone « ambre » alors que `F` est rouge). À régler aux tests.
+- Durée de chaque phase : tirée dans une plage (proto : jambe 1 ∈ 1–2 tours, rebond ∈ 1–3, jambe 3 ∈ 1–3).
+- Ampleur du rebond : distribution (proto : récupère 25–55 % de la jambe 1).
+- **Probabilité que le rebond soit un vrai plancher** (pas de phase 3) : proto ≈ 30 %.
+- Détente des signaux en phase 2 : retour en zone « ambre » alors que `F` est rouge.
+
+Tout est tiré par instance. **Aucune de ces valeurs ne doit être observable ou constante d'une partie à l'autre.**

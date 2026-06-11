@@ -1,6 +1,6 @@
 # Spécification du MVP web — VERROUILLÉ (proposition)
 
-> Version 0.1 — 11 juin 2026. Dérive du game-design-memo (v1.1).
+> Version 0.2 — 11 juin 2026. Dérive du game-design-memo (v1.2).
 > Objet : figer le périmètre exact de la première version jouable pour débloquer le code.
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
@@ -23,7 +23,7 @@ Si cette boucle est tendue et lisible, le concept est validé. Tout le reste est
 |---|---|---|
 | Archétypes jouables | **1** — le Vautour | les 6 autres |
 | Adversaires IA | **2** — Fonds leveragé + Value patient | les 7 autres profils |
-| Banque centrale | **non** (atmosphère réglementaire codée en dur) | IA de contrainte active |
+| Banque centrale | **non** au MVP (taux = règle réactive simple fonction de `F`, **réactive et non scriptée**) | IA de contrainte active |
 | Badges | **0** | draft de 2 badges |
 | Verbes | **3** — LIRE, POSITIONNER, RÉSERVER | CONSTRUIRE, NÉGOCIER |
 | Arbre de compétences | **aucun** | 4 branches |
@@ -162,7 +162,16 @@ Rôle : absorbe les chocs, abaisse `F` relativement, sert de contrepoint au Vaut
 
 ## 8. Jauge et cascade
 
-Repris **tel quel** de §23 (modèle numérique) et §24 (cascade 4 phases). Valeurs MVP : seuils `0.40 / 0.85`, `k=1.5`, purge `0.05/0.02`, cascade `1/2/2/2` tours, rebond récupère ~40 %.
+Repris **tel quel** de §23 (modèle numérique) et §24 (cascade). Valeurs MVP : seuils `0.40 / 0.85`, `k=1.5`, purge `0.05/0.02`.
+
+**Rien de scripté (§24.2)** : la cascade est une *morphologie*, pas une séquence figée. Par instance, on **tire** :
+- durées de phase dans des plages (jambe 1 ∈ 1–2, rebond ∈ 1–3, jambe 3 ∈ 1–3 tours) ;
+- ampleur du rebond ∈ 25–55 % de la jambe 1 ;
+- **si le rebond est un vrai plancher (≈ 30 %, pas de jambe 3) ou un piège.**
+
+Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le moteur ne rejoue jamais deux fois la même crise.
+
+**Régimes émergents (§15)** : bull/tension/crise/recovery sont des *lectures* de `F` + tendance des prix, pas un scénario que la partie déroule. Une partie prudente peut ne jamais crasher ; une partie imprudente peut crasher deux fois. Le nombre de crises est émergent.
 
 **3 signaux actifs** (le 4ᵉ, Initiés, est hors MVP) :
 
