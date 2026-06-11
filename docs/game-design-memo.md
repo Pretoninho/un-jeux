@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.9 — 11 juin 2026.
+> Document de référence vivant. Version 1.0 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -634,3 +634,81 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **IA concurrentes** : pool unifié 9 profils (5 archétypes jouables + 4 exclusifs IA) + Banque centrale permanente, choix des adversaires en début de partie, max 3 adversaires |
 | 2026-06-11 | **Signaux** : 4 signaux (Volatilité gratuit / Écart crédit LIRE / Financement nœud / Initiés techno), option A universelle pour prototype, B par archétype prévu |
 | 2026-06-11 | **Wireframes** : 4 écrans définis — configuration, vue principale, détail hex, post-mortem (§18) |
+| 2026-06-11 | **Modèle numérique de la jauge (MVP)** : jauge cachée `F∈[0,1]`, accumulation à 3 termes, déclencheur hybride (zone morte / roulette quadratique / plafond déterministe), reset post-crise quasi-total, signaux bruités-retardés, corrélation `ρ→1` en crise (§23) |
+
+---
+
+## 23. Modèle numérique de la jauge de fragilité (MVP) — VERROUILLÉ
+
+> Spécification chiffrée de la mécanique centrale (§4). Valeurs de prototype, à calibrer aux tests.
+> Cadre MVP : 1 archétype (Vautour) + 2 IA (Fonds leveragé, Value patient). Tout l'état est caché.
+
+### 23.1 La jauge `F`
+
+État systémique caché, `F ∈ [0, 1]`, non affiché en jeu (révélé seulement au post-mortem, §17).
+
+```
+F(t+1) = clamp01( F(t) + accumulation(t) − purge(t) )
+```
+
+### 23.2 Accumulation (ce qui gonfle la bulle)
+
+Somme de 3 termes agrégés sur **tous les acteurs** (joueur + IA) :
+
+| Terme | Définition | Contribution |
+| --- | --- | --- |
+| Levier | `ratio_levier` = capital leveragé total / capital total | `0.06 × ratio_levier` |
+| Crowding | `indice_crowding` = concentration des positions dans des hexes adjacents | `0.04 × indice_crowding` |
+| Valorisation | `tours_bull` = nb de tours consécutifs de régime bull | `0.01 × tours_bull` |
+
+Dérive à vide ≈ +0.01/tour. Fonds leveragé à plein régime ≈ +0.08/tour → zone rouge en 6–8 tours. Dynamique « feux de forêt » : un système jamais purgé accumule jusqu'au krach (§4.3).
+
+### 23.3 Purge (ce qui désamorce)
+
+| Terme | Effet |
+| --- | --- |
+| Désendettement / RÉSERVER | `−0.05` par acteur réduisant son levier ce tour |
+| Mean-reversion naturelle | `−0.02` par tour (petites corrections) |
+
+### 23.4 Déclencheur de crise — **hybride (DÉCISION)**
+
+```
+F < 0.40           →  p_crise = 0                    (zone morte : pas assez de combustible)
+0.40 ≤ F < 0.85    →  p_crise = k × (F − 0.40)²      (zone roulette : surprise, k ≈ 1.5)
+F ≥ 0.85           →  crise garantie dans 1–2 tours  (plafond déterministe : la bulle finit toujours par éclater)
+```
+
+Repères (`k=1.5`) : F=0.7 → ~13 %/tour · F=0.9 → crise imminente garantie.
+
+**Rationale** : la tension ne vient pas du RNG mais de l'**état caché à inférer**. Le quadratique rend la fin de bulle brutalement dangereuse ; la zone morte garantit qu'un système purgé est sûr ; le plafond déterministe interdit qu'une bulle euphorique soit tenue gratuitement ; le grain de stochastique en zone médiane tue le métagame de mémoire (§5). La jauge cachée transforme le déterminisme en suspense.
+
+### 23.5 Amplitude et reset post-crise
+
+- **Amplitude** = valeur de `F` au tour du déclenchement. Krach à F=0.95 → dévastation ; à F=0.45 → simple correction.
+- **Reset** : `F → 0.15 × amplitude` (purge quasi-totale — cycles nets, lisibles, façon 1830).
+- Les positions leveragées sont rasées proportionnellement à l'amplitude → le Fonds leveragé peut s'effondrer ici, au moment précis où le Vautour déploie sa réserve sèche. La boucle archétype ↔ crise est bouclée.
+
+### 23.6 Signaux (lecture bruitée-retardée de `F`)
+
+Option A universelle (§17). Signal affiché = `F` retardée + bruit, quantifié en barres.
+
+```
+signal_i(t) = quantize( F(t − retard_i) + N(0, σ_i) )
+```
+
+| Signal | Retard | Bruit σ | Accès MVP |
+| --- | --- | --- | --- |
+| Volatilité | 0 | 0.20 (fort) | gratuit, toujours visible |
+| Écart de crédit | 1 | 0.10 | 1 PA (LIRE) |
+| Financement | 2 | 0.04 (net) | présence au nœud liquidité |
+
+Le signal « Initiés » (§17) dépend de l'arbre techno, **coupé au MVP** → écarté pour l'instant. Skill central = **triangulation** : croiser plusieurs signaux concordants pour inférer la zone de `F`.
+
+### 23.7 Rendements et corrélation
+
+- Chaque hex a un rendement de base par régime ; une position rapporte `base ± volatilité_locale`.
+- Hexes adjacents corrélés par `ρ`. **Normal : `ρ ≈ 0.3`. Quand `F` monte : `ρ → 1`** → en crise tout tombe ensemble, contagion depuis les hexes les plus crowdés. La concentration est punie exactement quand `F` est haute.
+
+### 23.8 Paramètres à calibrer aux tests
+
+`0.06 / 0.04 / 0.01` (poids accumulation) · `0.05 / 0.02` (purge) · `k=1.5` · seuils `0.40 / 0.85` · `σ` des signaux · `ρ` normal/crise. Aucun n'est définitif — ce sont des points de départ cohérents, pas des constantes gravées.
