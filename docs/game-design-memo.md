@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.0 — 11 juin 2026.
+> Document de référence vivant. Version 1.1 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -635,6 +635,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Signaux** : 4 signaux (Volatilité gratuit / Écart crédit LIRE / Financement nœud / Initiés techno), option A universelle pour prototype, B par archétype prévu |
 | 2026-06-11 | **Wireframes** : 4 écrans définis — configuration, vue principale, détail hex, post-mortem (§18) |
 | 2026-06-11 | **Modèle numérique de la jauge (MVP)** : jauge cachée `F∈[0,1]`, accumulation à 3 termes, déclencheur hybride (zone morte / roulette quadratique / plafond déterministe), reset post-crise quasi-total, signaux bruités-retardés, corrélation `ρ→1` en crise (§23) |
+| 2026-06-11 | **Cascade de crise** : la crise n'est pas un choc unique mais une séquence chute → rebond (bull trap) → vraie jambe baissière. Le rebond fait mentir les signaux (piège épistémique côté short). Reset reporté en fin de phase 3. Manipulation émergente (short-covering) + active (Prédateur, hors MVP) (§24) |
 
 ---
 
@@ -685,8 +686,10 @@ Repères (`k=1.5`) : F=0.7 → ~13 %/tour · F=0.9 → crise imminente garantie.
 ### 23.5 Amplitude et reset post-crise
 
 - **Amplitude** = valeur de `F` au tour du déclenchement. Krach à F=0.95 → dévastation ; à F=0.45 → simple correction.
-- **Reset** : `F → 0.15 × amplitude` (purge quasi-totale — cycles nets, lisibles, façon 1830).
+- **Reset** : `F → 0.15 × amplitude` (purge quasi-totale — cycles nets, lisibles, façon 1830). **Le reset n'intervient qu'à la fin de la phase 3 de la cascade** (§24), pas au déclenchement : pendant le rebond (phase 2) `F` ne fait que *sembler* refluer via les signaux, sans purge réelle.
 - Les positions leveragées sont rasées proportionnellement à l'amplitude → le Fonds leveragé peut s'effondrer ici, au moment précis où le Vautour déploie sa réserve sèche. La boucle archétype ↔ crise est bouclée.
+
+> Le déclenchement n'est pas un choc instantané mais l'entrée dans une **cascade multi-phases** : voir §24.
 
 ### 23.6 Signaux (lecture bruitée-retardée de `F`)
 
@@ -712,3 +715,50 @@ Le signal « Initiés » (§17) dépend de l'arbre techno, **coupé au MVP** →
 ### 23.8 Paramètres à calibrer aux tests
 
 `0.06 / 0.04 / 0.01` (poids accumulation) · `0.05 / 0.02` (purge) · `k=1.5` · seuils `0.40 / 0.85` · `σ` des signaux · `ρ` normal/crise. Aucun n'est définitif — ce sont des points de départ cohérents, pas des constantes gravées.
+
+---
+
+## 24. Cascade de crise — le bull trap (MVP)
+
+> Amende §23.5. La crise n'est pas un choc instantané mais une **séquence multi-phases**.
+> Inspiration : le bear-market rally / dead-cat bounce qui sort les late shorts avant la vraie jambe baissière.
+
+### 24.1 Les quatre phases
+
+Une fois le déclencheur franchi (§23.4), la partie entre dans une cascade scénarisée :
+
+| Phase | Nom | Marché | `F` réelle | Ce que voient les signaux |
+| --- | --- | --- | --- | --- |
+| 0 | Déclenchement | — | au seuil | rouge (volatilité explose) |
+| 1 | Première jambe | chute sèche | élevée, stable | rouge net |
+| 2 | **Rebond (bull trap)** | hausse rapide | **inchangée (toujours haute)** | **se détendent — volatilité retombe, écart de crédit se resserre** |
+| 3 | Vraie jambe | chute profonde, `ρ→1`, contagion | maximale | rouge extrême (trop tard) |
+
+Le **reset** de `F` (§23.5) n'a lieu qu'**en fin de phase 3**, jamais avant.
+
+### 24.2 Le piège épistémique (cœur de la mécanique)
+
+En phase 2, `F` reste haute mais les **signaux bruités-retardés** (§23.6) se détendent : la volatilité retombe, l'écart de crédit se resserre. Le joueur lit *« c'est fini, le marché rebondit »* — alors que le combustible est intact. Le skill devient :
+
+- **Ne pas racheter son short / ne pas redéployer la réserve sèche pendant le rebond.**
+- Transpose « être en avance, c'est être dans le tort » (§4.5) côté **short** : le late short qui se couvre au rebond se fait sortir juste avant la vraie chute.
+
+Le rebond est le moment où les signaux *mentent le plus légitimement* — pas un bug, la dynamique réelle d'un marché en détresse.
+
+### 24.3 Manipulation du rebond
+
+- **Émergente (gratuite, réaliste)** : tout acteur qui **couvre son short** en phase 2 alimente le rebond. Le bull trap se creuse de lui-même via le short-covering agrégé — aucune règle spéciale, ça émerge des positions.
+- **Active (hors MVP)** : un acteur au palier **Dominance** (§11) ou le **Prédateur** (§6) peut acheter délibérément dans la panique pour forcer le squeeze, sortir les shorts, puis dumper en phase 3. Le **short squeeze** (déjà au kit du Prédateur, §10) devient une manœuvre de timing sur la cascade, pas un bouton isolé.
+
+### 24.4 Garde-fou contre l'exploit
+
+`F` reste **agrégée et non-possédée** (§4.3) : aucun joueur seul ne contrôle le dégonflement. On peut *pousser* `F` vers le bas en se désendettant, ou *fabriquer* un rebond local en phase 2, mais le combustible systémique appartient à tous les acteurs — pas d'exploit « bulle saine infinie ».
+
+### 24.5 Périmètre MVP
+
+- **Activé au MVP** : les 4 phases scriptées + le mensonge des signaux en phase 2 + la manipulation **émergente** (short-covering).
+- **Reporté (post-MVP)** : la manipulation **active** du rebond (arrive avec le Prédateur et le palier Dominance).
+
+### 24.6 Paramètres à calibrer
+
+Durée de chaque phase (proto : 1 / 2 / 2 / 2 tours) · ampleur du rebond phase 2 (proto : récupère ~40 % de la jambe 1) · niveau de détente des signaux en phase 2 (proto : retour en zone « ambre » alors que `F` est rouge). À régler aux tests.

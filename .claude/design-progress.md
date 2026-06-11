@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-11 — v1.0
+> Dernière mise à jour : 2026-06-11 — v1.1
 
 ---
 
@@ -28,6 +28,7 @@
 | **Signaux : 4 signaux (Volatilité/Écart crédit/Financement/Initiés), option A prototype** | §17 | v0.8 |
 | **Wireframes : 4 écrans (configuration / vue principale / détail hex / post-mortem)** | §18 | v0.9 |
 | **Modèle numérique de la jauge : déclencheur hybride, reset quasi-total, signaux chiffrés** | §23 | v1.0 |
+| **Cascade de crise : 4 phases (chute → rebond/bull trap → vraie jambe), signaux qui mentent** | §24 | v1.1 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
