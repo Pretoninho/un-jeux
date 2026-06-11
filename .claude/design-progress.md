@@ -1,44 +1,46 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-11
+> Dernière mise à jour : 2026-06-11 — v0.5
 
 ---
 
 ## Ce qui est tranché
 
-| Sujet | Memo § | Statut |
+| Sujet | Memo § | Version |
 | --- | --- | --- |
-| Cadre atemporel | §1 | Validé v0.3 |
-| Crises endogènes (modèle conditionnel) | §4 | Validé v0.3 |
-| Jauge de fragilité cachée, signaux bruités | §4 | Validé v0.3 |
-| 5 archétypes jouables + système de badges | §6, §7 | Validé v0.4 |
-| 2 badges par défaut (draft partiel) | §7 | Validé v0.4 |
-| Tour 1 = fondation (vue partielle + choix branche techno) | §8 | Validé v0.4 |
-| 4 PA par tour, 1 point de compétence tous les 3 tours | §8 | Validé v0.4 |
-| 5 verbes : LIRE / POSITIONNER / CONSTRUIRE / NÉGOCIER / RÉSERVER | §9 | Validé v0.4 |
-| Ressources : Capital (3 états) + Réputation + ressource archétype | §10 | Validé v0.4 |
-| Carte hexagonale : 3 types de hexes, adjacence = corrélation | §11 | Validé v0.4 |
-| Paliers de présence dans un hex (x4) | §11 | Validé v0.4 |
-| Prototype : carte fixe ~15-20 hexes, puis procédurale | §11 | Validé v0.4 |
-| Vocabulaire : jargon conservé + tooltips 2 niveaux | §12 | Validé v0.4 |
+| Cadre atemporel | §1 | v0.3 |
+| Crises endogènes (modèle conditionnel) | §4 | v0.3 |
+| Jauge de fragilité cachée, signaux bruités | §4 | v0.3 |
+| 5 archétypes jouables + système de badges | §6, §7 | v0.4 |
+| 2 badges par défaut (draft partiel) | §7 | v0.4 |
+| Tour 1 = fondation (vue partielle + choix branche techno) | §8 | v0.4 |
+| 4 PA par tour, 1 point de compétence tous les 3 tours | §8 | v0.4 |
+| 5 verbes : LIRE / POSITIONNER / CONSTRUIRE / NÉGOCIER / RÉSERVER | §9 | v0.4 |
+| Ressources : Capital (3 états) + Réputation + ressource archétype | §10 | v0.4 |
+| Carte hexagonale : 3 types de hexes, adjacence = corrélation | §11 | v0.4 |
+| Paliers de présence dans un hex (x4) | §11 | v0.4 |
+| Prototype : carte fixe ~15-20 hexes, puis procédurale | §11 | v0.4 |
+| Vocabulaire : jargon conservé + tooltips 2 niveaux | §12 | v0.4 |
+| **Objectif : jeu web, solo-first, multi WebSockets phase 2** | §13 | v0.5 |
+| **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
+| **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
 ---
 
 ## Ce qui reste à développer
 
-Par ordre de priorité (feuille de route §14) :
+Par ordre de priorité (feuille de route §16) :
 
-1. **Solo vs multijoueur** — posé ("les deux") mais pas approfondi
-2. **Échelle d'un tour et horizon de partie** — durée, nombre de tours, fin de partie
-3. **Design de la défaite** — alternative à la banqueroute sèche
-4. **IA concurrentes** — 5-6 archétypes avec fonctions de réaction simples
-5. **Signaux concrets de la jauge** — lesquels, à quel coût, quel niveau de bruit
-6. **Objectif du projet** — prototype perso / jeu de plateau / jeu vidéo indé / outil pédagogique
-7. **Structure détaillée de l'arbre de compétences**
-8. **Génération procédurale de la carte** (phase 2)
-9. **2 archétypes manquants** à définir
-10. **Noms in-game définitifs** des archétypes
+1. **Échelle d'un tour et horizon de partie** — durée, nombre de tours, condition de fin
+2. **Solo vs multijoueur** — implications IA à approfondir
+3. **IA concurrentes** — 5-6 archétypes avec fonctions de réaction simples
+4. **Signaux concrets de la jauge** — lesquels, à quel coût, quel niveau de bruit
+5. **Définition du MVP web** — périmètre exact de la première version jouable
+6. **Structure détaillée de l'arbre de compétences**
+7. **Génération procédurale de la carte** (phase 2)
+8. **2 archétypes manquants** à définir
+9. **Noms in-game définitifs** des archétypes
 
 ---
 
@@ -54,11 +56,29 @@ Par ordre de priorité (feuille de route §14) :
 
 ---
 
-## Prototype minimal — cible
+## Design de la défaite — aide-mémoire
 
-- 4-5 actifs / hexes marchés actifs
-- Jauge de fragilité (cachée)
-- 2-3 IA archétypes simples
+```
+Stress (avertissement)
+  → LPs inquiets, levier plus cher, encore récupérable
+
+Crise (pression active)
+  → LPs retirent, desks ferment, triage obligatoire
+
+Effondrement (fin de run)
+  ├── Absorption  → fond adverse gagne en puissance
+  └── Wind-down   → clôture narrative, score réduit
+```
+
+La faillite est une dernière décision stratégique.
+Les liquidations au stade 3 contribuent à la jauge systémique.
+
+---
+
+## Prototype minimal — cible MVP web
+
 - Carte fixe ~15-20 hexes
+- 1 archétype jouable + 2-3 IA simples (rule-based)
+- Jauge de fragilité active (cachée)
+- Boucle complète : LIRE → POSITIONNER → régime → crise éventuelle
 - Jouable en 1h
-- Tester la boucle : lire les signaux → se positionner → survivre au régime

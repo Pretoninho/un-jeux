@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.4 — 11 juin 2026.
+> Document de référence vivant. Version 0.5 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -282,7 +282,62 @@ Déterminée par archétype + badges. Le joueur voit son hex de départ + hexes 
 
 ---
 
-## 13. Références à étudier
+## 13. Objectif du projet
+
+**Décision : jeu web.**
+
+Avantages directs :
+- Le prototype est le jeu lui-même, construit incrémentalement — pas de rupture entre "tester l'idée" et "construire le jeu"
+- La jauge de fragilité cachée et tout l'état caché sont natifs en code, aucun compromis de règle nécessaire
+- L'IA concurrente = fonctions JavaScript, pas de règles à simuler manuellement
+- Les tooltips et le lexique s'intègrent nativement dans l'UI
+- Pas de barrière d'installation — accessible directement au public cible
+
+**Solo-first. Multijoueur (WebSockets) en phase 2.**
+
+| Impact sur | Implication |
+|---|---|
+| Solo vs multi | Solo-first, multi via WebSockets en phase 2 |
+| Prototype minimal | = le jeu lui-même à l'état MVP, pas un objet séparé |
+| IA concurrentes | Rule-based JS pour commencer, affinable sans refonte |
+| Signaux de la jauge | État caché géré nativement |
+| Carte hexagonale | SVG ou Canvas, bibliothèques existantes |
+
+---
+
+## 14. Design de la défaite
+
+**Principe** : la défaite est narrative et progressive — jamais arbitraire, jamais brutale. Le joueur doit pouvoir relire sa défaite et comprendre où il a dévié.
+
+**Les parties sont indépendantes** : aucun carry-over entre runs. Pas de méta-progression. La rejouabilité vient uniquement de la combinaison archétype × badges × carte.
+
+### Système à trois stades
+
+**Stade 1 — Stress** *(avertissement)*
+Performance dégradée plusieurs tours → LPs inquiets → coût du levier augmente. Signaux visuels discrets. Encore récupérable — c'est l'heure de désendetter et de négocier.
+
+**Stade 2 — Crise** *(pression active)*
+LPs retirent du capital → desks ferment faute de capital → levier restreint réglementairement → réputation abîmée. Phase de triage : le joueur choisit ce qu'il sacrifie pour survivre. Souvent le moment le plus dense tactiquement.
+
+**Stade 3 — Effondrement** *(fin de run, choix du joueur)*
+
+| Issue | Description | Conséquence |
+|---|---|---|
+| **Absorption** | Un fond adverse rachète à prix cassé | Le joueur disparaît, le fond adverse gagne en puissance |
+| **Wind-down** | Le joueur choisit de fermer proprement | Score réduit, clôture narrative — aucun transfert de puissance |
+
+### La faillite stratégique
+Si l'effondrement est inévitable, le joueur peut choisir *comment* tomber :
+- Se faire absorber par un rival affaibli pour lui transférer des actifs toxiques
+- Liquider massivement dans un marché où un adversaire est très exposé — la cascade peut l'emporter
+- Wind-down pour préserver la Réputation (score final)
+
+### Lien avec la jauge de fragilité
+Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un effondrement individuel peut déclencher un krach qui emporte d'autres fonds — ou créer l'opportunité que le Vautour attendait.
+
+---
+
+## 15. Références à étudier
 
 ### 1830: Railways & Robber Barons (Francis Tresham, 1986) — référence n°1
 - Joueur = investisseur, pas la compagnie. Directeur = actionnaire majoritaire → conflit d'intérêts principal-agent institutionnalisé.
@@ -305,47 +360,46 @@ Déterminée par archétype + badges. Le joueur voit son hex de départ + hexes 
 
 ---
 
-## 14. Points à éclaircir — feuille de route
+## 16. Points à éclaircir — feuille de route
 
 ### Niveau 1 — La vision
 1. ~~**Le fantasme du joueur**~~ — **TRANCHÉ (v0.4)** : 5 archétypes définis + 2 à venir (§6)
-2. **Solo vs multijoueur** : le jeu est conçu pour les deux. Les crises sont organiques en multi, portées par des IA crédibles en solo. À approfondir.
+2. **Solo vs multijoueur** — posé : solo-first, multi WebSockets en phase 2. À approfondir pour les implications IA.
 3. ~~**Historique vs procédural**~~ — **TRANCHÉ (v0.3)** : cadre atemporel.
 
 ### Niveau 2 — Le cœur mécanique
-4. ~~**La boucle de tour**~~ — **LARGEMENT TRAITÉ (v0.4)** : 5 verbes, 4 PA, points de compétence (§8, §9)
-5. ~~**Représentation du terrain**~~ — **TRAITÉ (v0.4)** : carte hexagonale, 3 types de hexes, adjacence = corrélation (§11)
-6. **Échelle d'un tour et horizon de partie** : durée d'un tour, nombre de tours total, jeu ouvert ? Piste : tours à durée variable — le temps ralentit en crise.
-7. **Design de la défaite** : qu'est-ce qui fait mal sans game over brutal ? Alternatives à la banqueroute sèche : perte de LPs, de desks, redémarrage à capital réduit.
+4. ~~**La boucle de tour**~~ — **TRANCHÉ (v0.4)** : 5 verbes, 4 PA, points de compétence (§8, §9)
+5. ~~**Représentation du terrain**~~ — **TRANCHÉ (v0.4)** : carte hexagonale, 3 types de hexes (§11)
+6. **Échelle d'un tour et horizon de partie** — durée d'un tour, nombre de tours, fin de partie. Piste : tours à durée variable, le temps ralentit en crise.
+7. ~~**Design de la défaite**~~ — **TRANCHÉ (v0.5)** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes (§14)
 
 ### Niveau 3 — Les systèmes
-8. **IA concurrentes (priorité haute)** : 5–6 archétypes (value patient, hedge fund leveragé, passif géant, retail momentum...) avec fonctions de réaction simples.
-9. **Banque centrale / régulateur** : posé comme nœud réglementaire sur la carte (§11). Comportement IA et règle de Taylor gamifiée à définir.
-10. **Signaux concrets de la jauge** : combien, lesquels, à quel coût ? Piste : signaux achetables via LIRE et équipes de recherche.
+8. **IA concurrentes (priorité haute)** : 5–6 archétypes avec fonctions de réaction simples.
+9. **Banque centrale / régulateur** : posé comme nœud réglementaire (§11). Comportement IA à définir.
+10. **Signaux concrets de la jauge** : combien, lesquels, à quel coût, quel niveau de bruit.
 
 ### Niveau 4 — La réalité du projet
-11. **Objectif du projet** : prototype perso, jeu de plateau, jeu vidéo indé, outil pédagogique ? Change radicalement le périmètre.
-12. **Le test minimal** : prototype papier/tableur — 4–5 actifs, jauge de fragilité, signaux bruités, 2–3 IA archétypes, jouable en 1h. Carte fixe 15–20 hexes.
+11. ~~**Objectif du projet**~~ — **TRANCHÉ (v0.5)** : jeu web, solo-first, multijoueur en phase 2 (§13)
+12. **Le test minimal** : MVP web — carte fixe, 1 archétype jouable, 2–3 IA simples, jauge de fragilité active.
 
-**Ordre d'attaque restant : 2, 6, 7, 8, 10, 11**
+**Ordre d'attaque restant : 6, 2 (implications IA), 8, 10, 12**
 
 ---
 
-## 15. Questions ouvertes
+## 17. Questions ouvertes
 
-- [ ] Solo vs multijoueur — à approfondir (§14 point 2)
-- [ ] Structure détaillée de l'arbre de compétences : branches, exclusivités, coûts, prérequis
-- [ ] Échelle d'un tour et horizon de partie
-- [ ] Design de la défaite (alternative à la banqueroute sèche)
+- [ ] Échelle d'un tour et horizon de partie (durée, nombre de tours, condition de fin)
 - [ ] IA concurrentes : archétypes et fonctions de réaction
-- [ ] Signaux bruités de la jauge : lesquels, à quel coût, avec quel niveau de bruit/retard
+- [ ] Signaux bruités de la jauge : lesquels, à quel coût, quel niveau de bruit/retard
+- [ ] Structure détaillée de l'arbre de compétences
 - [ ] Génération procédurale de la carte (phase 2)
 - [ ] Deux archétypes jouables restants à définir
 - [ ] Noms in-game définitifs des archétypes
+- [ ] Définition du MVP web (périmètre exact de la première version jouable)
 
 ---
 
-## 16. Journal des décisions
+## 18. Journal des décisions
 
 | Date | Décision |
 |---|---|
@@ -354,10 +408,12 @@ Déterminée par archétype + badges. Le joueur voit son hex de départ + hexes 
 | 2026-06-10 | 1830 et Offworld Trading Company comme références principales |
 | 2026-06-10 | Ajout feuille de route 12 points — ordre d'attaque : fantasme, boucle de tour, prototype minimal |
 | 2026-06-10 | **Cadre atemporel** : monde financier complet dès le tour 1, arbre de capacités de la firme |
-| 2026-06-11 | **Archétypes** : 5 définis (Compounder, Sismographe, Prédateur, Architecte, Vautour) + 2 à venir — noms réels réservés au dev interne |
-| 2026-06-11 | **Badges** : 2 par défaut, 4 catégories, draft partiel, asymétrie possible par archétype |
-| 2026-06-11 | **Structure des tours** : tour 1 = fondation (vue partielle + choix branche techno), tour 2+ = 4 PA, 1 point de compétence tous les 3 tours |
+| 2026-06-11 | **Archétypes** : 5 définis (Compounder, Sismographe, Prédateur, Architecte, Vautour) + 2 à venir |
+| 2026-06-11 | **Badges** : 2 par défaut, 4 catégories, draft partiel |
+| 2026-06-11 | **Structure des tours** : tour 1 fondation, 4 PA, 1 point de compétence tous les 3 tours |
 | 2026-06-11 | **5 verbes** : LIRE / POSITIONNER / CONSTRUIRE / NÉGOCIER / RÉSERVER |
-| 2026-06-11 | **Ressources** : Capital (3 états) + Réputation (universelles) + ressource unique par archétype + jauge fragilité / sentiment (systémiques) |
-| 2026-06-11 | **Carte hexagonale** : 3 types de hexes (marché / nœud / frontière), adjacence = corrélation, 4 paliers de présence, carte fixe pour prototype puis procédurale |
-| 2026-06-11 | **Vocabulaire** : jargon conservé, tooltips 2 niveaux, lexique global, onboarding contextuel |
+| 2026-06-11 | **Ressources** : Capital (3 états) + Réputation + ressource archétype + systémiques |
+| 2026-06-11 | **Carte hexagonale** : 3 types, adjacence = corrélation, 4 paliers, carte fixe puis procédurale |
+| 2026-06-11 | **Vocabulaire** : jargon conservé, tooltips 2 niveaux, lexique global |
+| 2026-06-11 | **Objectif** : jeu web, solo-first, multijoueur WebSockets en phase 2 |
+| 2026-06-11 | **Design de la défaite** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes |
