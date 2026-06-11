@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.8 — 11 juin 2026.
+> Document de référence vivant. Version 0.9 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -432,7 +432,127 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 
 ---
 
-## 18. Références à étudier
+## 18. Wireframes — architecture des écrans
+
+### Écran 1 — Configuration de partie
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        NOUVELLE PARTIE                              │
+├──────────────────────────┬──────────────────────────────────────────┤
+│  ARCHÉTYPE               │  Description                             │
+│                          │                                          │
+│  ○ Compounder            │  ┌──────────────────────────────────┐   │
+│  ○ Sismographe           │  │ Patience et compounding.         │   │
+│  ● Vautour          ←    │  │ Ressource : Réserve sèche.       │   │
+│  ○ Prédateur             │  │ Victoire naturelle : Score.      │   │
+│  ○ Architecte            │  │                                  │   │
+│                          │  │ Badge friction : LPs activistes  │   │
+│                          │  │ veulent du résultat — vous        │   │
+│                          │  │ attendez le bon moment.          │   │
+│                          │  └──────────────────────────────────┘   │
+├──────────────────────────┴──────────────────────────────────────────┤
+│  BADGES  (2 parmi 4 proposés)                                       │
+│                                                                     │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ ✓ Boutique        │  │ ✓ LPs activistes  │   ← sélectionnés     │
+│  └──────────────────┘  └──────────────────┘                        │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │   Deal flow VC   │  │   Insider sect.  │   ← non sélectionnés   │
+│  └──────────────────┘  └──────────────────┘                        │
+├─────────────────────────────────────────────────────────────────────┤
+│  ADVERSAIRES  (2–3 parmi 9)          Banque centrale : toujours ✓  │
+│                                                                     │
+│  ● Fonds leveragé   ● Suiveur momentum   ○ Prédateur               │
+│  ○ Compounder       ○ Value patient      ○ Passif géant             │
+│  ○ Sismographe      ○ Architecte         ○ Vautour                  │
+│                                                                     │
+│  Préconfigurations :  [Marché euphorique]  [Table de prédateurs]   │
+├─────────────────────────────────────────────────────────────────────┤
+│                      [ LANCER LA PARTIE ]                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Écran 2 — Vue principale (en jeu)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  CYCLE 1/3  ·  TOUR 8  ·  Régime : BULL            [?] Lexique     │
+│  VAUTOUR  ·  Capital: 180M déployé / 60M réservé / 0 leveragé      │
+│  Réserve sèche : ████████░░░░   Réputation : ███░░   STRESS : ░░░  │
+├──────────────────────────────────┬──────────────────────────────────┤
+│                                  │  ACTIONS   [ 3 PA restants ]    │
+│         CARTE ÉCONOMIQUE         │  ┌────────────────────────────┐ │
+│                                  │  │ LIRE           1 PA  [?]   │ │
+│  ⬡ IG EU    ⬡ IG US   ⬡ IG EM  │  │ POSITIONNER  1-2 PA  [?]   │ │
+│                                  │  │ CONSTRUIRE     2 PA  [?]   │ │
+│  ⬡ LC EU  ●⬡ LC US   ⬡ LC EM  │  │ NÉGOCIER       1 PA  [?]   │ │
+│            ↑ analyste            │  │ RÉSERVER       0 PA  [?] ← │ │
+│  ⬡ Immo   ⬡ PE/VC   ░⬡ [?]    │  └────────────────────────────┘ │
+│                    ↑ brouillard  │                                  │
+│  ◆ FED     ⬡ Cdt   ░⬡ [?]     │  SIGNAUX                        │
+│  ↑ nœud réglementaire            │  ┌────────────────────────────┐ │
+│                                  │  │ Volatilité   ▓▓▓░░░░  ~    │ │
+│  ⬡ = hex disponible              │  │ Écart crédit ▓▓░░░░░  ~    │ │
+│  ●⬡ = analyste présent           │  │ Financement  — non acquis  │ │
+│  ░⬡ = brouillard de guerre       │  │ Initiés      — non acquis  │ │
+│  ◆  = nœud                       │  └────────────────────────────┘ │
+│                                  │  ~ = signal bruité / incertain  │
+├──────────────────────────────────┴──────────────────────────────────┤
+│  Tour 8 — Fonds leveragé ouvre position en LC US  ·  2 hex crowdés │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Écran 3 — Détail d'un hex (clic)
+
+```
+┌────────────────────────────────────────┐
+│  Large Cap US                     [×]  │
+│  Classe : Equities · Zone : US         │
+├────────────────────────────────────────┤
+│  Rendement estimé  ████████░░  ~+6%   │
+│  Volatilité locale ████░░░░░░  modérée │
+│  Crowding          ██░░░░░░░░  2 fonds │
+├────────────────────────────────────────┤
+│  Votre présence : ANALYSTE (palier 1)  │
+│  ○ Inexploré  ● Analyste               │
+│  ○ Position   ○ Desk   ○ Dominance     │
+├────────────────────────────────────────┤
+│  Actions disponibles                   │
+│  [ Ouvrir une position   — 1 PA ]      │
+│  [ Retirer l'analyste    — 0 PA ]      │
+└────────────────────────────────────────┘
+```
+
+### Écran 4 — Post-mortem après crise
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  CRISE — Cycle 1, Tour 14          Stade atteint : EFFONDREMENT    │
+├─────────────────────────────────────────────────────────────────────┤
+│  JAUGE DE FRAGILITÉ RÉELLE (révélée)                                │
+│                                                                     │
+│  Tour  1  2  3  4  5  6  7  8  9  10  11  12  13  14              │
+│        ░  ░  ▒  ▒  ▒  ▓  ▓  ▓  ▓  ██  ██  ██  ██  ██  ← réel    │
+│                                                                     │
+│  Ce que vous avez vu :                                              │
+│  Volatilité  ░  ░  ░  ▒  ░  ▒  ▓  ▓  ▓  ██  ██                   │
+│  Écart cdt   —  —  —  —  ░  ░  ▒  ▒  ▓  ██  ██  ← signal utile   │
+│                                                                     │
+│  ✓ L'écart de crédit vous a alerté 2 tours avant la crise.         │
+│  ✗ Vous n'aviez pas accès au signal Financement — il était rouge    │
+│    depuis le tour 9.                                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Votre fonds : Stade CRISE — vous avez survécu.                     │
+│  Fonds leveragé : EFFONDREMENT au tour 13 (absorption).             │
+├─────────────────────────────────────────────────────────────────────┤
+│  [ Continuer — Cycle 2 ]                                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 19. Références à étudier
 
 ### 1830: Railways & Robber Barons (Francis Tresham, 1986) — référence n°1
 - Joueur = investisseur, pas la compagnie. Directeur = actionnaire majoritaire → conflit d'intérêts principal-agent institutionnalisé.
@@ -455,7 +575,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 
 ---
 
-## 19. Points à éclaircir — feuille de route
+## 20. Points à éclaircir — feuille de route
 
 ### Niveau 1 — La vision
 1. ~~**Le fantasme du joueur**~~ — **TRANCHÉ (v0.4)** : 5 archétypes définis + 2 à venir (§6)
@@ -481,7 +601,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 
 ---
 
-## 20. Questions ouvertes
+## 21. Questions ouvertes
 
 - [ ] Signaux bruités de la jauge : lesquels, à quel coût, quel niveau de bruit/retard
 - [ ] Structure détaillée de l'arbre de compétences
@@ -492,7 +612,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 
 ---
 
-## 21. Journal des décisions
+## 22. Journal des décisions
 
 | Date | Décision |
 |---|---|
@@ -513,3 +633,4 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Échelle et horizon** : tours abstraits numérotés, fin par condition de victoire ou 3 cycles épuisés, score tiebreaker |
 | 2026-06-11 | **IA concurrentes** : pool unifié 9 profils (5 archétypes jouables + 4 exclusifs IA) + Banque centrale permanente, choix des adversaires en début de partie, max 3 adversaires |
 | 2026-06-11 | **Signaux** : 4 signaux (Volatilité gratuit / Écart crédit LIRE / Financement nœud / Initiés techno), option A universelle pour prototype, B par archétype prévu |
+| 2026-06-11 | **Wireframes** : 4 écrans définis — configuration, vue principale, détail hex, post-mortem (§18) |
