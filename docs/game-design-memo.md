@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 0.5 — 11 juin 2026.
+> Document de référence vivant. Version 0.6 — 11 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -337,7 +337,19 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 15. Références à étudier
+## 15. Échelle d'un tour et horizon de partie
+
+**Tours abstraits (DÉCISION)** : les tours sont numérotés sans référence temporelle — "Tour 12", pas "Q3 de l'an 4". Cohérent avec le cadre atemporel.
+
+**Horizon de partie — modèle hybride (DÉCISION)** : la partie se termine dès qu'une condition de victoire est atteinte **ou** au terme du dernier cycle. Le score départage si personne n'a gagné.
+
+**Cycles** : unités de structure de jeu (marqueurs de progression, pas unités de temps). Le joueur voit "Cycle 2 sur 3". Chaque cycle traverse les phases : bull → tension → crise → recovery.
+
+**Prototype : 3 cycles.** Nombre définitif pour le MVP à déterminer ultérieurement.
+
+---
+
+## 16. Références à étudier
 
 ### 1830: Railways & Robber Barons (Francis Tresham, 1986) — référence n°1
 - Joueur = investisseur, pas la compagnie. Directeur = actionnaire majoritaire → conflit d'intérêts principal-agent institutionnalisé.
@@ -360,7 +372,7 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 16. Points à éclaircir — feuille de route
+## 17. Points à éclaircir — feuille de route
 
 ### Niveau 1 — La vision
 1. ~~**Le fantasme du joueur**~~ — **TRANCHÉ (v0.4)** : 5 archétypes définis + 2 à venir (§6)
@@ -370,7 +382,7 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 ### Niveau 2 — Le cœur mécanique
 4. ~~**La boucle de tour**~~ — **TRANCHÉ (v0.4)** : 5 verbes, 4 PA, points de compétence (§8, §9)
 5. ~~**Représentation du terrain**~~ — **TRANCHÉ (v0.4)** : carte hexagonale, 3 types de hexes (§11)
-6. **Échelle d'un tour et horizon de partie** — durée d'un tour, nombre de tours, fin de partie. Piste : tours à durée variable, le temps ralentit en crise.
+6. ~~**Échelle d'un tour et horizon de partie**~~ — **TRANCHÉ (v0.6)** : tours abstraits numérotés, fin par condition de victoire ou 3 cycles épuisés, score tiebreaker (§15)
 7. ~~**Design de la défaite**~~ — **TRANCHÉ (v0.5)** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes (§14)
 
 ### Niveau 3 — Les systèmes
@@ -382,13 +394,12 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 11. ~~**Objectif du projet**~~ — **TRANCHÉ (v0.5)** : jeu web, solo-first, multijoueur en phase 2 (§13)
 12. **Le test minimal** : MVP web — carte fixe, 1 archétype jouable, 2–3 IA simples, jauge de fragilité active.
 
-**Ordre d'attaque restant : 6, 2 (implications IA), 8, 10, 12**
+**Ordre d'attaque restant : 2 (implications IA), 8, 10, 12**
 
 ---
 
-## 17. Questions ouvertes
+## 18. Questions ouvertes
 
-- [ ] Échelle d'un tour et horizon de partie (durée, nombre de tours, condition de fin)
 - [ ] IA concurrentes : archétypes et fonctions de réaction
 - [ ] Signaux bruités de la jauge : lesquels, à quel coût, quel niveau de bruit/retard
 - [ ] Structure détaillée de l'arbre de compétences
@@ -399,7 +410,7 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 
 ---
 
-## 18. Journal des décisions
+## 19. Journal des décisions
 
 | Date | Décision |
 |---|---|
@@ -417,3 +428,4 @@ Les liquidations forcées au stade 3 contribuent à la jauge systémique. Un eff
 | 2026-06-11 | **Vocabulaire** : jargon conservé, tooltips 2 niveaux, lexique global |
 | 2026-06-11 | **Objectif** : jeu web, solo-first, multijoueur WebSockets en phase 2 |
 | 2026-06-11 | **Design de la défaite** : 3 stades (Stress → Crise → Effondrement), absorption ou wind-down, parties indépendantes |
+| 2026-06-11 | **Échelle et horizon** : tours abstraits numérotés, fin par condition de victoire ou 3 cycles épuisés, score tiebreaker |
