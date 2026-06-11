@@ -38,11 +38,13 @@
 
 Par ordre de priorité (feuille de route §16) :
 
-1. **Définition du MVP web** — périmètre exact de la première version jouable
-3. **Structure détaillée de l'arbre de compétences**
-4. **Génération procédurale de la carte** (phase 2)
-5. **2 archétypes manquants** à définir
-6. **Noms in-game définitifs** des archétypes
+1. ~~**Définition du MVP web**~~ — **PROPOSÉ (v0.1)** : périmètre figé dans `docs/mvp-spec.md` (Vautour + 2 IA, 3 verbes, carte 16 hexes, 1 cycle). En attente de validation, puis code.
+2. **Structure détaillée de l'arbre de compétences** (hors MVP)
+3. **Génération procédurale de la carte** (phase 2)
+4. **2 archétypes manquants** à définir
+5. **Noms in-game définitifs** des archétypes
+
+> Prochaine étape concrète : valider `docs/mvp-spec.md` (§13) → démarrer le code (jalons §12).
 
 ---
 
