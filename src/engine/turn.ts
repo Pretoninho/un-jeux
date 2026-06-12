@@ -53,10 +53,11 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
 function accrueCarryAndCost(state: GameState): void {
   const carryOf = new Map(state.map.hexes.map((h) => [h.id, h.carry ?? 0]));
   for (const actor of state.actors) {
+    const borrowMult = actor.borrowMultiplier ?? 1; // <1 = levier moins cher (présence PB)
     for (const pos of actor.positions) {
       const notional = pos.equity * (1 + pos.leverage);
       actor.cash += notional * (carryOf.get(pos.hexId) ?? 0); // carry
-      actor.cash -= pos.equity * pos.leverage * state.params.leverageBorrowRate; // coût d'emprunt
+      actor.cash -= pos.equity * pos.leverage * state.params.leverageBorrowRate * borrowMult; // coût d'emprunt
     }
   }
 }

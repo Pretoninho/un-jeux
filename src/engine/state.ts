@@ -54,6 +54,8 @@ export interface ActorState {
   positions: Position[];
   /** Historique de richesse mark-to-market, par tour (pour le drawdown, §27). */
   wealthHistory: number[];
+  /** Multiplicateur du coût d'emprunt (1 = normal ; <1 = levier moins cher, ex. présence PB). */
+  borrowMultiplier?: number;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */

@@ -49,6 +49,9 @@
   const PRESENCE_TURNS = 3; // persistance après s'être installé (réglable ; futur bouton d'archétype)
   const isPresent = (id: string) => (presenceUntil[id] ?? -1) >= gs.turn;
   const presenceLeft = (id: string) => Math.max(0, (presenceUntil[id] ?? gs.turn) - gs.turn);
+  // Présence active à un nœud d'un type donné (PB = liquidité, Notation = information).
+  const hasNode = (type: string) => hexes.some((h) => h.kind === 'noeud' && h.nodeType === type && isPresent(h.id));
+  const PB_BORROW_DISCOUNT = 0.5; // présence PB → coût d'emprunt × 0.5 (réglable ; futur bouton d'archétype)
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
   let openDir = $state<'long' | 'short'>('long'); // sens de la prochaine ouverture
@@ -94,9 +97,7 @@
     const wealth = actorWealth(player, gs.market);
     const tr = trackRecord(player, gs.benchmarkHistory, gs.params.drawdownPenalty);
     // Présence active à un nœud Notation → signaux plus nets (memo §11, §29.2).
-    const infoActive = gs.map.hexes.some(
-      (h) => h.kind === 'noeud' && h.nodeType === 'information' && (presenceUntil[h.id] ?? -1) >= gs.turn,
-    );
+    const infoActive = hasNode('information');
     const sig: SignalReading = computeSignals(gs, makeRng(gs.rngSeed * 1000003 + gs.turn), infoActive ? 0.5 : 1);
     const market: Record<string, number> = {};
     const delta: Record<string, number> = {};
@@ -145,10 +146,7 @@
       latentByHex,
       leverageByHex,
       aiPresence,
-      // Financement débloqué = présence active à un nœud liquidité (PB) — memo §23.6.
-      pbActive: gs.map.hexes.some(
-        (h) => h.kind === 'noeud' && h.nodeType === 'liquidite' && (presenceUntil[h.id] ?? -1) >= gs.turn,
-      ),
+      pbActive: hasNode('liquidite'), // débloque le Financement + levier moins cher (memo §11)
       infoActive,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
@@ -299,6 +297,7 @@
   function endTurn() {
     if (!view || view.over) return;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
+    gs.actors[0]!.borrowMultiplier = hasNode('liquidite') ? PB_BORROW_DISCOUNT : 1; // présence PB → emprunt moins cher
     const human: Policy = { id: 'human', decide: () => [{ verb: 'RESERVER' }] };
     runTurn(gs, [human, ...ai], rng);
     paUsed = 0;
@@ -452,7 +451,7 @@
                 <button class:active={openLev === 2} onclick={() => (openLev = 2)}>2×</button>
                 <button class:active={openLev === 3} onclick={() => (openLev = 3)}>3×</button>
               </div>
-              {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge</div>{/if}
+              {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge{#if view.pbActive} · <span style="color:#5ab0a0">PB actif : intérêt −50%</span>{/if}</div>{/if}
               <div class="open-row">
                 <span>{here ? 'Ouvrir ici' : 'Ouvrir & aller'}</span>
                 <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < oCost}>25%</button>
@@ -464,7 +463,7 @@
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
             {/if}
-            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
+            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
