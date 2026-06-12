@@ -1,6 +1,6 @@
 # Spécification du MVP web — VERROUILLÉ (proposition)
 
-> Version 0.3 — 12 juin 2026. Dérive du game-design-memo (v1.4).
+> Version 0.4 — 12 juin 2026. Dérive du game-design-memo (v1.5).
 > Objet : figer le périmètre exact de la première version jouable pour débloquer le code.
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
@@ -29,7 +29,7 @@ Si cette boucle est tendue et lisible, le concept est validé. Tout le reste est
 | Arbre de compétences | **aucun** | 4 branches |
 | Points de compétence | **aucun** | 1 / 3 tours |
 | Cycles | **1** (~12–15 tours) | 3 cycles |
-| Conditions de victoire | **survie + score Sharpe** | les 4 autres |
+| Conditions de victoire | **survie + Track Record** (memo §27) | les 4 autres |
 | Carte | **fixe, 16 hexes** | génération procédurale |
 | Multijoueur | **non** | WebSockets phase 2 |
 | Manipulation active du rebond | **non** (seulement émergente) | Prédateur / Dominance |
@@ -129,7 +129,7 @@ Ordre du tour : actions joueur → actions des 2 IA → résolution marché (ren
 | Fantasme | survivre aux crises, acheter en détresse |
 | Ressource | **Réserve sèche** — +1 par tour passé en RÉSERVER |
 | Dépense | déploiement massif de la réserve quand il juge le creux atteint — **aucun bonus scripté** : c'est la physique neutre qui paie (acheter la dislocation `V≪A` capte la réversion *si* la recovery vient, memo §25.6) |
-| Victoire naturelle | Score (Sharpe cumulé) |
+| Victoire naturelle | Score (Track Record, memo §27) |
 | Friction intégrée | chaque tour en réserve = carry et drift abandonnés, chiffrés à l'écran (memo §25.5) |
 
 **Le pari du Vautour** : tenir la réserve pendant que la bulle gonfle (frustrant), ne pas se faire piéger par le rebond (§24.2), déployer dans la vraie jambe — en acceptant qu'une dead recovery (memo §25.6) ou une partie sans crise (memo §26.2) puisse le faire perdre. La friction *est* le gameplay ; la patience est un pari, pas une recette.
@@ -186,8 +186,8 @@ Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le 
 ## 9. Victoire et fin de partie
 
 - La partie dure **1 cycle (~12–15 tours)** ou s'arrête si le joueur atteint l'**Effondrement** (§14).
-- **Score = Sharpe cumulé** (rendement / volatilité des rendements sur la partie). Récompense la régularité, pas la taille brute.
-- Écran de **post-mortem** (§18 écran 4) à la fin : révèle la courbe réelle de `F` superposée aux signaux vus. C'est le moment d'apprentissage.
+- **Score = Track Record** (memo §27) : `rendement excédentaire vs marché − α·MaxDrawdown − pénalités de détresse`, α=0.5. Benchmark = indice fixe des hexes investissables de la carte ; drawdown en mark-to-market. Affiché en continu (marché vs joueur) pour la pression FOMO.
+- Écran de **post-mortem** (§18 écran 4) à la fin : révèle la courbe réelle de `F` superposée aux signaux vus, + le rapport Track Record (Vous / Marché / Excédent / Pire séquence). C'est le moment d'apprentissage.
 
 ---
 

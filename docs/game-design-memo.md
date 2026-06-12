@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.4 — 12 juin 2026.
+> Document de référence vivant. Version 1.5 — 12 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -38,7 +38,7 @@ Un jeu de stratégie au tour par tour de type 4X (eXplore, eXpand, eXploit, eXte
 - **Science** : atteindre une frontière technologique
 - **Culture** : sa philosophie d'investissement domine les flux mondiaux
 - **Économique** : seuil d'AUM ou % des actifs mondiaux détenus
-- **Score** : meilleur Sharpe cumulé sur la partie (récompense la régularité, pas la taille brute)
+- **Score** : meilleur **Track Record** en fin de partie — rendement excédentaire vs le marché, pénalisé par le pire drawdown (§27)
 
 ---
 
@@ -99,7 +99,7 @@ Les fantasmes du joueur sont des **traits choisis en début de partie**, non des
 | Réf. dev | Nom in-game (piste) | Fantasme | Condition de victoire naturelle |
 |---|---|---|---|
 | Buffett | Le Compounder / L'Horloger | Patience, compounding | Économique (seuil AUM) |
-| Soros | Le Sismographe | Coup macro, timing de régime | Score (meilleur Sharpe) |
+| Soros | Le Sismographe | Coup macro, timing de régime | Score (meilleur Track Record) |
 | Icahn | Le Prédateur / Le Catalyseur | Raids, domination directe | Domination |
 | Simons | L'Architecte / L'Alchimiste | Modèles, edge systématique | Science (frontière techno) |
 | H. Marks | Le Vautour / Le Résilient | Survie aux crises, achat en détresse | Score (régularité) |
@@ -654,6 +654,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Moteur de prix — PROPOSITION (v1.3, non verrouillé)** : structure à facteurs (corrélation émergente, `ρ→1` par domination du facteur marché), niveau de prix réversif autour d'une ancre (contrarian réel), facteur marché piloté par `F` avec melt-up en tension et bull trap en P&L. En attente des points du concepteur (§25) |
 | 2026-06-11 | **Audit script stratégique (v1.3) — 5 défauts à corriger** : (1) Sharpe gameable [priorité], (2) RÉSERVER gratuit triple-récompense + levier individuel sur `F`, (3) clarté des signaux achetable, (4) levier = option morte sous Sharpe, (5) bonus phase-3 du Vautour redondant. Motif commun : appliquer aux mécaniques la règle « friction, pas synergie » (§7). NON ENCORE CORRIGÉS — chantier ouvert (§26.3, §26.5) |
 | 2026-06-12 | **Moteur de prix VERROUILLÉ (v1.4, §25)** : (a) niveau `V` public / ancre `A` **cachée** = deuxième état caché du jeu, estimation de `A` à plancher de bruit irréductible [fix B] ; (b) melt-up **stochastique**, plage tension chevauchant le bull [anti-fuite] ; (c) variance `M/C/ε` ≈ 40/30/30 en plages, bascule 80-90 % systématique en crise → `ρ→1` émergent ; (d) `flux` = impact-prix intégré au moteur, « valorisations tendues » formalisées (`Σ log(V/A)+`) ; (e) carry séparé = coût physique de RÉSERVER, taux cash **jamais indexé sur `F`** [fix A] ; (f) `λ` faible en normal [fix D], recovery stochastique avec **dead recoveries** [fix C] — le creux n'est pas toujours une aubaine. Conséquences : défaut #5 résolu (bonus Vautour supprimé), #2 résolu au volet gratuité, #4 principe acquis, impact-prix absorbé, T2 (score) débloqué |
+| 2026-06-12 | **Score VERROUILLÉ — Track Record (v1.5, §27)** : le Sharpe (3 vices : optimum dégénéré, punit le profil lumpy/récompense le skew négatif, illisible) est remplacé par `Rendement excédentaire vs marché − α·MaxDrawdown − pénalités de détresse`. Benchmark = **indice fixe de la carte** (anti-exploit « reste petit ») ; drawdown en **mark-to-market** (anti-exploit « diamond hands ») ; α=0.5 = point d'équilibre du défaut #4 à calibrer en J7. Affichage continu marché/joueur = pression FOMO. **Exception anti-script assumée** : le score est transparent et stable, pas bruité — l'anti-gaming vient de la structure, pas de l'obscurité. Défaut #1 résolu |
 
 ---
 
@@ -931,9 +932,64 @@ Quatre de ces cinq défauts viennent de la même erreur : **une métrique ou une
 ### 26.5 Actions de modification — état au verrouillage du moteur (v1.4)
 
 - [x] Réécrire la boucle macro **partout sans clause Vautour** (§25.7).
-- [ ] Corriger le score (#1) — **priorité, c'est la fonction-objectif du MVP**. Débloqué par §25 (distribution des rendements connue).
+- [x] Corriger le score (#1) — **TRANCHÉ (v1.5)** : remplacé par le Track Record (§27).
 - [~] Re-tarifer RÉSERVER (#2) — volet « gratuité » **résolu** par le carry (§25.5) ; **reste** : diluer l'effet individuel sur `F` (piste : purge proportionnelle à la part du capital total).
 - [~] Plancher de bruit irréductible (#3) — principe **étendu au micro** (`A`, §25.2) ; **reste** : chiffrer les planchers des signaux macro.
-- [~] Levier (#4) — principe acquis : « parfois correct » via conviction de régime sur `M` (§25.9) ; **reste** : vérifier au calibrage MVP.
+- [~] Levier (#4) — principe acquis : « parfois correct » via conviction de régime sur `M` (§25.9) ; **reste** : calibrer **α** du Track Record (§27.4), qui est le point d'équilibre de #4.
 - [x] Retirer le bonus phase-3 du Vautour de la spec (#5) — la physique paie le creux, quand elle le paie (§25.6).
 - [x] Inscrire la neutralité archétypale + « le hoarder peut perdre » comme contraintes du moteur de prix (§25 : recovery stochastique + carry rendent le hoarding arithmétiquement perdant sans crise).
+
+---
+
+## 27. Le score — Track Record (VERROUILLÉ, v1.5)
+
+> Remplace le Sharpe (défaut #1, §26.3). La fonction-objectif oriente tout le comportement du joueur : elle doit être anti-gaming **par structure**, lisible, et neutre entre archétypes.
+
+### 27.1 Pourquoi le Sharpe saute (trois vices)
+
+1. **Optimum dégénéré** : carry de l'hexe le moins volatil + immobilité → Sharpe énorme, jeu mort.
+2. **Il punit le bon profil** : le Sharpe pénalise la volatilité *des gains aussi*. Le profil du Vautour (plat, plat, +60 % d'un coup) voit son pic de gain exploser sa vol mesurée → Sharpe effondré. Pire, il **récompense le skew négatif** (gains réguliers, perte cachée) — le comportement même que le jeu dénonce.
+3. **Illisible en jeu** : « rendement moyen / écart-type » ne se voit pas pendant la partie.
+
+### 27.2 Formule
+
+```
+Track Record = Rendement excédentaire − α · MaxDrawdown − pénalités de détresse
+```
+
+**Terme 1 — Rendement excédentaire vs le marché.**
+- Benchmark = le **portefeuille passif de l'indice de marché** : évolution pondérée des `V` de **tous les hexes investissables non-frontière de la carte**, carry inclus (ce que ferait le Passif géant).
+- **Le benchmark est un indice FIXE de la carte, jamais relatif au joueur** (anti-exploit, §27.3). Ton score de base = ce que tu as fait *au-dessus* du marché.
+- Tue le penny-picking : carry lisse mais **sous** le marché → excédent négatif → tu perds. Le marché *est* le seuil, et il est endogène (pas de seuil absolu artificiel).
+- Implémente §26.2 mécaniquement : sans crise, le hoarder fait `taux cash − marché en bull` = très négatif. « Le hoarder peut perdre » devient arithmétique.
+
+**Terme 2 — MaxDrawdown, pondéré α** (remplace le dénominateur du Sharpe).
+- **Mesuré sur la richesse mark-to-market** (positions ouvertes incluses, via les `V` publics) — les **pertes papier comptent** (anti-exploit « diamond hands », §27.3).
+- **Asymétrique** : un pic de gain n'est pas un drawdown → le profil lumpy du Vautour n'est plus puni ; seules les pertes pèsent → le levier qui saute est écrasé.
+- **Lisible** (« ta pire séquence : −38 % ») et **diégétique** : le drawdown est ce qui fait fuir les LPs — c'est déjà le déclencheur des stades de défaite (§14). Score et survie mesurent la même chose.
+
+**Terme 3 — Pénalités de détresse.** Passer par Stress/Crise (§14) coûte des points ; wind-down = score réduit (déjà §14). Le risque caché qui *se réalise* est facturé deux fois (drawdown + détresse).
+
+### 27.3 Audit anti-script du score
+
+| Vecteur testé | Verdict |
+| --- | --- |
+| Coller au benchmark (indexer) | excédent ~0, on porte le drawdown du marché → score ≤ 0. Indexer ne gagne jamais : il faut un risque *différencié*. ✓ |
+| « Toujours cash » | excédent très négatif en bull ; ne gagne que si la crise vient → pari sur l'état caché, pas une recette. ✓ |
+| **« Reste petit » pour adoucir sa barre** | **neutralisé** : le benchmark est un indice fixe de la carte, pas relatif au joueur (§27.2). ✓ |
+| **« Diamond hands » (ne jamais réaliser une perte)** | **neutralisé** : drawdown en mark-to-market, les pertes papier comptent (§27.2). ✓ |
+| Levier chanceux non puni sur une run | résidu borné : le levier *fabrique* `F`, et le plafond `F≥0.85` garantit que la table leveragée finit par cramer. On *veut* le levier parfois correct (#4). ✓ |
+| Fuite d'état caché par l'affichage | le benchmark est dérivé des `V` **publics** → ne révèle rien que le joueur ne puisse déjà calculer. ✓ |
+| Skew négatif récompensé (vice n°2 du Sharpe) | inversé : skew positif non puni, skew négatif facturé. ✓ |
+
+**Exception explicite à la règle anti-script** : contrairement à la physique du monde (§24.7, §25.10), **le score n'est ni bruité ni en plages** — la fonction-objectif doit être parfaitement transparente et stable, le joueur doit savoir ce qu'il optimise. L'anti-gaming vient de la **structure** (benchmark endogène + drawdown mark-to-market), jamais de l'obscurité. À ne pas confondre avec l'anti-script de la physique.
+
+### 27.4 Paramètres et habillage
+
+- **α = 0.5** (un point de drawdown coûte un demi-point d'excédent) — point de départ. **C'est le point d'équilibre du défaut #4** : trop haut, les archétypes leveragés meurent ; trop bas, le levier imprudent n'est plus puni. À calibrer en priorité (J7).
+- **Habillage** : le score s'appelle **Track Record**, présenté comme un rapport aux LPs — « Vous : +34 % · Marché : +21 % · Excédent : +13 % · Pire séquence : −18 % ».
+- **Affichage continu en cours de partie** : « Marché : +21 % / Vous : +3 % » → la pression FOMO du hoarder devient visible et chiffrée (la friction §26.4, à l'écran).
+
+### 27.5 Neutralité archétypale (§26.1) — chacun bat le marché par son edge
+
+Vautour (cash → dislocation, faible drawdown propre) · Compounder (compounding non-leveragé, drawdown peu profond) · Sismographe (pari leveragé sur `M`, excédent ≫ drawdown *s'il lit juste*) · Architecte (alpha idiosyncratique, quasi market-neutral) · Prédateur (dislocations provoquées). La métrique ne connaît aucun profil.
