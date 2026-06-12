@@ -32,6 +32,7 @@
   let read = $state<Set<string>>(new Set());
   let showDetail = $state(false);
   let transactions = $state<Array<{ turn: number; label: string; dir: 'long' | 'short'; pnl: number }>>([]);
+  let profileLabel = $state(''); // libellé du profil joué (lu depuis la config, pas codé en dur)
 
   function recordTx(turn: number, hexId: string, dir: 'long' | 'short', pnl: number) {
     transactions = [{ turn, label: hexById(hexId)?.label ?? hexId, dir, pnl }, ...transactions].slice(0, 15);
@@ -133,6 +134,7 @@
 
   function newGame(s: number) {
     const cfg = presetExplore(s);
+    profileLabel = cfg.archetype.label;
     const init = buildInitialState(cfg);
     gs = init.state;
     rng = init.rng;
@@ -264,7 +266,7 @@
 
 <main>
   <header>
-    <div class="title">un-jeux <span class="sub">· Vautour · exploration (proto)</span></div>
+    <div class="title">un-jeux <span class="sub">· {profileLabel} · exploration (proto)</span></div>
     {#if view}
       <div class="status">
         <span>Tour <b>{view.turn}/{view.horizon}</b></span>
