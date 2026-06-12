@@ -76,6 +76,8 @@ Restent en J7 (vérifications **numériques**, pas de design) : α, coût du lev
 > Backlog design : T1 ✅ · T2 ✅ · T3 ✅ · T4 ✅ · T5 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅. **Design MVP complet, audité, chantier clos.**
 >
 > **Code : J1 ✅** — squelette Svelte/Vite/TS. Moteur découplé (`src/engine/`, TS pur sans DOM), tout en données (`src/data/` : carte 16 hexes, Vautour, 2 profils IA, preset MVP). Anti-script porté par le code : RNG seedé (`rng.ts`) + paramètres en plages tirées par instance (`params.ts`, aligné v1.8 dont levier §29.3). 17 tests verts (intégrité/symétrie/connexité carte, reproductibilité RNG, plages des paramètres + `F(0)` < zone morte). Build OK. Prochaine étape : **J2 — moteur sans UI + harness `simulate`**.
+>
+> ⚠️ **À trancher avant J5** (memo §21) : écart de comptage carte — prose spec §4 = 16 hexes, liste d'adjacence = 13. Le code (`src/data/maps/mvp-16.ts`) suit l'adjacence (13 hexes : 8 marché · 3 nœuds · 2 frontière).
 
 ---
 
