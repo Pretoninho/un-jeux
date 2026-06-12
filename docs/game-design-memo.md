@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.9 — 12 juin 2026.
+> Document de référence vivant. Version 1.10 — 12 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -641,7 +641,11 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 - [x] ~~**RÉSERVER, volet restant** (#2)~~ — **TRANCHÉ (v1.8)** : purge symétrique agrégée, proportionnelle à la part du capital (§23.3, §29.1)
 - [x] ~~**Planchers de bruit** (#3)~~ — **TRANCHÉ (v1.8)** : σ réductible/irréductible + délais planchers, tirés en plages (§29.2)
 - [x] ~~**Levier** (#4)~~ — **TRANCHÉ (v1.8)** : mécanique complète (coût croissant, appel de marge) ; viabilité = assertion J7 (§29.3)
-- [ ] **Carte MVP — écart de comptage (détecté en J1)** : la prose de la spec §4 annonce « 16 hexes (11 marché · 3 nœuds · 2 frontière) » mais sa liste d'adjacence n'en définit que **13** (8 marché · 3 nœuds · 2 frontière). Le code (`src/data/maps/mvp-16.ts`) transcrit fidèlement les 13 de l'adjacence. **À trancher avant J5 (UI)** : compléter à 16 (ajouter ~3 hexes marché + leurs adjacences) ou assumer 13 et corriger la prose.
+- [x] ~~**Short au MVP ?**~~ — **TRANCHÉ (§30)** : le short devient une **primitive du profil neutre** ; les archétypes la modulent (Sismographe excelle, Vautour dissuadé par sa ressource). Implémenté (`Position.direction`).
+- [~] **Carte — écart 13/16** : sans objet pour le prototype d'exploration, qui utilise une **carte hexagonale générée** (géométrie = adjacence, §30). La carte fixe `MVP_MAP` (13 hexes) reste pour les tests. À retrancher si on revient à une carte fixe pour le MVP.
+- [ ] **Spécificités des archétypes à définir** — un à la fois, par-dessus le profil neutre (§30) : ressource, contraintes, mécaniques exclusives, modulation des primitives (dont le short).
+- [ ] **Bénéfices des nœuds à câbler** dans le moteur : taux anticipés (BC) / signaux plus nets (Notation) / levier moins cher + signal Financement (Prime broker). La présence est posée en UI (action « S'installer »), l'effet reste à brancher.
+- [ ] **Déblocage des hexes frontière** (marchés verrouillés) : mécanisme à définir (arbre de compétences §8 ou événement de marché).
 
 ---
 
@@ -685,6 +689,8 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **J3 LIVRÉ (code)** : cascade complète (§24) — machine à phases leg1 → rebond → (leg3 OU vrai plancher ~30%) → recovery, **forme tirée PAR CRISE** (anti-script intra-partie), bull trap matérialisé en P&L (drift positif du rebond) ; reset `F ∝ amplitude` à la résolution. **Signaux observables** (§23.6) : lectures bruitées-retardées de `F`, plancher de bruit en plages, **mensonge du rebond** (détente ambiguë car parfois vrai plancher). Instrument **horloge-vs-signaux** (§28.7) posé (assertion stricte → J7). 46 tests, build OK |
 | 2026-06-12 | **J4 LIVRÉ (code)** : les 2 IA rule-based via une **fonction de réaction PARAMÉTRÉE** (memo §16) — `engine/ai.ts` interprète des paramètres de comportement portés en données sur le profil (ajouter une IA = des données). Fonds leveragé (momentum + levier, lit la **volatilité perçue bruitée**, réduit « trop tard ») et Value patient (achète la décote via **estimation bruitée de `A`** à plancher irréductible, jamais de levier, ne panique pas). Les IA ne voient JAMAIS `F`/`A` directs → derrière la courbe, contribution à `F` émergente. `runGame` câble les politiques depuis les profils. 51 tests, build OK. **Observation calibrage J7** : au tempo par défaut le taux de crise sature (~100 %) — les cibles §28.2 (20-25 % sans crise) ne sont PAS atteintes, à régler en J7 (l'émergence reste discriminée via le pic de `F`) |
 | 2026-06-12 | **J5 LIVRÉ (code)** : UI vue principale (`App.svelte` + `lib/layout.ts`). Carte SVG des 13 hexes, panneau signaux (3 barres, `F` cachée), panneau actions (Ouvrir/Fermer/Réserver, budget PA), bandeau Track Record (Vous/Marché/pire séquence), journal, sélecteur de seed. **Le joueur humain = une `Policy` alimentée par l'UI → moteur inchangé.** Build OK (UI 59 kB), 51 tests. **Coutures honnêtes** : signaux révélés gratuitement (coût LIRE/nœuds pas encore câblé) · clôture partielle et levier absents de l'UI · 13 hexes rendus (écart 13/16 toujours ouvert §21). Vérifié par compilation + tests, pas par rendu live |
+| 2026-06-12 | **Prototype d'exploration (UI, à l'essai — §30)** : nouvelle boucle proposée par le concepteur. Spawn aléatoire, **brouillard** (voir seulement les adjacents), **investir = se déplacer + révéler** (immédiat, sans retour), **CHAIN** (1ʳᵉ ouverture 1 PA, enchaînées 2 PA), **S'installer** sur les nœuds (présence sans investir). **Carte hexagonale GÉNÉRÉE** (`generate.ts`) où voisins = coords axiales → géométrie = adjacence (corrige la grille carrée). LIRE câblé en UI (signaux Écart/Financement payants). Moteur économique **inchangé**. Carte fixe `MVP_MAP` conservée pour les tests |
+| 2026-06-12 | **Restructuration des profils (DÉCISION — §30)** : on inverse l'ordre — **primitives d'abord (profil NEUTRE), spécificités ensuite (archétypes)**. Le profil neutre = toutes les primitives, zéro pouvoir → bac à sable de mécanique. Les archétypes deviennent une **couche de modificateurs** développée **un à la fois** (définir → tester → équilibrer → valider → suivant). **Conséquence sur le short** : devient une **primitive du neutre** (réoriente §21), les archétypes la **modulent** (Sismographe excelle, Vautour en est dissuadé par sa ressource — pas par une interdiction codée). **Primitive SHORT livrée** (`Position.direction`, P&L miroir, marge/flux sensibles au sens). Inventaire des primitives complet : OUVRIR(L/S)/RÉSERVER/LIRE/RENFORCER/FERMER/PARTIAL. 62 tests |
 
 ---
 
@@ -1138,3 +1144,40 @@ Le principe « parfois correct » était acquis (§25.9) ; voici la mécanique :
 | 5 | Bonus phase-3 Vautour | ✅ résolu (supprimé, v1.4) |
 
 **Le chantier « script stratégique » est clos.** Restent les vérifications *numériques* en J7 : α, coût du levier, planchers, cibles de tempo, neutralité multi-profils.
+
+---
+
+## 30. Restructuration des profils et prototype d'exploration (EN COURS)
+
+> Direction de travail ouverte avec le concepteur après les premiers tests jouables.
+> Statut : **profil neutre + primitives = livrés** ; **archétypes = à développer un à la fois** ;
+> **boucle d'exploration = prototype UI à l'essai** (pas encore une décision verrouillée).
+
+### 30.1 Primitives d'abord, spécificités ensuite (DÉCISION)
+
+On inverse l'ordre de construction :
+- **Profil neutre** = la boîte à outils complète des primitives, **aucun pouvoir spécial**. C'est le *bac à sable de mécanique* : tester les briques isolément, sans le bruit des spécificités.
+- **Archétypes** = une **couche de modificateurs** par-dessus le neutre (ressource §10, restrictions, mécaniques exclusives, modulation des primitives). Développés **un à la fois** : définir → tester → équilibrer → valider → suivant.
+
+**Primitives (toutes livrées)** : OUVRIR (long/short) · RÉSERVER · LIRE · RENFORCER · FERMER · CLÔTURE PARTIELLE. Toutes coûtent des PA (sauf RÉSERVER = 0).
+
+### 30.2 Le short est une primitive (réoriente §21)
+
+Conclusion révisée : le short n'est plus « réservé au Sismographe ». C'est une **primitive du neutre** (`Position.direction` long/short, P&L miroir, appel de marge et flux sensibles au sens). Les **archétypes la modulent** : le Sismographe en fait son edge (shorter le sommet), le Vautour en est dissuadé par sa ressource/identité — **pas par une interdiction codée en dur**. Le bull trap (§24.2) punit naturellement les shorts au rebond.
+
+### 30.3 Prototype d'exploration (UI, à l'essai)
+
+Boucle proposée, implémentée comme **couche UI** (moteur économique inchangé) :
+- **Spawn** aléatoire sur un hexe marché vide ; **brouillard** : on ne voit que les adjacents.
+- **Investir = se déplacer + révéler** les nouveaux voisins. Action **immédiate, sans retour arrière**.
+- **CHAIN** : 1ʳᵉ ouverture du tour = 1 PA, ouvertures enchaînées ensuite = 2 PA (frein à la course).
+- **S'installer** : se déplacer sur un nœud adjacent (présence, sans investir) → rend la carte traversable.
+- **Carte hexagonale GÉNÉRÉE** (`src/data/maps/generate.ts`) : voisins calculés depuis les coordonnées axiales → **géométrie = adjacence** (« ce qui borde ton hexe = ce dans quoi tu peux chaîner »). Seedée. Corrige la grille carrée hardcodée.
+
+**Simplifications de prototype assumées** : IA non spatiales · le flux des ouvertures immédiates n'alimente pas l'impact-prix du tour · bénéfices des nœuds pas encore branchés · frontières infranchissables (déblocage non câblé).
+
+### 30.4 À décider / câbler ensuite
+
+- Valider (ou non) la boucle d'exploration comme mécanique retenue, puis l'intégrer au moteur (IA spatiales, flux des ouvertures, carte procédurale comme standard).
+- Définir le **premier archétype** à spécialiser et ses traits.
+- Brancher les **bénéfices des nœuds** et le **déblocage des frontières** (§21).

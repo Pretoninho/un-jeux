@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-12 — v1.8
+> Dernière mise à jour : 2026-06-12 — v1.10
 
 ---
 
@@ -36,6 +36,7 @@
 | **Tempo : calibrage statistique (cibles de distribution, pas de durée), `F(0)` en plage cachée, critère « signaux battent l'horloge » (test J7)** | §28 | v1.6 |
 | **Périmètre MVP validé (T8) : architecture N-archétypes/profils/cartes = données, harness paramétrable, calibrage multi-profils + assertion de neutralité (J7)** | spec §11bis, §28.8 | v1.7 |
 | **Défauts #2/#3/#4 résolus : purge symétrique agrégée, planchers de bruit irréductibles, mécanique du levier (appel de marge = transmission des cascades) — chantier script stratégique CLOS** | §23.3, §29 | v1.8 |
+| **Restructuration profils : primitives d'abord (profil NEUTRE = bac à sable), archétypes = spécificités par-dessus (un à la fois). Short = primitive, modulée par archétype** | §30 | v1.10 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
