@@ -1,7 +1,7 @@
-# Spécification du MVP web — VERROUILLÉ (proposition)
+# Spécification du MVP web — VERROUILLÉ (T8 tranché)
 
-> Version 0.5 — 12 juin 2026. Dérive du game-design-memo (v1.6).
-> Objet : figer le périmètre exact de la première version jouable pour débloquer le code.
+> Version 0.6 — 12 juin 2026. Dérive du game-design-memo (v1.7).
+> Objet : périmètre exact de la première version jouable. **Validé — prêt pour le code (J1).**
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
 ---
@@ -18,6 +18,8 @@ Si cette boucle est tendue et lisible, le concept est validé. Tout le reste est
 ---
 
 ## 2. Périmètre figé
+
+**Distinction de statut** : ce tableau décrit le **contenu livré**, pas l'architecture. Le moteur est conçu **N-archétypes / N-profils / N-cartes dès le premier jour** (§11bis) — « 1 archétype » signifie « une seule instance de données fournie », jamais « le Vautour câblé en dur ».
 
 | Élément | MVP | Hors MVP (plus tard) |
 |---|---|---|
@@ -202,24 +204,51 @@ Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le 
 
 ---
 
-## 11. Stack technique (proposition)
+## 11. Stack technique (VALIDÉ, T8)
 
 - **Svelte + Vite** — état réactif natif pour une UI à jauges/signaux, build léger, zéro backend (le solo tourne 100 % client).
 - **Carte en SVG** — 16 hexes, simple à styliser et à rendre interactif.
-- **Logique de jeu en TypeScript pur**, découplée de l'UI (un module `engine/` testable sans DOM → on pourra brancher l'IA et calibrer les paramètres en tests unitaires).
+- **Logique de jeu en TypeScript pur**, découplée de l'UI (un module `engine/` testable sans DOM).
 - Pas de dépendance lourde. Déployable en statique (GitHub Pages / Netlify).
+
+---
+
+## 11bis. Architecture d'extensibilité et harness paramétrable (T8)
+
+> Exigence : pouvoir tester demain un autre archétype, une autre table d'IA ou une autre carte **sans toucher au moteur**.
+
+### Tout est données, rien n'est câblé
+
+- **Archétype** = objet de configuration (ressource, règles de gain/dépense, position de départ, modificateurs) conforme à une interface `Archetype`. Le Vautour est `archetypes/vautour.ts` — en ajouter un = ajouter un fichier.
+- **Profil IA** = même logique (`profiles/fonds-leverage.ts`, …), cohérent avec le pool unifié humain/IA du memo §16.
+- **Carte** = fichier de données (hexes, clusters, adjacences, nœuds). La carte MVP est `maps/mvp-16.ts`.
+- **Configuration de partie** = `{ archetype, adversaires[], carte, seed }`. La partie MVP auto-configurée (§3) n'est qu'un **preset par défaut** de cet objet.
+
+### Le harness de simulation est paramétrable sur le même objet
+
+`simulate(config, n)` joue N parties headless pour n'importe quelle combinaison. Conséquences :
+- Tester un nouvel archétype = écrire son fichier + lancer le harness dessus.
+- Les cibles de tempo (§28.2 memo) sont re-vérifiables par profil.
+
+### Calibrage multi-profils (anti-script, memo §28.8)
+
+**Catch d'audit** : calibrer le monde contre un seul bot-Vautour re-sculpterait la physique *autour* du Vautour — le script stratégique (§26) reviendrait par la porte du tuning, sans que personne ne l'ait écrit.
+
+Parade (rendue possible par ce harness) :
+1. Les cibles statistiques de tempo doivent tenir face à **plusieurs bots-joueurs** différents.
+2. **Assertion de neutralité (J7)** : sur N parties simulées, **aucun profil ne domine strictement** la distribution des Track Records. La neutralité archétypale (memo §26.1) devient un test qui casse si on la viole.
 
 ---
 
 ## 12. Plan de construction par jalons
 
-1. **J1 — Squelette** : projet Svelte/Vite + TS, structure `engine/` vs `ui/`, données de la carte (§4) en dur.
-2. **J2 — Moteur sans UI** : état de partie, boucle de tour, jauge `F` (§23) + `F(0)` en plage, moteur de prix (§25), score Track Record (§27). **Inclut un harness de simulation headless** (jouer N parties sans écran) — prérequis du calibrage J7.
+1. **J1 — Squelette** : projet Svelte/Vite + TS, structure `engine/` vs `ui/`, interfaces `Archetype`/`Profil`/`Carte` (§11bis), carte MVP en données (§4).
+2. **J2 — Moteur sans UI** : état de partie, boucle de tour, jauge `F` (§23) + `F(0)` en plage, moteur de prix (§25), score Track Record (§27). **Inclut le harness `simulate(config, n)` paramétrable** (§11bis) — prérequis du calibrage J7.
 3. **J3 — Cascade** : la morphologie (§24) + mensonge des signaux. Testé en unitaire.
 4. **J4 — Les 2 IA** (§7) branchées dans la boucle.
 5. **J5 — UI vue principale** : carte SVG, actions, signaux, jauges visibles + bandeau Track Record (marché vs joueur, §27.4).
 6. **J6 — Détail hexe + post-mortem** : modale + écran de fin avec courbe `F` révélée + rapport Track Record.
-7. **J7 — Calibrage** : régler les paramètres (§23.8, §24.7, §25.10, α du score) via le harness jusqu'à atteindre les **cibles statistiques de tempo (§28.2)** et **valider le critère « les signaux battent l'horloge » (§28.7)**.
+7. **J7 — Calibrage** : régler les paramètres (§23.8, §24.7, §25.10, α du score) via le harness jusqu'à atteindre les **cibles statistiques de tempo (§28.2)**, valider le critère **« les signaux battent l'horloge » (§28.7)** et l'**assertion de neutralité multi-profils (§11bis / memo §28.8)**.
 
 **Chemin critique** : J2 → J3 (le moteur et la cascade). Le harness de J2 est ce qui rend J7 mesurable. L'UI vient après et peut rester rustique tant que la boucle est juste.
 
@@ -227,7 +256,9 @@ Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le 
 
 ## 13. Questions à valider avant de coder
 
-- [ ] Le périmètre §2 te convient-il (notamment : Vautour comme unique archétype, 3 verbes) ?
-- [ ] La carte §4 (16 hexes, ces adjacences) est-elle un bon point de départ ?
-- [ ] Stack Svelte/TS/SVG validée, ou tu préfères autre chose (React, vanilla) ?
-- [ ] Durée cible (~30–45 min, 12–15 tours) cohérente avec ce que tu imagines ?
+- [x] Périmètre §2 — **VALIDÉ (T8)** : Vautour seul archétype *livré*, 3 verbes ; architecture N-archétypes (§11bis).
+- [x] Carte §4 — **VALIDÉE (T8)** : 16 hexes, en fichier de données interchangeable.
+- [x] Stack Svelte/TS/SVG — **VALIDÉE (T8)**.
+- [x] Durée ~30–45 min, 12–15 tours — **VALIDÉE (T8)**.
+
+**T8 clos. Plus aucune question bloquante : prochaine étape = J1.**

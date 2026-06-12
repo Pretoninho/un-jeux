@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.6 — 12 juin 2026.
+> Document de référence vivant. Version 1.7 — 12 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -657,6 +657,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **Moteur de prix VERROUILLÉ (v1.4, §25)** : (a) niveau `V` public / ancre `A` **cachée** = deuxième état caché du jeu, estimation de `A` à plancher de bruit irréductible [fix B] ; (b) melt-up **stochastique**, plage tension chevauchant le bull [anti-fuite] ; (c) variance `M/C/ε` ≈ 40/30/30 en plages, bascule 80-90 % systématique en crise → `ρ→1` émergent ; (d) `flux` = impact-prix intégré au moteur, « valorisations tendues » formalisées (`Σ log(V/A)+`) ; (e) carry séparé = coût physique de RÉSERVER, taux cash **jamais indexé sur `F`** [fix A] ; (f) `λ` faible en normal [fix D], recovery stochastique avec **dead recoveries** [fix C] — le creux n'est pas toujours une aubaine. Conséquences : défaut #5 résolu (bonus Vautour supprimé), #2 résolu au volet gratuité, #4 principe acquis, impact-prix absorbé, T2 (score) débloqué |
 | 2026-06-12 | **Score VERROUILLÉ — Track Record (v1.5, §27)** : le Sharpe (3 vices : optimum dégénéré, punit le profil lumpy/récompense le skew négatif, illisible) est remplacé par `Rendement excédentaire vs marché − α·MaxDrawdown − pénalités de détresse`. Benchmark = **indice fixe de la carte** (anti-exploit « reste petit ») ; drawdown en **mark-to-market** (anti-exploit « diamond hands ») ; α=0.5 = point d'équilibre du défaut #4 à calibrer en J7. Affichage continu marché/joueur = pression FOMO. **Exception anti-script assumée** : le score est transparent et stable, pas bruité — l'anti-gaming vient de la structure, pas de l'obscurité. Défaut #1 résolu |
 | 2026-06-12 | **Tempo VERROUILLÉ (v1.6, §28)** : on calibre une **distribution d'expériences**, pas une durée. Cibles statistiques (~60 % 1 crise / 10-15 % 2 crises / **20-25 % sans crise** / crise <t.5 rare mais possible) = diagnostics à atteindre via les paramètres générateurs, **jamais** en forçant le timing. `F(0)` tirée en plage cachée ~0.10-0.35 (§23.1 — monde avec un passé, pas de départ mémorisable). Pas de fenêtre de grâce décrétée. Arc en 3 actes = conséquence statistique, pas structure. Budget épistémique ~50-60 PA (voir ou agir). Asymétrie montée/chute ≥ 2:1. **Critère d'or = « les signaux battent l'horloge », assertion de test automatisé au jalon J7** (le moteur peut prouver qu'il n'est pas scripté) |
+| 2026-06-12 | **Périmètre MVP VERROUILLÉ — T8 (v1.7)** : les 4 questions de la spec §13 validées (Vautour seul archétype *livré*, carte 16 hexes, stack Svelte/TS/SVG, ~30-45 min). **Exigence d'extensibilité élevée en principe** : archétypes / profils IA / cartes = données interchangeables, moteur N-profils dès J1, harness `simulate(config, n)` paramétrable (spec §11bis). **Calibrage multi-profils (§28.8)** : catch d'audit — tuner contre un seul bot re-scripterait la physique autour du Vautour ; parade = cibles de tempo multi-bots + assertion de neutralité en J7 (aucun profil ne domine strictement les Track Records). Design MVP complet : prochaine étape = code (J1) |
 
 ---
 
@@ -1043,3 +1044,11 @@ Danger résiduel : si 80 % des crises tombent tours 8–11, le joueur apprend *l
 > **Le pouvoir prédictif du numéro de tour sur la crise doit être FAIBLE devant celui des signaux.** Mesurable en simulation (information mutuelle, ou précision d'un prédicteur « horloge seule » vs « signaux seuls »). Si l'horloge prédit presque aussi bien que les signaux → le tempo est devenu un script → recalibrer (élargir les plages de `F(0)`, la variance d'accumulation).
 
 Ce critère transforme le principe « grammaire connue, instance imprévisible » (§4.4) en **assertion vérifiable au jalon J7** : le moteur peut *prouver* qu'il n'est pas scripté.
+
+### 28.8 Calibrage multi-profils (v1.7 — anti-script du tuning)
+
+**Catch d'audit T8** : calibrer le monde contre un seul bot-joueur (le Vautour du MVP) re-sculpterait la physique *autour* de ce profil — le script stratégique (§26) reviendrait par la porte du calibrage, sans que personne ne l'ait écrit.
+
+Parade, rendue possible par le harness paramétrable (spec §11bis : archétypes, profils IA et cartes = données, `simulate(config, n)`) :
+1. Les cibles de tempo (§28.2) doivent tenir face à **plusieurs bots-joueurs** de profils différents.
+2. **Assertion de neutralité (J7)** : sur N parties simulées, **aucun profil ne domine strictement** la distribution des Track Records. La neutralité archétypale (§26.1) devient une propriété testée, qui casse si on la viole.
