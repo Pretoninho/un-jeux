@@ -1,6 +1,6 @@
 # Spécification du MVP web — VERROUILLÉ (T8 tranché)
 
-> Version 0.6 — 12 juin 2026. Dérive du game-design-memo (v1.7).
+> Version 0.7 — 12 juin 2026. Dérive du game-design-memo (v1.8).
 > Objet : périmètre exact de la première version jouable. **Validé — prêt pour le code (J1).**
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
@@ -118,7 +118,7 @@ INFO   ↔ IG_US, LIQ
 |---|---|---|
 | **LIRE** | 1 PA | rafraîchit un signal (valable 1 tour) ou pose/déplace un analyste (signal continu) |
 | **POSITIONNER** | 1–2 PA | ouvre / redimensionne / ferme une position (impact prix si taille) |
-| **RÉSERVER** | 0 PA | garde la réserve sèche ; **réduit `F` de 0.05** (purge, §23.3) ; accumule la ressource Réserve sèche du Vautour |
+| **RÉSERVER** | 0 PA | garde la réserve sèche ; purge `F` via la **baisse du levier agrégé, proportionnelle à sa part du capital** (memo §23.3 v1.8) ; accumule la ressource Réserve sèche du Vautour. Coût réel : carry + drift abandonnés (memo §25.5) |
 
 Ordre du tour : actions joueur → actions des 2 IA → résolution marché (rendements, mise à jour `F`, test de crise §23.4 / avancée de cascade §24).
 
@@ -177,11 +177,13 @@ Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le 
 
 **3 signaux actifs** (le 4ᵉ, Initiés, est hors MVP) :
 
-| Signal | Retard | σ | Accès MVP |
+| Signal | Retard (base → plancher) | σ (base → plancher) | Accès MVP |
 |---|---|---|---|
-| Volatilité | 0 | 0.20 | gratuit |
-| Écart de crédit | 1 | 0.10 | 1 PA LIRE, ou analyste sur un hexe crédit |
-| Financement | 2 | 0.04 | présence au nœud LIQ |
+| Volatilité | 0 → 0 | 0.20 → 0.10 | gratuit |
+| Écart de crédit | 1 → 1 (irréductible) | 0.10 → 0.06 | 1 PA LIRE, ou analyste sur un hexe crédit |
+| Financement | 2 → 1 (jamais 0) | 0.08 → 0.04 | présence au nœud LIQ |
+
+Planchers de bruit irréductibles (memo §29.2) : l'infrastructure achète de la netteté, jamais de la certitude. Planchers tirés en plages par instance. Le levier suit la mécanique complète du memo §29.3 (coût croissant, **appel de marge** = transmission des cascades).
 
 ---
 

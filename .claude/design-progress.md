@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-12 — v1.7
+> Dernière mise à jour : 2026-06-12 — v1.8
 
 ---
 
@@ -35,6 +35,7 @@
 | **Score = Track Record (excédent vs marché − α·drawdown) ; benchmark fixe, drawdown mark-to-market ; remplace le Sharpe** | §27 | v1.5 |
 | **Tempo : calibrage statistique (cibles de distribution, pas de durée), `F(0)` en plage cachée, critère « signaux battent l'horloge » (test J7)** | §28 | v1.6 |
 | **Périmètre MVP validé (T8) : architecture N-archétypes/profils/cartes = données, harness paramétrable, calibrage multi-profils + assertion de neutralité (J7)** | spec §11bis, §28.8 | v1.7 |
+| **Défauts #2/#3/#4 résolus : purge symétrique agrégée, planchers de bruit irréductibles, mécanique du levier (appel de marge = transmission des cascades) — chantier script stratégique CLOS** | §23.3, §29 | v1.8 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
 
@@ -54,23 +55,25 @@ Par ordre de priorité (feuille de route §16) :
 
 ---
 
-## Chantier ouvert — défauts de script stratégique (état v1.4)
+## Chantier script stratégique — CLOS (v1.8)
 
 **Moteur de prix (§25) — VERROUILLÉ v1.4** avec 4 fixes anti-script intégrés (A : taux cash jamais indexé sur `F` ; B : plancher de bruit sur l'estimation de `A` ; C : dead recoveries ; D : `λ` faible en normal).
 
-**Défauts de script stratégique (§26.3) — état après verrouillage du moteur :**
+**Les 5 défauts de §26.3 sont résolus (détail en memo §29.4) :**
 
-| # | Défaut | État | Priorité |
-| --- | --- | --- | --- |
-| 1 | Score Sharpe gameable | **résolu — Track Record (§27)** | — |
-| 2 | RÉSERVER : volet « gratuité » résolu (carry §25.5) ; reste la dilution de l'effet individuel sur `F` | partiel | moyenne |
-| 3 | Clarté achetable : principe étendu au micro (`A`) ; reste à chiffrer les planchers macro | partiel | moyenne |
-| 4 | Levier : principe « parfois correct » acquis ; **point d'équilibre = α du Track Record** à calibrer (J7) | partiel | basse |
-| 5 | Bonus phase-3 du Vautour | **résolu — retiré de la spec** | — |
+| # | Défaut | Résolution |
+| --- | --- | --- |
+| 1 | Score Sharpe gameable | Track Record (§27) |
+| 2 | RÉSERVER / purge individuelle | purge symétrique agrégée, proportionnelle à la part de capital (§23.3, §29.1) |
+| 3 | Clarté achetable | planchers de bruit + délais irréductibles, en plages (§29.2) |
+| 4 | Levier option morte | mécanique complète (coût, appel de marge) + test de viabilité en J7 (§29.3) |
+| 5 | Bonus phase-3 du Vautour | supprimé (v1.4) |
 
-Principe directeur : **chaque levier doit porter un coût symétrique** (règle des badges §7 : friction, pas synergie). Détail en §26.5 du memo.
+Principe directeur : **chaque levier doit porter un coût symétrique** (règle des badges §7 : friction, pas synergie).
 
-> Backlog : T1 ✅ · T2 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅ · T3/T4 renvoyés au calibrage J7. **Design MVP complet et audité.** Prochaine étape : **code — jalon J1** (squelette Svelte/TS + interfaces + carte en données, spec §12).
+Restent en J7 (vérifications **numériques**, pas de design) : α, coût du levier, planchers, cibles de tempo (§28.2), critère signaux>horloge (§28.7), neutralité multi-profils (§28.8).
+
+> Backlog : T1 ✅ · T2 ✅ · T3 ✅ · T4 ✅ · T5 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅. **Design MVP complet, audité, chantier clos.** Prochaine étape : **code — jalon J1** (squelette Svelte/TS + interfaces + carte en données, spec §12).
 
 ---
 
