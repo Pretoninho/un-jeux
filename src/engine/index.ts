@@ -1,8 +1,16 @@
-// Point d'entrée public du moteur. Le moteur est du TS pur, importable depuis un
-// script Node sans toucher au navigateur (c'est le contrat de J1).
+// Point d'entrée public du moteur. TS pur, importable depuis Node sans navigateur.
 
 export * from './types';
 export * from './rng';
 export * from './params';
+export * from './state';
+export * from './regime';
+export * from './market';
+export * from './portfolio';
+export * from './fragility';
+export * from './score';
+export * from './policy';
+export * from './init';
+export * from './turn';
 export * from './simulate';
 export { mapNeighborProblems, isConnected } from './map-utils';

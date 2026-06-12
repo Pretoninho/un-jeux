@@ -14,6 +14,8 @@ export interface Rng {
   int(min: number, max: number): number;
   /** Vrai avec probabilité p. */
   chance(p: number): boolean;
+  /** Tirage normal standard (moyenne 0, écart-type 1) — Box-Muller. */
+  gauss(): number;
 }
 
 export function makeRng(seed: number): Rng {
@@ -28,10 +30,18 @@ export function makeRng(seed: number): Rng {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 
+  const gauss = (): number => {
+    // Box-Muller : deux uniformes (0,1] → une normale standard.
+    const u1 = 1 - next();
+    const u2 = next();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  };
+
   return {
     next,
     range: (min, max) => min + (max - min) * next(),
     int: (min, max) => min + Math.floor(next() * (max - min + 1)),
     chance: (p) => next() < p,
+    gauss,
   };
 }

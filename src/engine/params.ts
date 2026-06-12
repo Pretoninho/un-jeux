@@ -42,9 +42,23 @@ export const PARAM_RANGES = {
   varianceMarket: r(0.30, 0.50), // part du facteur M en régime normal (§25.1)
   varianceCluster: r(0.20, 0.35), // part du facteur C
   // (la part idiosyncratique ε = reste, normalisé)
+  crisisVarianceMarket: r(0.80, 0.90), // en crise, M domine → ρ→1 émergent (§25.1)
   lambdaNormal: r(0.02, 0.06), // réversion faible en normal (§25.6, fix D)
   lambdaRecovery: r(0.08, 0.20), // réversion (stochastique) en recovery (§25.6, fix C)
   anchorNoiseFloor: r(0.04, 0.08), // plancher de bruit sur l'estimation de A (§25.2, fix B)
+  anchorWalk: r(0.005, 0.015), // amplitude de la marche lente de l'ancre A (§25.2)
+  fluxImpact: r(0.02, 0.06), // sensibilité du prix au flux net d'ordres (§25.4)
+
+  // ── Drifts et vols par régime (memo §25.3) — μ/σ du facteur marché M ──
+  // La plage de tension CHEVAUCHE le bull (anti-leak du melt-up, §25.3).
+  driftBull: r(0.010, 0.030),
+  volBull: r(0.02, 0.04),
+  driftTension: r(0.010, 0.050),
+  volTension: r(0.04, 0.07),
+  driftCrisis: r(-0.18, -0.08),
+  volCrisis: r(0.08, 0.14),
+  driftRecovery: r(-0.03, 0.05), // inclut le négatif → dead recoveries (§25.6, fix C)
+  volRecovery: r(0.04, 0.08),
 
   // ── Levier (memo §29.3, v1.8) ──
   // Le coût et le seuil de marge sont des règles TRANSPARENTES (exception §27.3) ;

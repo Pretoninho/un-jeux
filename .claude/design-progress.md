@@ -75,7 +75,9 @@ Restent en J7 (vérifications **numériques**, pas de design) : α, coût du lev
 
 > Backlog design : T1 ✅ · T2 ✅ · T3 ✅ · T4 ✅ · T5 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅. **Design MVP complet, audité, chantier clos.**
 >
-> **Code : J1 ✅** — squelette Svelte/Vite/TS. Moteur découplé (`src/engine/`, TS pur sans DOM), tout en données (`src/data/` : carte 16 hexes, Vautour, 2 profils IA, preset MVP). Anti-script porté par le code : RNG seedé (`rng.ts`) + paramètres en plages tirées par instance (`params.ts`, aligné v1.8 dont levier §29.3). 17 tests verts (intégrité/symétrie/connexité carte, reproductibilité RNG, plages des paramètres + `F(0)` < zone morte). Build OK. **25 tests** (dont 8 sur le catalogue d'actions §9bis). Prochaine étape : **J2 — moteur sans UI + harness `simulate`**.
+> **Code : J1 ✅** — squelette Svelte/Vite/TS. Moteur découplé (`src/engine/`, TS pur sans DOM), tout en données (`src/data/` : carte 16 hexes, Vautour, 2 profils IA, preset MVP). Anti-script porté par le code : RNG seedé (`rng.ts`) + paramètres en plages tirées par instance (`params.ts`, aligné v1.8 dont levier §29.3). 17 tests verts (intégrité/symétrie/connexité carte, reproductibilité RNG, plages des paramètres + `F(0)` < zone morte). Build OK.
+>
+> **Code : J2 ✅** — moteur sans UI exécutable. `engine/` : state, regime (émergent), market (facteurs §25, ρ→1 en crise), portfolio (mark-to-market, levier/crowding, appels de marge), fragility (§23.4), score (Track Record §27), turn (boucle), policy (interface + politiques triviales), simulate (harness §28). **Tests d'émergence verts** : levier→crises, réserve→sûr, nb de crises variable (non scripté). **37 tests**, typecheck + build OK. Coutures : cascade complète §24 = J3 · vraies IA = J4 · signaux = J3. Prochaine étape : **J3 — cascade de crise (§24) + signaux observables**.
 >
 > POSITIONNER (memo §9bis, v1.9) : 4 opérations — Ouvrir (1-2) · Renforcer (1-2) · **Clôture partielle (2)** · Fermer totale (1). En données : `src/data/actions.ts`.
 >
