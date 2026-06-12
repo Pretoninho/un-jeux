@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-12 — v1.11
+> Dernière mise à jour : 2026-06-12 — v1.12
 >
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
@@ -93,6 +93,10 @@ Restent en J7 (vérifications **numériques**, pas de design) : α, coût du lev
 > **Proto exploration (UI, hors moteur)** : carte hexagonale **générée** (géométrie = adjacence), brouillard, déplacement par investissement, CHAIN (1 PA puis 2), S'installer sur nœuds (présence), exposition par hexe, Track Record en valeur absolue + %.
 >
 > **Restructuration archétypes (en cours)** : on bâtit d'abord un **profil NEUTRE** (`src/data/archetypes/neutre.ts`) = toutes les primitives, aucune spécificité → bac à sable de mécanique. **Primitive SHORT livrée** : `Position.direction` long/short, P&L miroir, appel de marge et flux sensibles au sens (moteur) + sélecteur Long/Short et affichage du sens (UI). 62 tests. Les archétypes (spécificités par-dessus le neutre) seront développés **un à la fois** ensuite.
+>
+> **Bénéfices des nœuds câblés (prototype)** : **PB → Financement** (flux continu gratuit sur présence) · **PB → levier −50 %** (`borrowMultiplier`, moteur) · **Notation → signaux plus nets** (plancher de bruit irréductible §29.2). **BC → taux anticipés** reste ⛔ (dépend du chantier « réveiller la BC »). **Présence à durée ~3 tours** (`presenceUntil`) = futur bouton d'archétype. **Levier joueur** 0/2/3× exposé (UI). Primitive **DÉPLACER** (bouger sans investir, 1 PA) + **« Ouvrir ici »** (investir sur l'hexe courant). **Mode debug 🐞** (révèle F / régime / phase / ancres A). Réf : `docs/mecaniques.md`.
+>
+> 🎯 **PROCHAIN CHANTIER — Calibrage J7 (autre session)**. Diagnostic (seed 3 rejoué + partie testée) : **tempo trop rapide** (F franchit le plafond 0.85 dès le tour ~6) et **amplitudes trop fortes** (marché ×2 en 12 tours, joueur +434 %, drawdown ~0 % → trop facile). À régler : poids d'accumulation (`accLeverage/accCrowding/accValuation`) + purge, drifts/vols des régimes, vers les cibles §28.2 (~60 % 1 crise / 20-25 % sans crise) et un drawdown qui mord. Outils prêts : harness `simulate`, critère §28.7, mode debug.
 >
 > POSITIONNER (memo §9bis, v1.9) : Ouvrir (Long/Short) · Renforcer · **Clôture partielle (2)** · Fermer. En données : `src/data/actions.ts`.
 >
