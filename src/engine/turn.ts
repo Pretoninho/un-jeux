@@ -3,13 +3,14 @@
 //   marge → mise à jour de F → test de crise → avance de cascade → comptabilité.
 
 import type { GameState, ActorState, Position } from './state';
-import type { Rng } from './rng';
+import { makeRng, type Rng } from './rng';
 import type { Policy, PlannedAction } from './policy';
 import { PA_PAR_TOUR } from '../data/actions';
 import { deriveRegime } from './regime';
 import { resolveMarket } from './market';
 import { actorWealth, applyMarginCalls, positionValue } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
+import { computeSignals } from './signals';
 
 const PA_COST: Record<string, number> = { RESERVER: 0, ouvrir: 1, fermer: 1 };
 
@@ -90,8 +91,13 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
   state.bullStreak = state.regime === 'bull' ? state.bullStreak + 1 : 0;
   updateFragility(state);
   maybeTriggerCrisis(state, rng);
-  advanceCrisis(state);
+  advanceCrisis(state, rng);
   state.fragilityHistory.push(state.fragility);
+
+  // Signaux observés du tour (memo §23.6). RNG dédié, dérivé du seed+tour, pour ne
+  // pas perturber la dynamique : les signaux sont purement observationnels.
+  const sigRng = makeRng(state.rngSeed * 1000003 + state.turn);
+  state.signalsHistory.push(computeSignals(state, sigRng));
 
   // 5. Comptabilité : benchmark (return + carry moyen) et richesse des acteurs.
   const benchAfter = benchmarkLevel(state);

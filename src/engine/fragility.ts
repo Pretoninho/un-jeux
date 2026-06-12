@@ -6,6 +6,7 @@
 
 import type { GameState } from './state';
 import type { Rng } from './rng';
+import { PARAM_RANGES } from './params';
 import { aggregateLeverageRatio, crowdingIndex } from './portfolio';
 import { valuationStretch } from './market';
 
@@ -39,36 +40,74 @@ export function crisisProbability(state: GameState): number {
   return Math.min(1, p.crisisK * d * d);
 }
 
-/** Tente de déclencher une crise. Retourne true si elle se déclenche. */
+/**
+ * Tente de déclencher une crise (memo §24). La FORME de la cascade est tirée
+ * PAR CRISE (durées, ampleur du rebond, vrai-plancher-ou-piège) → deux crises
+ * d'une même partie diffèrent, pas de script intra-partie.
+ */
 export function maybeTriggerCrisis(state: GameState, rng: Rng): boolean {
   if (state.crisis.active) return false;
   const p = crisisProbability(state);
   if (rng.chance(p)) {
+    const pr = state.params;
     state.crisis = {
       active: true,
+      phase: 'leg1',
       triggeredTurn: state.turn,
       amplitude: state.fragility, // amplitude = F au déclenchement (§23.5)
-      turnsLeft: 1, // durée minimale ; J3 remplacera par la cascade complète (§24)
+      durations: {
+        leg1: Math.round(rng.range(PARAM_RANGES.cascadeLeg1Turns.min, PARAM_RANGES.cascadeLeg1Turns.max)),
+        bounce: Math.round(rng.range(PARAM_RANGES.cascadeBounceTurns.min, PARAM_RANGES.cascadeBounceTurns.max)),
+        leg3: Math.round(rng.range(PARAM_RANGES.cascadeLeg3Turns.min, PARAM_RANGES.cascadeLeg3Turns.max)),
+      },
+      bounceRecovery: rng.range(PARAM_RANGES.bounceRecovery.min, PARAM_RANGES.bounceRecovery.max),
+      isRealFloor: rng.chance(pr.realFloorProbability), // ~30% : le rebond EST le plancher (§24.2)
+      phaseTurnsLeft: 0, // fixé au démarrage de leg1 (tour suivant)
+      recoveryTurnsLeft: 0,
     };
+    state.crisis.phaseTurnsLeft = state.crisis.durations.leg1;
     state.crisisTurns.push(state.turn);
     return true;
   }
   return false;
 }
 
+/** Résout la fin de cascade : reset de F ∝ amplitude (§23.5) + fenêtre de recovery. */
+function resolveCascade(state: GameState, rng: Rng): void {
+  state.fragility = state.params.resetFactor * state.crisis.amplitude; // purge quasi-totale
+  const recovery = Math.round(rng.range(PARAM_RANGES.recoveryTurns.min, PARAM_RANGES.recoveryTurns.max));
+  state.crisis.active = false;
+  state.crisis.phase = 'none';
+  state.crisis.recoveryTurnsLeft = recovery;
+}
+
 /**
- * Fait avancer/terminer une crise active (version J2 : choc court à une phase).
- * J3 remplace par la morphologie complète (chute → rebond → vraie jambe, §24).
- * À la résolution : reset de F ∝ amplitude (§23.5), puis fenêtre de recovery.
+ * Fait avancer la cascade (memo §24) : leg1 → rebond → (leg3 OU vrai plancher) →
+ * recovery. Le tour de déclenchement ne consomme pas de phase (la chute démarre
+ * au tour suivant).
  */
-export function advanceCrisis(state: GameState): void {
-  if (!state.crisis.active) {
-    if (state.crisis.turnsLeft < 0) state.crisis.turnsLeft += 1; // décompte recovery
+export function advanceCrisis(state: GameState, rng: Rng): void {
+  const c = state.crisis;
+  if (!c.active) {
+    if (c.recoveryTurnsLeft > 0) c.recoveryTurnsLeft -= 1; // décompte de la recovery
     return;
   }
-  state.crisis.turnsLeft -= 1;
-  if (state.crisis.turnsLeft <= 0) {
-    state.fragility = state.params.resetFactor * state.crisis.amplitude; // purge quasi-totale
-    state.crisis = { active: false, triggeredTurn: state.crisis.triggeredTurn, amplitude: 0, turnsLeft: -2 };
+  if (c.triggeredTurn === state.turn) return; // déclenché ce tour : on n'avance pas encore
+
+  c.phaseTurnsLeft -= 1;
+  if (c.phaseTurnsLeft > 0) return;
+
+  if (c.phase === 'leg1') {
+    c.phase = 'bounce';
+    c.phaseTurnsLeft = c.durations.bounce;
+  } else if (c.phase === 'bounce') {
+    if (c.isRealFloor) {
+      resolveCascade(state, rng); // le rebond était le vrai plancher : pas de leg3
+    } else {
+      c.phase = 'leg3';
+      c.phaseTurnsLeft = c.durations.leg3;
+    }
+  } else if (c.phase === 'leg3') {
+    resolveCascade(state, rng);
   }
 }

@@ -8,6 +8,7 @@ export * from './regime';
 export * from './market';
 export * from './portfolio';
 export * from './fragility';
+export * from './signals';
 export * from './score';
 export * from './policy';
 export * from './init';

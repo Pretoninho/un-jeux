@@ -44,12 +44,23 @@ export function buildInitialState(config: ConfigPartie): InitResult {
     fragility: params.f0, // F(0) tiré en plage cachée (memo §23.1)
     regime: 'bull',
     bullStreak: 0,
-    crisis: { active: false, triggeredTurn: -1, amplitude: 0, turnsLeft: 0 },
+    crisis: {
+      active: false,
+      phase: 'none',
+      triggeredTurn: -1,
+      amplitude: 0,
+      phaseTurnsLeft: 0,
+      durations: { leg1: 0, bounce: 0, leg3: 0 },
+      bounceRecovery: 0,
+      isRealFloor: false,
+      recoveryTurnsLeft: 0,
+    },
     market,
     actors,
     fragilityHistory: [params.f0],
     crisisTurns: [],
     benchmarkHistory: [1],
+    signalsHistory: [],
   };
 
   return { state, rng };

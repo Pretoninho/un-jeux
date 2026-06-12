@@ -17,6 +17,25 @@ export function regimeDriftVol(regime: Regime, p: InstanceParams): { mu: number;
   }
 }
 
+/**
+ * μ/σ effectifs du tour. En crise, la PHASE de la cascade (memo §24) pilote :
+ *   leg1   → chute · bounce → rebond (drift POSITIF, le bull trap) · leg3 → vraie jambe.
+ * Sinon, le régime émergent.
+ */
+export function marketDriftVol(state: GameState): { mu: number; sigma: number } {
+  const p = state.params;
+  const c = state.crisis;
+  if (c.active) {
+    switch (c.phase) {
+      case 'leg1': return { mu: p.driftCrisis, sigma: p.volCrisis };
+      case 'bounce': return { mu: Math.abs(p.driftCrisis) * c.bounceRecovery, sigma: p.volCrisis * 0.8 };
+      case 'leg3': return { mu: p.driftCrisis * 1.3, sigma: p.volCrisis * 1.2 };
+      default: break;
+    }
+  }
+  return regimeDriftVol(state.regime, p);
+}
+
 /** Fractions de variance M / C / ε. En crise, M domine → ρ→1 (memo §25.1). */
 export function varianceFractions(regime: Regime, p: InstanceParams): { fM: number; fC: number; fIdio: number } {
   const fIdioNormal = Math.max(0, 1 - p.varianceMarket - p.varianceCluster);
@@ -39,7 +58,7 @@ const isInvestable = (h: Hex): boolean => h.kind === 'marche' || h.kind === 'fro
  */
 export function resolveMarket(state: GameState, fluxByHex: Record<string, number>, rng: Rng): void {
   const p = state.params;
-  const { mu, sigma } = regimeDriftVol(state.regime, p);
+  const { mu, sigma } = marketDriftVol(state);
   const { fM, fC, fIdio } = varianceFractions(state.regime, p);
 
   // Facteur marché commun (une réalisation), et facteur de cluster (une par cluster).

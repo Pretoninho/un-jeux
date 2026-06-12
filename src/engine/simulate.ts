@@ -3,7 +3,7 @@
 // cibles de tempo (§28.2), critère signaux>horloge (§28.7), neutralité (§28.8).
 
 import type { ConfigPartie } from './types';
-import type { GameState } from './state';
+import type { GameState, SignalReading } from './state';
 import type { Policy } from './policy';
 import { alwaysReserve } from './policy';
 import { buildInitialState } from './init';
@@ -17,6 +17,8 @@ export interface SimResult {
   crisisTurns: number[];
   finalFragility: number;
   fragilityHistory: number[];
+  /** Signaux observés par tour (memo §23.6) — pour le critère J7 (§28.7). */
+  signalsHistory: SignalReading[];
   /** Track Record par acteur (clé = id d'acteur). actors[0] = le joueur. */
   trackRecords: Record<string, TrackRecord>;
   playerTrackRecord: TrackRecord;
@@ -49,6 +51,7 @@ function resultFromState(state: GameState, seed: number): SimResult {
     crisisTurns: [...state.crisisTurns],
     finalFragility: state.fragility,
     fragilityHistory: [...state.fragilityHistory],
+    signalsHistory: [...state.signalsHistory],
     trackRecords,
     playerTrackRecord: trackRecords[state.actors[0]!.id]!,
   };

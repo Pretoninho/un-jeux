@@ -9,8 +9,8 @@ import type { GameState, Regime } from './state';
  */
 export function deriveRegime(state: GameState): Regime {
   if (state.crisis.active) return 'crise';
-  // Fenêtre de recovery juste après une crise (turnsLeft négatif = compteur recovery).
-  if (state.crisis.turnsLeft < 0) return 'recovery';
+  // Fenêtre de recovery juste après la résolution d'une cascade (memo §24).
+  if (state.crisis.recoveryTurnsLeft > 0) return 'recovery';
 
   const { fragility, params } = state;
   // bull tant que la fragilité est sous la zone morte ; tension quand ça chauffe.

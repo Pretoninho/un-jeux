@@ -74,6 +74,15 @@ export const PARAM_RANGES = {
 
   // ── Tempo (memo §28) ──
   horizonTurns: r(12, 15), // durée d'un cycle MVP (§28.2, §28.5)
+  recoveryTurns: r(2, 4), // fenêtre de recovery après une cascade (§24)
+
+  // ── Signaux observables (memo §23.6, §29.2) ──
+  // Bruit total par signal (le plancher irréductible est inclus). Tirés en plages
+  // par instance → le joueur ne peut pas mesurer son bruit résiduel (§29.2).
+  signalNoiseVol: r(0.12, 0.20), // Volatilité : retard 0, bruit fort
+  signalNoiseSpread: r(0.06, 0.12), // Écart de crédit : retard 1
+  signalNoiseFinance: r(0.04, 0.08), // Financement : retard 2, bruit faible
+  bounceDetune: r(0.15, 0.30), // détente des signaux pendant le rebond — le mensonge (§24.2)
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -92,6 +101,7 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'cascadeBounceTurns',
     'cascadeLeg3Turns',
     'horizonTurns',
+    'recoveryTurns',
   ]);
 
   const out = {} as InstanceParams;
