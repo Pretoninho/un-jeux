@@ -399,15 +399,13 @@
               <button class="lire" onclick={() => readSignal('ecartCredit')} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
             {/if}
           </div>
-          <!-- Financement : nécessite une présence active au prime broker (PB) -->
+          <!-- Financement : présence active au PB = flux CONTINU gratuit (desk posté, memo §17) ; sinon verrouillé -->
           <div class="bar-row">
             <span>Financement</span>
-            {#if !view.pbActive}
-              <span class="locked">🔒 présence PB requise</span>
-            {:else if read.has('financement')}
+            {#if view.pbActive}
               <div class="bar"><div class="fill" style="width:{view.signals.financement * 100}%"></div></div>
             {:else}
-              <button class="lire" onclick={() => readSignal('financement')} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
+              <span class="locked">🔒 présence PB requise</span>
             {/if}
           </div>
         </section>

@@ -51,7 +51,7 @@
 - **3 signaux** (`engine/signals.ts`, memo §23.6) = lectures **bruitées et retardées** de `F`, ne la révèlent jamais exactement :
   - **Volatilité** (retard 0, gratuite) · **Écart de crédit** (retard 1) · **Financement** (retard 2).
   - 🟡 **Coût de LIRE** : implémenté **dans l'UI** (Volatilité gratuite ; Écart/Financement masqués, révélés par LIRE 1 PA chacun). Le moteur calcule les signaux par ailleurs.
-  - ✅ **Financement verrouillé sans le PB** : il n'est accessible (puis LIRE) que si tu as une **présence active à un nœud prime broker** (memo §11). Présence persistante ~3 tours (réglable ; futur bouton d'archétype).
+  - ✅ **Financement = présence au PB** : verrouillé sans présence à un nœud prime broker (memo §11). Avec présence active, il s'affiche **en CONTINU et gratuitement** (desk posté = flux permanent, memo §17 — pas de LIRE à payer). Présence persistante ~3 tours (réglable ; futur bouton d'archétype).
   - ✅ **Notation → signaux plus nets** : présence active à un nœud Notation = bruit des 3 signaux **réduit** (× 0.5), borné par un **plancher irréductible** (§29.2 : l'infra améliore sans jamais rendre certain).
 
 ## F. La crise — cascade & bull trap ✅ (memo §24)
