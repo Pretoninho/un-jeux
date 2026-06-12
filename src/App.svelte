@@ -1,6 +1,10 @@
 <script lang="ts">
-  // Vue principale (J5). Le moteur (src/engine) est inchangé : le joueur humain est
-  // une Policy alimentée par l'UI. F reste cachée — on n'affiche que les signaux.
+  // Vue principale — PROTOTYPE d'exploration (gameplay à l'essai).
+  // Le moteur (src/engine) est INCHANGÉ : le brouillard, le déplacement et le CHAIN
+  // sont une couche d'UI. Les actions du joueur sont IMMÉDIATES (pas de retour arrière).
+  // Simplifications de prototype : IA non spatiales · le flux des ouvertures immédiates
+  // n'alimente pas l'impact-prix du tour · carte fixe 13 hexes (la mécanique vise une
+  // carte procédurale large, memo §11).
   import { buildInitialState } from './engine/init';
   import { runTurn } from './engine/turn';
   import { policyForProfile } from './engine/ai';
@@ -10,31 +14,40 @@
   import { makeRng, type Rng } from './engine/rng';
   import type { GameState, SignalReading } from './engine/state';
   import type { Hex } from './engine/types';
-  import type { Policy, PlannedAction } from './engine/policy';
+  import type { Policy } from './engine/policy';
   import { PA_PAR_TOUR } from './data/actions';
   import { presetMvp } from './data/config-mvp';
   import { LEXICON } from './data/lexicon';
-  import { HEX_POS, hexPoints, hexFill, MAP_W, MAP_H, HEX_R } from './lib/layout';
+  import { HEX_POS, hexPoints, hexFill, MAP_W, MAP_H } from './lib/layout';
 
-  // État non réactif (le moteur) ; l'UI lit des snapshots réactifs.
   let gs: GameState;
   let rng: Rng;
   let ai: Policy[];
-  let prevV: Record<string, number> = {}; // V du tour précédent → sens de la flèche
+  let prevV: Record<string, number> = {};
 
-  let queued = $state<PlannedAction[]>([]);
   let seed = $state(1);
   let selected = $state<string | null>(null);
   let hexes = $state<Hex[]>([]);
   let log = $state<string[]>([]);
   let view = $state<ReturnType<typeof buildView>>();
-  let read = $state<Set<string>>(new Set()); // signaux acquis ce tour (au-delà de la volatilité)
-  let showDetail = $state(false); // explication détaillée de l'hexe sélectionné
+  let read = $state<Set<string>>(new Set());
+  let showDetail = $state(false);
 
-  const PARTIAL = 2;
-  const paCost = (a: PlannedAction) =>
-    a.verb === 'RESERVER' ? 0 : a.op === 'cloture_partielle' ? PARTIAL : 1;
-  const fmtPct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
+  // Couche d'exploration
+  let playerHex = $state<string>('');
+  let revealed = $state<Set<string>>(new Set());
+  let paUsed = $state(0);
+  let opensThisTurn = $state(0);
+
+  const isInvestable = (h: Hex) => h.kind === 'marche';
+  const paLeft = () => PA_PAR_TOUR - paUsed - read.size;
+  const openCost = () => (opensThisTurn === 0 ? 1 : 2); // 1ʳᵉ ouverture = 1 PA, CHAIN = 2 PA
+  const hexById = (id: string) => hexes.find((h) => h.id === id);
+  const neighborsOfPlayer = () => hexById(playerHex)?.neighbors ?? [];
+  const canOpen = (id: string) => {
+    const h = hexById(id);
+    return !!h && isInvestable(h) && revealed.has(id) && neighborsOfPlayer().includes(id);
+  };
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -45,7 +58,7 @@
     const delta: Record<string, number> = {};
     for (const [id, m] of Object.entries(gs.market)) {
       market[id] = m.V;
-      delta[id] = m.V - (prevV[id] ?? m.V); // variation depuis le tour précédent
+      delta[id] = m.V - (prevV[id] ?? m.V);
     }
     return {
       turn: gs.turn,
@@ -57,14 +70,16 @@
       market,
       delta,
       signals: sig,
-      track: {
-        you: wealth / 100 - 1,
-        market: (gs.benchmarkHistory.at(-1) ?? 1) - 1,
-        drawdown: tr.maxDrawdown,
-      },
-      paUsed: queued.reduce((a, act) => a + paCost(act), 0),
+      track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
       over: gs.turn >= gs.params.horizonTurns,
     };
+  }
+
+  function reveal(id: string) {
+    const next = new Set(revealed);
+    next.add(id);
+    for (const n of hexById(id)?.neighbors ?? []) next.add(n);
+    revealed = next;
   }
 
   function newGame(s: number) {
@@ -73,64 +88,107 @@
     gs = init.state;
     rng = init.rng;
     ai = cfg.adversaires.map(policyForProfile);
-    queued = [];
     hexes = gs.map.hexes;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
-    selected = null;
+    // Spawn sur un hexe marché au hasard (reproductible par seed).
+    const spawnable = hexes.filter(isInvestable).map((h) => h.id);
+    const spw = makeRng(s * 7 + 1);
+    playerHex = spawnable[spw.int(0, spawnable.length - 1)] ?? spawnable[0]!;
+    revealed = new Set();
+    reveal(playerHex);
+    paUsed = 0;
+    opensThisTurn = 0;
     read = new Set();
+    selected = playerHex;
     showDetail = false;
-    log = [`Nouvelle partie — seed ${s}`];
+    log = [`Apparition en ${hexById(playerHex)?.label} — seed ${s}`];
     view = buildView();
   }
 
-  const paLeft = () => PA_PAR_TOUR - (view?.paUsed ?? 0) - read.size;
-
-  function queueAction(a: PlannedAction) {
-    if (!view || view.over || paCost(a) > paLeft()) return;
-    queued.push(a);
+  // Actions IMMÉDIATES (mutent l'acteur joueur ; le moteur résout le marché à Fin du tour).
+  function spend(cost: number) {
+    paUsed += cost;
     view = buildView();
   }
 
   function open(hexId: string, frac: number) {
-    queueAction({ verb: 'POSITIONNER', op: 'ouvrir', hexId, equity: gs.actors[0]!.cash * frac, leverage: 0 });
-  }
-  function reinforce(hexId: string) {
-    queueAction({ verb: 'POSITIONNER', op: 'renforcer', hexId, equity: gs.actors[0]!.cash * 0.25, leverage: 0 });
-  }
-  function partial(hexId: string) {
-    queueAction({ verb: 'POSITIONNER', op: 'cloture_partielle', hexId });
-  }
-  function close(hexId: string) {
-    queueAction({ verb: 'POSITIONNER', op: 'fermer', hexId });
+    const cost = openCost();
+    if (view?.over || !canOpen(hexId) || paLeft() < cost) return;
+    const player = gs.actors[0]!;
+    const equity = player.cash * frac;
+    if (equity <= 0) return;
+    player.cash -= equity;
+    player.positions.push({ hexId, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    playerHex = hexId; // déplacement
+    reveal(hexId); // révèle les nouveaux voisins
+    opensThisTurn += 1;
+    selected = hexId;
+    log = [`Ouvre ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
+    spend(cost);
   }
 
-  // LIRE (1 PA) : révèle un signal coûteux pour ce tour (la volatilité est gratuite).
+  function reinforce(hexId: string) {
+    if (view?.over || !view?.positions.has(hexId) || paLeft() < 1) return;
+    const player = gs.actors[0]!;
+    const equity = player.cash * 0.25;
+    if (equity <= 0) return;
+    player.cash -= equity;
+    player.positions.push({ hexId, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    spend(1);
+  }
+
+  function partial(hexId: string) {
+    if (view?.over || !view?.positions.has(hexId) || paLeft() < 2) return;
+    const player = gs.actors[0]!;
+    for (const p of player.positions) {
+      if (p.hexId !== hexId) continue;
+      const notional = p.equity * (1 + p.leverage);
+      const value = p.equity + notional * (gs.market[hexId]!.V / p.entryV - 1);
+      player.cash += 0.5 * Math.max(0, value);
+      p.equity *= 0.5;
+    }
+    spend(2);
+  }
+
+  function close(hexId: string) {
+    if (view?.over || !view?.positions.has(hexId) || paLeft() < 1) return;
+    const player = gs.actors[0]!;
+    const kept = [];
+    for (const p of player.positions) {
+      if (p.hexId === hexId) {
+        const notional = p.equity * (1 + p.leverage);
+        player.cash += Math.max(0, p.equity + notional * (gs.market[hexId]!.V / p.entryV - 1));
+      } else kept.push(p);
+    }
+    player.positions = kept;
+    spend(1);
+  }
+
   function readSignal(name: string) {
-    if (!view || view.over || read.has(name) || paLeft() < 1) return;
+    if (view?.over || read.has(name) || paLeft() < 1) return;
     read = new Set(read).add(name);
   }
 
   function endTurn() {
     if (!view || view.over) return;
-    prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V])); // snapshot avant résolution
-    const human: Policy = { id: 'human', decide: () => (queued.length ? queued : [{ verb: 'RESERVER' }]) };
+    prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
+    const human: Policy = { id: 'human', decide: () => [{ verb: 'RESERVER' }] };
     runTurn(gs, [human, ...ai], rng);
-    queued = [];
-    read = new Set(); // les signaux acquis ne valent que pour le tour
+    paUsed = 0;
+    opensThisTurn = 0;
+    read = new Set();
     log = [`Tour ${gs.turn} · ${gs.regime}`, ...log].slice(0, 8);
     view = buildView();
   }
 
-  function isInvestable(h: Hex) {
-    return h.kind === 'marche';
-  }
+  const fmtPct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
 
-  newGame(1); // seed initial (le champ « Nouvelle partie » permet d'en changer)
+  newGame(1);
 </script>
 
 <main>
   <header>
-    <div class="title">un-jeux <span class="sub">· Vautour</span></div>
+    <div class="title">un-jeux <span class="sub">· Vautour · exploration (proto)</span></div>
     {#if view}
       <div class="status">
         <span>Tour <b>{view.turn}/{view.horizon}</b></span>
@@ -146,52 +204,49 @@
 
   {#if view}
     <div class="board">
-      <!-- CARTE -->
       <svg viewBox="0 0 {MAP_W} {MAP_H}" class="map">
         {#each hexes as h (h.id)}
           {@const pos = HEX_POS[h.id]}
           {#if pos}
+            {@const shown = revealed.has(h.id)}
+            {@const d = view.delta[h.id] ?? 0}
             <g
               class="hex"
               class:selected={selected === h.id}
               class:owned={view.positions.has(h.id)}
+              class:here={playerHex === h.id}
+              class:openable={canOpen(h.id)}
               role="button"
               tabindex="0"
-              onclick={() => (selected = h.id)}
-              onkeydown={(e) => e.key === 'Enter' && (selected = h.id)}
+              onclick={() => shown && (selected = h.id)}
+              onkeydown={(e) => e.key === 'Enter' && shown && (selected = h.id)}
             >
-              <title>{LEXICON[h.id]?.court ?? h.label}</title>
-              <polygon
-                points={hexPoints(pos[0], pos[1])}
-                fill={hexFill(h.kind, h.cluster)}
-                class:frontier={h.kind === 'frontiere'}
-              />
-              <text x={pos[0]} y={pos[1] - 6} class="label">{h.label}</text>
-              {#if isInvestable(h)}
-                {@const d = view.delta[h.id] ?? 0}
-                <text
-                  x={pos[0]}
-                  y={pos[1] + 12}
-                  class="vval"
-                  class:up={d > 0.05}
-                  class:down={d < -0.05}
-                >{view.market[h.id]?.toFixed(0)}{d > 0.05 ? ' ▲' : d < -0.05 ? ' ▼' : ''}</text>
+              <title>{shown ? (LEXICON[h.id]?.court ?? h.label) : 'Inexploré'}</title>
+              {#if shown}
+                <polygon points={hexPoints(pos[0], pos[1])} fill={hexFill(h.kind, h.cluster)} class:frontier={h.kind === 'frontiere'} />
+                <text x={pos[0]} y={pos[1] - 6} class="label">{h.label}</text>
+                {#if isInvestable(h)}
+                  <text x={pos[0]} y={pos[1] + 12} class="vval" class:up={d > 0.05} class:down={d < -0.05}>
+                    {view.market[h.id]?.toFixed(0)}{d > 0.05 ? ' ▲' : d < -0.05 ? ' ▼' : ''}
+                  </text>
+                {/if}
+                {#if playerHex === h.id}<circle cx={pos[0]} cy={pos[1] + 26} r="5" class="token" />{/if}
+              {:else}
+                <polygon points={hexPoints(pos[0], pos[1])} class="fog" />
+                <text x={pos[0]} y={pos[1] + 4} class="fogq">?</text>
               {/if}
             </g>
           {/if}
         {/each}
       </svg>
 
-      <!-- PANNEAU -->
       <aside>
         <section class="signals">
           <h3>Signaux <span class="hint">~ bruités, F cachée</span></h3>
-          <!-- Volatilité : toujours visible et gratuite (memo §23.6). -->
           <div class="bar-row">
             <span>Volatilité</span>
             <div class="bar"><div class="fill" style="width:{view.signals.volatilite * 100}%"></div></div>
           </div>
-          <!-- Écart crédit / Financement : acquis via LIRE (1 PA), valables ce tour. -->
           {#each [['Écart crédit', 'ecartCredit'], ['Financement', 'financement']] as [name, key]}
             <div class="bar-row">
               <span>{name}</span>
@@ -206,44 +261,39 @@
 
         <section class="actions">
           <h3>Actions <span class="pa">{paLeft()} / {PA_PAR_TOUR} PA</span></h3>
+          <div class="chain">Prochaine ouverture : <b>{openCost()} PA</b>{opensThisTurn > 0 ? ' (CHAIN)' : ''}</div>
           {#if selected}
-            {@const h = hexes.find((x) => x.id === selected)}
+            {@const h = hexById(selected)}
             {@const held = view.positions.has(selected)}
-            {@const investable = !!h && isInvestable(h)}
             <div class="sel">
-              <b>{h?.label}</b>
+              <b>{h?.label}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
               <button class="qmark" onclick={() => (showDetail = !showDetail)} title="Explication">?</button>
             </div>
             <div class="court">{LEXICON[selected]?.court}</div>
             {#if showDetail}<div class="long">{LEXICON[selected]?.long}</div>{/if}
 
-            {#if investable}
+            {#if canOpen(selected)}
               <div class="open-row">
-                <span>Ouvrir</span>
-                <button onclick={() => open(selected!, 0.25)} disabled={view.over || paLeft() < 1}>25%</button>
-                <button onclick={() => open(selected!, 0.5)} disabled={view.over || paLeft() < 1}>50%</button>
-                <button onclick={() => open(selected!, 1)} disabled={view.over || paLeft() < 1}>100%</button>
+                <span>Ouvrir & aller</span>
+                <button onclick={() => open(selected!, 0.25)} disabled={paLeft() < openCost()}>25%</button>
+                <button onclick={() => open(selected!, 0.5)} disabled={paLeft() < openCost()}>50%</button>
+                <button onclick={() => open(selected!, 1)} disabled={paLeft() < openCost()}>100%</button>
               </div>
-              <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1 || !held}>
-                Renforcer (+25%) · 1 PA
-              </button>
-              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < PARTIAL || !held}>
-                Clôture partielle (−50%) · 2 PA
-              </button>
-              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || !held}>
-                Fermer (totale) · 1 PA
-              </button>
-            {:else}
-              <div class="muted small">Hexe non investissable (nœud / frontière).</div>
+            {/if}
+            {#if held}
+              <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
+              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
+              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1}>Fermer (totale) · 1 PA</button>
+            {/if}
+            {#if !canOpen(selected) && !held && playerHex !== selected}
+              <div class="muted small">Pas adjacent / non investissable.</div>
             {/if}
           {:else}
-            <div class="sel muted">Clique un hexe.</div>
+            <div class="sel muted">Clique un hexe révélé.</div>
           {/if}
           <div class="cash">Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b></div>
-          <button class="end" onclick={endTurn} disabled={view.over}>
-            {queued.length ? `Valider le tour (${queued.length})` : 'Réserver & passer'}
-          </button>
-          {#if view.over}<div class="over">Partie terminée — Track Record final : <b>{fmtPct(view.track.you - view.track.market)}</b> vs marché</div>{/if}
+          <button class="end" onclick={endTurn} disabled={view.over}>Fin du tour</button>
+          {#if view.over}<div class="over">Partie terminée — Track Record : <b>{fmtPct(view.track.you - view.track.market)}</b> vs marché</div>{/if}
         </section>
 
         <section class="log">
@@ -265,26 +315,30 @@
   main { max-width: 980px; margin: 0 auto; padding: 1rem; }
   header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2f3a; padding-bottom: .5rem; }
   .title { font-size: 1.3rem; font-weight: 700; }
-  .sub { color: #7a8294; font-weight: 400; font-size: .9rem; }
+  .sub { color: #7a8294; font-weight: 400; font-size: .85rem; }
   .status { display: flex; gap: 1rem; font-size: .85rem; color: #9aa3b5; flex-wrap: wrap; }
   .status b { color: #e6ebf5; }
-  b.crise { color: #e0564f; }
-  .neg { color: #e0564f; }
+  b.crise, .neg { color: #e0564f; }
   .board { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; margin-top: 1rem; }
   .map { width: 100%; background: #0e1015; border-radius: 8px; }
   .hex { cursor: pointer; }
-  .hex polygon { stroke: #0e1015; stroke-width: 2; transition: stroke .1s; }
+  .hex polygon { stroke: #0e1015; stroke-width: 2; }
   .hex.owned polygon { stroke: #e8b54a; stroke-width: 3.5; }
+  .hex.openable polygon { stroke: #6fae8f; stroke-width: 3; stroke-dasharray: 5 3; }
   .hex.selected polygon { stroke: #fff; stroke-width: 3.5; }
+  .hex.here polygon { stroke: #f0f3f9; }
   polygon.frontier { opacity: .45; stroke-dasharray: 4 3; }
+  polygon.fog { fill: #181b22; stroke: #23272f; stroke-width: 2; }
+  .fogq { fill: #3c424e; font-size: 18px; text-anchor: middle; pointer-events: none; }
+  .token { fill: #f0f3f9; stroke: #14161c; stroke-width: 1.5; }
   .label { fill: #eef1f7; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .vval.up { fill: #46b277; }
-  .vval.down { fill: #e0564f; }
+  .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
   aside { display: flex; flex-direction: column; gap: .8rem; }
   section { background: #1a1d25; border: 1px solid #2a2f3a; border-radius: 8px; padding: .7rem; }
   h3 { margin: 0 0 .5rem; font-size: .9rem; display: flex; justify-content: space-between; align-items: baseline; }
   .hint, .pa { font-weight: 400; font-size: .72rem; color: #7a8294; }
+  .chain { font-size: .76rem; color: #9aa3b5; margin-bottom: .4rem; }
   .bar-row { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: .5rem; font-size: .78rem; margin: .25rem 0; }
   .bar { background: #0e1015; border-radius: 3px; height: 10px; overflow: hidden; }
   .fill { background: linear-gradient(90deg, #3a7d5a, #d9a23a, #d9543a); height: 100%; }
@@ -299,8 +353,7 @@
   .open-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
   .open-row button { margin: .25rem 0; }
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
-  .small { font-size: .76rem; }
-  .muted { color: #7a8294; }
+  .small { font-size: .72rem; } .muted { color: #7a8294; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }
   .log { font-size: .76rem; color: #9aa3b5; }
