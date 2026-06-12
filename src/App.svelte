@@ -16,9 +16,8 @@
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
   import { PA_PAR_TOUR } from './data/actions';
-  import { presetMvp } from './data/config-mvp';
-  import { LEXICON } from './data/lexicon';
-  import { HEX_POS, hexPoints, hexFill, MAP_W, MAP_H } from './lib/layout';
+  import { presetExplore } from './data/config-explore';
+  import { hexFill, axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
 
   let gs: GameState;
   let rng: Rng;
@@ -38,8 +37,28 @@
   let revealed = $state<Set<string>>(new Set());
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
+  let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
+  let viewBox = $state('0 0 100 100');
 
   const isInvestable = (h: Hex) => h.kind === 'marche';
+
+  // Descriptions génériques (carte générée → pas d'entrée dans le lexique fixe).
+  const CLUSTER_DESC: Record<string, [string, string]> = {
+    credit: ['Crédit', 'Obligations : beta faible, carry régulier, défensif. Sensible aux taux et aux spreads.'],
+    actions: ['Actions', 'Grandes capitalisations : beta élevé, moteur de rendement, exposé aux corrections.'],
+    alternatifs: ['Alternatifs', 'Immobilier / private equity : carry variable, illiquide, impact-prix marqué en sortie.'],
+  };
+  const NODE_DESC: Record<string, string> = {
+    reglementaire: 'Banque centrale : fixe les taux. Présence = lecture anticipée des taux.',
+    liquidite: 'Prime broker : levier moins cher, débloque le signal Financement.',
+    information: 'Agence de notation : signaux moins bruités.',
+  };
+  function descOf(h?: Hex): { court: string; long: string } {
+    if (!h) return { court: '', long: '' };
+    if (h.kind === 'noeud') return { court: `${h.label} · nœud`, long: NODE_DESC[h.nodeType ?? ''] ?? '' };
+    const c = CLUSTER_DESC[h.cluster ?? ''] ?? ['Marché', ''];
+    return { court: c[0] + (h.kind === 'frontiere' ? ' — frontière (verrouillé)' : ''), long: c[1] };
+  }
   const paLeft = () => PA_PAR_TOUR - paUsed - read.size;
   const openCost = () => (opensThisTurn === 0 ? 1 : 2); // 1ʳᵉ ouverture = 1 PA, CHAIN = 2 PA
   const hexById = (id: string) => hexes.find((h) => h.id === id);
@@ -66,7 +85,11 @@
       regime: gs.regime,
       cash: player.cash,
       wealth,
-      positions: new Set(player.positions.map((p) => p.hexId)),
+      held: new Set(player.positions.map((p) => p.hexId)),
+      exposure: player.positions.reduce<Record<string, number>>((acc, p) => {
+        acc[p.hexId] = (acc[p.hexId] ?? 0) + p.equity;
+        return acc;
+      }, {}),
       market,
       delta,
       signals: sig,
@@ -83,13 +106,23 @@
   }
 
   function newGame(s: number) {
-    const cfg = presetMvp(s);
+    const cfg = presetExplore(s);
     const init = buildInitialState(cfg);
     gs = init.state;
     rng = init.rng;
     ai = cfg.adversaires.map(policyForProfile);
     hexes = gs.map.hexes;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
+    // Centres pixel depuis les coordonnées axiales + viewBox englobante.
+    const centers: Array<[number, number]> = [];
+    positions = {};
+    for (const h of hexes) {
+      const c = h.coord ? axialToPixel(h.coord.q, h.coord.r) : [0, 0] as [number, number];
+      positions[h.id] = c;
+      centers.push(c);
+    }
+    const b = genBounds(centers);
+    viewBox = `${b.minX.toFixed(1)} ${b.minY.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
     // Spawn sur un hexe marché au hasard (reproductible par seed).
     const spawnable = hexes.filter(isInvestable).map((h) => h.id);
     const spw = makeRng(s * 7 + 1);
@@ -128,7 +161,7 @@
   }
 
   function reinforce(hexId: string) {
-    if (view?.over || !view?.positions.has(hexId) || paLeft() < 1) return;
+    if (view?.over || !view?.held.has(hexId) || paLeft() < 1) return;
     const player = gs.actors[0]!;
     const equity = player.cash * 0.25;
     if (equity <= 0) return;
@@ -138,7 +171,7 @@
   }
 
   function partial(hexId: string) {
-    if (view?.over || !view?.positions.has(hexId) || paLeft() < 2) return;
+    if (view?.over || !view?.held.has(hexId) || paLeft() < 2) return;
     const player = gs.actors[0]!;
     for (const p of player.positions) {
       if (p.hexId !== hexId) continue;
@@ -151,7 +184,7 @@
   }
 
   function close(hexId: string) {
-    if (view?.over || !view?.positions.has(hexId) || paLeft() < 1) return;
+    if (view?.over || !view?.held.has(hexId) || paLeft() < 1) return;
     const player = gs.actors[0]!;
     const kept = [];
     for (const p of player.positions) {
@@ -204,16 +237,16 @@
 
   {#if view}
     <div class="board">
-      <svg viewBox="0 0 {MAP_W} {MAP_H}" class="map">
+      <svg viewBox={viewBox} class="map">
         {#each hexes as h (h.id)}
-          {@const pos = HEX_POS[h.id]}
+          {@const pos = positions[h.id]}
           {#if pos}
             {@const shown = revealed.has(h.id)}
             {@const d = view.delta[h.id] ?? 0}
             <g
               class="hex"
               class:selected={selected === h.id}
-              class:owned={view.positions.has(h.id)}
+              class:owned={view.held.has(h.id)}
               class:here={playerHex === h.id}
               class:openable={canOpen(h.id)}
               role="button"
@@ -221,18 +254,19 @@
               onclick={() => shown && (selected = h.id)}
               onkeydown={(e) => e.key === 'Enter' && shown && (selected = h.id)}
             >
-              <title>{shown ? (LEXICON[h.id]?.court ?? h.label) : 'Inexploré'}</title>
+              <title>{shown ? descOf(h).court : 'Inexploré'}</title>
               {#if shown}
-                <polygon points={hexPoints(pos[0], pos[1])} fill={hexFill(h.kind, h.cluster)} class:frontier={h.kind === 'frontiere'} />
-                <text x={pos[0]} y={pos[1] - 6} class="label">{h.label}</text>
+                <polygon points={hexPointsPointy(pos[0], pos[1])} fill={hexFill(h.kind, h.cluster)} class:frontier={h.kind === 'frontiere'} />
+                {#if playerHex === h.id}<circle cx={pos[0]} cy={pos[1] - 17} r="4" class="token" />{/if}
+                <text x={pos[0]} y={pos[1] - 5} class="label">{h.label}</text>
                 {#if isInvestable(h)}
-                  <text x={pos[0]} y={pos[1] + 12} class="vval" class:up={d > 0.05} class:down={d < -0.05}>
+                  <text x={pos[0]} y={pos[1] + 9} class="vval" class:up={d > 0.05} class:down={d < -0.05}>
                     {view.market[h.id]?.toFixed(0)}{d > 0.05 ? ' ▲' : d < -0.05 ? ' ▼' : ''}
                   </text>
                 {/if}
-                {#if playerHex === h.id}<circle cx={pos[0]} cy={pos[1] + 26} r="5" class="token" />{/if}
+                {#if view.held.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="expo">▣ {view.exposure[h.id]?.toFixed(0)}</text>{/if}
               {:else}
-                <polygon points={hexPoints(pos[0], pos[1])} class="fog" />
+                <polygon points={hexPointsPointy(pos[0], pos[1])} class="fog" />
                 <text x={pos[0]} y={pos[1] + 4} class="fogq">?</text>
               {/if}
             </g>
@@ -264,13 +298,13 @@
           <div class="chain">Prochaine ouverture : <b>{openCost()} PA</b>{opensThisTurn > 0 ? ' (CHAIN)' : ''}</div>
           {#if selected}
             {@const h = hexById(selected)}
-            {@const held = view.positions.has(selected)}
+            {@const held = view.held.has(selected)}
             <div class="sel">
-              <b>{h?.label}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
+              <b>{descOf(h).court}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
               <button class="qmark" onclick={() => (showDetail = !showDetail)} title="Explication">?</button>
             </div>
-            <div class="court">{LEXICON[selected]?.court}</div>
-            {#if showDetail}<div class="long">{LEXICON[selected]?.long}</div>{/if}
+            {#if held}<div class="court">Exposition sur cet hexe : <b>{view.exposure[selected]?.toFixed(0)}</b></div>{/if}
+            {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
 
             {#if canOpen(selected)}
               <div class="open-row">
@@ -334,6 +368,7 @@
   .label { fill: #eef1f7; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
+  .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
   aside { display: flex; flex-direction: column; gap: .8rem; }
   section { background: #1a1d25; border: 1px solid #2a2f3a; border-radius: 8px; padding: .7rem; }
   h3 { margin: 0 0 .5rem; font-size: .9rem; display: flex; justify-content: space-between; align-items: baseline; }

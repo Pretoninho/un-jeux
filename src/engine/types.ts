@@ -31,6 +31,9 @@ export interface Hex {
   carry?: number;
   /** Adjacence = corrélation (memo §11). Doit être symétrique (testé). */
   neighbors: HexId[];
+  /** Coordonnées axiales (q, r) — présentes pour les cartes générées (géométrie =
+   * adjacence). Ignorées par le moteur, utilisées par l'UI pour le pavage. */
+  coord?: { q: number; r: number };
 }
 
 export interface GameMap {
