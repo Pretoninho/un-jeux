@@ -12,19 +12,30 @@ import { actorWealth, applyMarginCalls, positionValue } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
 
-const PA_COST: Record<string, number> = { RESERVER: 0, ouvrir: 1, fermer: 1 };
+const PA_COST: Record<string, number> = {
+  RESERVER: 0, ouvrir: 1, renforcer: 1, cloture_partielle: 2, fermer: 1,
+};
 
 function executeAction(actor: ActorState, action: PlannedAction, state: GameState, flux: Record<string, number>): void {
   if (action.verb === 'RESERVER') return;
   const m = state.market[action.hexId];
   if (!m) return;
 
-  if (action.op === 'ouvrir') {
+  if (action.op === 'ouvrir' || action.op === 'renforcer') {
+    // Ouvrir = nouvelle position ; Renforcer = exposition additionnelle (memo §9bis).
     const equity = Math.min(action.equity, actor.cash);
     if (equity <= 0) return;
     actor.cash -= equity;
     actor.positions.push({ hexId: action.hexId, equity, leverage: action.leverage, entryV: m.V });
     flux[action.hexId] = (flux[action.hexId] ?? 0) + equity * (1 + action.leverage);
+  } else if (action.op === 'cloture_partielle') {
+    // Allège de moitié chaque position de l'hexe (memo §9bis).
+    for (const pos of actor.positions) {
+      if (pos.hexId !== action.hexId) continue;
+      actor.cash += 0.5 * Math.max(0, positionValue(pos, m.V));
+      flux[action.hexId] = (flux[action.hexId] ?? 0) - 0.5 * pos.equity * (1 + pos.leverage);
+      pos.equity *= 0.5;
+    }
   } else if (action.op === 'fermer') {
     const kept: Position[] = [];
     for (const pos of actor.positions) {

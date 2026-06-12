@@ -12,6 +12,8 @@ import type { Rng } from './rng';
 export type PlannedAction =
   | { verb: 'RESERVER' }
   | { verb: 'POSITIONNER'; op: 'ouvrir'; hexId: HexId; equity: number; leverage: number }
+  | { verb: 'POSITIONNER'; op: 'renforcer'; hexId: HexId; equity: number; leverage: number }
+  | { verb: 'POSITIONNER'; op: 'cloture_partielle'; hexId: HexId }
   | { verb: 'POSITIONNER'; op: 'fermer'; hexId: HexId };
 
 export interface Policy {

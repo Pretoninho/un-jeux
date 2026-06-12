@@ -13,6 +13,7 @@
   import type { Policy, PlannedAction } from './engine/policy';
   import { PA_PAR_TOUR } from './data/actions';
   import { presetMvp } from './data/config-mvp';
+  import { LEXICON } from './data/lexicon';
   import { HEX_POS, hexPoints, hexFill, MAP_W, MAP_H, HEX_R } from './lib/layout';
 
   // État non réactif (le moteur) ; l'UI lit des snapshots réactifs.
@@ -27,8 +28,12 @@
   let hexes = $state<Hex[]>([]);
   let log = $state<string[]>([]);
   let view = $state<ReturnType<typeof buildView>>();
+  let read = $state<Set<string>>(new Set()); // signaux acquis ce tour (au-delà de la volatilité)
+  let showDetail = $state(false); // explication détaillée de l'hexe sélectionné
 
-  const paCost = (a: PlannedAction) => (a.verb === 'RESERVER' ? 0 : 1);
+  const PARTIAL = 2;
+  const paCost = (a: PlannedAction) =>
+    a.verb === 'RESERVER' ? 0 : a.op === 'cloture_partielle' ? PARTIAL : 1;
   const fmtPct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
 
   function buildView() {
@@ -72,11 +77,13 @@
     hexes = gs.map.hexes;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
     selected = null;
+    read = new Set();
+    showDetail = false;
     log = [`Nouvelle partie — seed ${s}`];
     view = buildView();
   }
 
-  const paLeft = () => PA_PAR_TOUR - (view?.paUsed ?? 0);
+  const paLeft = () => PA_PAR_TOUR - (view?.paUsed ?? 0) - read.size;
 
   function queueAction(a: PlannedAction) {
     if (!view || view.over || paCost(a) > paLeft()) return;
@@ -84,11 +91,23 @@
     view = buildView();
   }
 
-  function open(hexId: string) {
-    queueAction({ verb: 'POSITIONNER', op: 'ouvrir', hexId, equity: gs.actors[0]!.cash * 0.25, leverage: 0 });
+  function open(hexId: string, frac: number) {
+    queueAction({ verb: 'POSITIONNER', op: 'ouvrir', hexId, equity: gs.actors[0]!.cash * frac, leverage: 0 });
+  }
+  function reinforce(hexId: string) {
+    queueAction({ verb: 'POSITIONNER', op: 'renforcer', hexId, equity: gs.actors[0]!.cash * 0.25, leverage: 0 });
+  }
+  function partial(hexId: string) {
+    queueAction({ verb: 'POSITIONNER', op: 'cloture_partielle', hexId });
   }
   function close(hexId: string) {
     queueAction({ verb: 'POSITIONNER', op: 'fermer', hexId });
+  }
+
+  // LIRE (1 PA) : révèle un signal coûteux pour ce tour (la volatilité est gratuite).
+  function readSignal(name: string) {
+    if (!view || view.over || read.has(name) || paLeft() < 1) return;
+    read = new Set(read).add(name);
   }
 
   function endTurn() {
@@ -97,6 +116,7 @@
     const human: Policy = { id: 'human', decide: () => (queued.length ? queued : [{ verb: 'RESERVER' }]) };
     runTurn(gs, [human, ...ai], rng);
     queued = [];
+    read = new Set(); // les signaux acquis ne valent que pour le tour
     log = [`Tour ${gs.turn} · ${gs.regime}`, ...log].slice(0, 8);
     view = buildView();
   }
@@ -140,6 +160,7 @@
               onclick={() => (selected = h.id)}
               onkeydown={(e) => e.key === 'Enter' && (selected = h.id)}
             >
+              <title>{LEXICON[h.id]?.court ?? h.label}</title>
               <polygon
                 points={hexPoints(pos[0], pos[1])}
                 fill={hexFill(h.kind, h.cluster)}
@@ -165,10 +186,20 @@
       <aside>
         <section class="signals">
           <h3>Signaux <span class="hint">~ bruités, F cachée</span></h3>
-          {#each [['Volatilité', view.signals.volatilite], ['Écart crédit', view.signals.ecartCredit], ['Financement', view.signals.financement]] as [name, val]}
+          <!-- Volatilité : toujours visible et gratuite (memo §23.6). -->
+          <div class="bar-row">
+            <span>Volatilité</span>
+            <div class="bar"><div class="fill" style="width:{view.signals.volatilite * 100}%"></div></div>
+          </div>
+          <!-- Écart crédit / Financement : acquis via LIRE (1 PA), valables ce tour. -->
+          {#each [['Écart crédit', 'ecartCredit'], ['Financement', 'financement']] as [name, key]}
             <div class="bar-row">
               <span>{name}</span>
-              <div class="bar"><div class="fill" style="width:{(val as number) * 100}%"></div></div>
+              {#if read.has(key)}
+                <div class="bar"><div class="fill" style="width:{(view.signals as any)[key] * 100}%"></div></div>
+              {:else}
+                <button class="lire" onclick={() => readSignal(key)} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
+              {/if}
             </div>
           {/each}
         </section>
@@ -177,13 +208,34 @@
           <h3>Actions <span class="pa">{paLeft()} / {PA_PAR_TOUR} PA</span></h3>
           {#if selected}
             {@const h = hexes.find((x) => x.id === selected)}
-            <div class="sel">Sélection : <b>{h?.label}</b></div>
-            <button onclick={() => open(selected!)} disabled={view.over || paLeft() < 1 || !!h && !isInvestable(h)}>
-              Ouvrir (déployer 25%) · 1 PA
-            </button>
-            <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || !view.positions.has(selected!)}>
-              Fermer · 1 PA
-            </button>
+            {@const held = view.positions.has(selected)}
+            {@const investable = !!h && isInvestable(h)}
+            <div class="sel">
+              <b>{h?.label}</b>
+              <button class="qmark" onclick={() => (showDetail = !showDetail)} title="Explication">?</button>
+            </div>
+            <div class="court">{LEXICON[selected]?.court}</div>
+            {#if showDetail}<div class="long">{LEXICON[selected]?.long}</div>{/if}
+
+            {#if investable}
+              <div class="open-row">
+                <span>Ouvrir</span>
+                <button onclick={() => open(selected!, 0.25)} disabled={view.over || paLeft() < 1}>25%</button>
+                <button onclick={() => open(selected!, 0.5)} disabled={view.over || paLeft() < 1}>50%</button>
+                <button onclick={() => open(selected!, 1)} disabled={view.over || paLeft() < 1}>100%</button>
+              </div>
+              <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1 || !held}>
+                Renforcer (+25%) · 1 PA
+              </button>
+              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < PARTIAL || !held}>
+                Clôture partielle (−50%) · 2 PA
+              </button>
+              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || !held}>
+                Fermer (totale) · 1 PA
+              </button>
+            {:else}
+              <div class="muted small">Hexe non investissable (nœud / frontière).</div>
+            {/if}
           {:else}
             <div class="sel muted">Clique un hexe.</div>
           {/if}
@@ -240,7 +292,14 @@
   button:hover:not(:disabled) { background: #333c4d; }
   button:disabled { opacity: .4; cursor: not-allowed; }
   button.end { background: #2f5d8a; border-color: #3b6ea0; margin-top: .5rem; }
-  .sel { font-size: .82rem; margin-bottom: .4rem; }
+  .sel { font-size: .82rem; margin-bottom: .3rem; display: flex; justify-content: space-between; align-items: center; }
+  .qmark { width: auto; margin: 0; padding: 0 .45rem; border-radius: 50%; background: #2a3140; line-height: 1.4; }
+  .court { font-size: .76rem; color: #aeb6c6; margin-bottom: .3rem; }
+  .long { font-size: .76rem; color: #cdd3df; background: #0e1015; border-radius: 5px; padding: .45rem; margin-bottom: .4rem; line-height: 1.35; }
+  .open-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
+  .open-row button { margin: .25rem 0; }
+  .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
+  .small { font-size: .76rem; }
   .muted { color: #7a8294; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }

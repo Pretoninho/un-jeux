@@ -16,10 +16,11 @@ export const MAP_H = 450;
 /** Points d'un hexagone (flat-top) centré en (cx, cy). */
 export function hexPoints(cx: number, cy: number, r = HEX_R): string {
   const h = r * 0.866;
-  return [
+  const pts: [number, number][] = [
     [cx + r, cy], [cx + r / 2, cy + h], [cx - r / 2, cy + h],
     [cx - r, cy], [cx - r / 2, cy - h], [cx + r / 2, cy - h],
-  ].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  ];
+  return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 }
 
 /** Couleur de remplissage par nature/cluster d'hexe. */
