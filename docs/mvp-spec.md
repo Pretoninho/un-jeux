@@ -1,6 +1,6 @@
 # Spécification du MVP web — VERROUILLÉ (proposition)
 
-> Version 0.2 — 11 juin 2026. Dérive du game-design-memo (v1.2).
+> Version 0.3 — 12 juin 2026. Dérive du game-design-memo (v1.4).
 > Objet : figer le périmètre exact de la première version jouable pour débloquer le code.
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
@@ -128,11 +128,11 @@ Ordre du tour : actions joueur → actions des 2 IA → résolution marché (ren
 |---|---|
 | Fantasme | survivre aux crises, acheter en détresse |
 | Ressource | **Réserve sèche** — +1 par tour passé en RÉSERVER |
-| Dépense | déploiement massif en haute fragilité (bonus de rendement si achat pendant phase 3 de la cascade) |
+| Dépense | déploiement massif de la réserve quand il juge le creux atteint — **aucun bonus scripté** : c'est la physique neutre qui paie (acheter la dislocation `V≪A` capte la réversion *si* la recovery vient, memo §25.6) |
 | Victoire naturelle | Score (Sharpe cumulé) |
-| Friction intégrée | chaque tour en réserve = coût d'opportunité visible (le marché monte sans lui) |
+| Friction intégrée | chaque tour en réserve = carry et drift abandonnés, chiffrés à l'écran (memo §25.5) |
 
-**Le pari du Vautour** : tenir la réserve pendant que la bulle gonfle (frustrant), ne pas se faire piéger par le rebond (§24.2), déployer dans la vraie jambe. La friction *est* le gameplay.
+**Le pari du Vautour** : tenir la réserve pendant que la bulle gonfle (frustrant), ne pas se faire piéger par le rebond (§24.2), déployer dans la vraie jambe — en acceptant qu'une dead recovery (memo §25.6) ou une partie sans crise (memo §26.2) puisse le faire perdre. La friction *est* le gameplay ; la patience est un pari, pas une recette.
 
 ---
 
@@ -160,9 +160,9 @@ Rôle : absorbe les chocs, abaisse `F` relativement, sert de contrepoint au Vaut
 
 ---
 
-## 8. Jauge et cascade
+## 8. Jauge, cascade et moteur de prix
 
-Repris **tel quel** de §23 (modèle numérique) et §24 (cascade). Valeurs MVP : seuils `0.40 / 0.85`, `k=1.5`, purge `0.05/0.02`.
+Repris **tel quel** de §23 (modèle numérique), §24 (cascade) et **§25 (moteur de prix, verrouillé v1.4)** : structure à facteurs, ancre `A` cachée (plancher de bruit), `flux` = impact-prix, carry, recovery stochastique avec dead recoveries. Valeurs MVP : seuils `0.40 / 0.85`, `k=1.5`, purge `0.05/0.02`.
 
 **Rien de scripté (§24.2)** : la cascade est une *morphologie*, pas une séquence figée. Par instance, on **tire** :
 - durées de phase dans des plages (jambe 1 ∈ 1–2, rebond ∈ 1–3, jambe 3 ∈ 1–3 tours) ;
