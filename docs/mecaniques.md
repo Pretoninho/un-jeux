@@ -25,7 +25,7 @@
 | **FERMER** | 1 | solde la position (réalise le P&L) |
 | **LIRE** | 1 | 🟡 révèle un signal caché *pour ce tour* (UI seulement, voir §E) |
 | **RÉSERVER** | 0 | rester en cash (le joueur ne se déplace pas) |
-| **S'INSTALLER** | 1 (CHAIN) | se déplacer sur un nœud + **présence ~3 tours**. Nœud **PB** ✅ → débloque le signal **Financement** ; Notation/BC ⛔ à venir |
+| **S'INSTALLER** | 1 (CHAIN) | se déplacer sur un nœud + **présence ~3 tours**. **PB** ✅ → débloque le **Financement** · **Notation** ✅ → **signaux plus nets** ; BC ⛔ à venir |
 
 - **CHAIN** (memo §9bis, exploration) : la 1ʳᵉ ouverture du tour coûte 1 PA, les ouvertures **enchaînées** ensuite coûtent **2 PA** → frein à la course sur la carte.
 
@@ -52,6 +52,7 @@
   - **Volatilité** (retard 0, gratuite) · **Écart de crédit** (retard 1) · **Financement** (retard 2).
   - 🟡 **Coût de LIRE** : implémenté **dans l'UI** (Volatilité gratuite ; Écart/Financement masqués, révélés par LIRE 1 PA chacun). Le moteur calcule les signaux par ailleurs.
   - ✅ **Financement verrouillé sans le PB** : il n'est accessible (puis LIRE) que si tu as une **présence active à un nœud prime broker** (memo §11). Présence persistante ~3 tours (réglable ; futur bouton d'archétype).
+  - ✅ **Notation → signaux plus nets** : présence active à un nœud Notation = bruit des 3 signaux **réduit** (× 0.5), borné par un **plancher irréductible** (§29.2 : l'infra améliore sans jamais rendre certain).
 
 ## F. La crise — cascade & bull trap ✅ (memo §24)
 
@@ -79,7 +80,7 @@
 
 ## ⛔ Ce qui n'est PAS encore branché (à savoir)
 
-- **Bénéfices des nœuds** : **PB → Financement** ✅ câblé (UI) ; restent ⛔ **PB → levier moins cher** (avec le levier joueur / Sismographe), **Notation → signaux plus nets**, **BC → taux anticipés** (dépend de la banque centrale active, memo §21, §30.4).
+- **Bénéfices des nœuds** : **PB → Financement** ✅ et **Notation → signaux plus nets** ✅ câblés (UI) ; restent ⛔ **PB → levier moins cher** (avec le levier joueur / Sismographe) et **BC → taux anticipés** (dépend de la banque centrale active, memo §21, §30.4).
 - **Frontières / exotiques** : infranchissables, **pas de déblocage** (memo §11, §21).
 - **LIRE** : son coût n'est câblé **que dans l'UI**.
 - **IA** : footprint visible mais **non spatiales** (pas de déplacement / chemin) — memo §31.

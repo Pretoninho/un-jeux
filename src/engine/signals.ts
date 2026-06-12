@@ -12,6 +12,10 @@ const DELAYS = { volatilite: 0, ecartCredit: 1, financement: 2 } as const;
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
+/** Plancher de bruit IRRÉDUCTIBLE (memo §29.2) : l'infrastructure (nœud Notation)
+ * comprime le bruit réductible, jamais en dessous de ce plancher. */
+const IRREDUCIBLE = 0.35;
+
 /** F observée avec `delay` tours de retard. */
 function fAtDelay(state: GameState, delay: number): number {
   const h = state.fragilityHistory;
@@ -20,15 +24,16 @@ function fAtDelay(state: GameState, delay: number): number {
 }
 
 /**
- * Calcule les 3 signaux du tour. Pendant le rebond (phase bounce), tous se
- * DÉTENDENT (lisent plus bas que F réel) — le mensonge (§24.2). Comme le rebond
- * est parfois un vrai plancher, cette détente est ambiguë, jamais une preuve.
+ * Calcule les 3 signaux du tour. `noiseScale` < 1 = signaux plus nets (présence au
+ * nœud Notation, §11), borné par le plancher irréductible. Pendant le rebond (phase
+ * bounce), tous se DÉTENDENT (lisent plus bas que F réel) — le mensonge (§24.2).
  */
-export function computeSignals(state: GameState, rng: Rng): SignalReading {
+export function computeSignals(state: GameState, rng: Rng, noiseScale = 1): SignalReading {
   const p = state.params;
   const detune = state.crisis.active && state.crisis.phase === 'bounce' ? p.bounceDetune : 0;
+  const scale = Math.max(noiseScale, IRREDUCIBLE);
   const read = (delay: number, sigma: number): number =>
-    clamp01(fAtDelay(state, delay) - detune + rng.gauss() * sigma);
+    clamp01(fAtDelay(state, delay) - detune + rng.gauss() * sigma * scale);
   return {
     volatilite: read(DELAYS.volatilite, p.signalNoiseVol),
     ecartCredit: read(DELAYS.ecartCredit, p.signalNoiseSpread),

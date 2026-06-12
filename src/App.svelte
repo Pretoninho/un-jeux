@@ -93,7 +93,11 @@
     const player = gs.actors[0]!;
     const wealth = actorWealth(player, gs.market);
     const tr = trackRecord(player, gs.benchmarkHistory, gs.params.drawdownPenalty);
-    const sig: SignalReading = gs.signalsHistory.at(-1) ?? computeSignals(gs, makeRng(gs.rngSeed));
+    // Présence active à un nœud Notation → signaux plus nets (memo §11, §29.2).
+    const infoActive = gs.map.hexes.some(
+      (h) => h.kind === 'noeud' && h.nodeType === 'information' && (presenceUntil[h.id] ?? -1) >= gs.turn,
+    );
+    const sig: SignalReading = computeSignals(gs, makeRng(gs.rngSeed * 1000003 + gs.turn), infoActive ? 0.5 : 1);
     const market: Record<string, number> = {};
     const delta: Record<string, number> = {};
     for (const [id, m] of Object.entries(gs.market)) {
@@ -145,6 +149,7 @@
       pbActive: gs.map.hexes.some(
         (h) => h.kind === 'noeud' && h.nodeType === 'liquidite' && (presenceUntil[h.id] ?? -1) >= gs.turn,
       ),
+      infoActive,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
@@ -381,7 +386,7 @@
         </section>
 
         <section class="signals">
-          <h3>Signaux <span class="hint">~ bruités, F cachée</span></h3>
+          <h3>Signaux <span class="hint">{view.infoActive ? '✨ Notation : plus nets' : '~ bruités, F cachée'}</span></h3>
           <div class="bar-row">
             <span>Volatilité</span>
             <div class="bar"><div class="fill" style="width:{view.signals.volatilite * 100}%"></div></div>
@@ -453,7 +458,7 @@
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
             {/if}
-            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b>{/if}</div>{/if}
+            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
