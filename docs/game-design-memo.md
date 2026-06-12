@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.5 — 12 juin 2026.
+> Document de référence vivant. Version 1.6 — 12 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -618,7 +618,8 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 - [ ] Noms in-game définitifs des archétypes
 - [ ] Définition du MVP web (périmètre exact de la première version jouable)
 - [x] ~~**Moteur de prix**~~ — **TRANCHÉ (v1.4)** : facteurs + ancre cachée + flux/impact-prix + carry, 4 fixes anti-script intégrés (§25)
-- [ ] **Score Sharpe gameable** (#1, §26.3) — corriger l'optimum dégénéré : la fonction-objectif du MVP. Débloqué par §25.
+- [x] ~~**Score**~~ — **TRANCHÉ (v1.5)** : Track Record (excédent vs marché − α·drawdown), remplace le Sharpe (§27)
+- [x] ~~**Tempo / courbe d'accumulation**~~ — **TRANCHÉ (v1.6)** : calibrage statistique + `F(0)` en plage + critère horloge-vs-signaux (§28)
 - [ ] **RÉSERVER, volet restant** (#2) : diluer l'effet individuel sur `F` (purge proportionnelle à la part du capital)
 - [ ] **Planchers de bruit à chiffrer** (#3) : signaux macro (le principe est étendu au micro `A` en §25.2)
 - [ ] **Levier au calibrage MVP** (#4) : vérifier qu'il est effectivement « parfois correct » en pratique
@@ -655,6 +656,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-11 | **Audit script stratégique (v1.3) — 5 défauts à corriger** : (1) Sharpe gameable [priorité], (2) RÉSERVER gratuit triple-récompense + levier individuel sur `F`, (3) clarté des signaux achetable, (4) levier = option morte sous Sharpe, (5) bonus phase-3 du Vautour redondant. Motif commun : appliquer aux mécaniques la règle « friction, pas synergie » (§7). NON ENCORE CORRIGÉS — chantier ouvert (§26.3, §26.5) |
 | 2026-06-12 | **Moteur de prix VERROUILLÉ (v1.4, §25)** : (a) niveau `V` public / ancre `A` **cachée** = deuxième état caché du jeu, estimation de `A` à plancher de bruit irréductible [fix B] ; (b) melt-up **stochastique**, plage tension chevauchant le bull [anti-fuite] ; (c) variance `M/C/ε` ≈ 40/30/30 en plages, bascule 80-90 % systématique en crise → `ρ→1` émergent ; (d) `flux` = impact-prix intégré au moteur, « valorisations tendues » formalisées (`Σ log(V/A)+`) ; (e) carry séparé = coût physique de RÉSERVER, taux cash **jamais indexé sur `F`** [fix A] ; (f) `λ` faible en normal [fix D], recovery stochastique avec **dead recoveries** [fix C] — le creux n'est pas toujours une aubaine. Conséquences : défaut #5 résolu (bonus Vautour supprimé), #2 résolu au volet gratuité, #4 principe acquis, impact-prix absorbé, T2 (score) débloqué |
 | 2026-06-12 | **Score VERROUILLÉ — Track Record (v1.5, §27)** : le Sharpe (3 vices : optimum dégénéré, punit le profil lumpy/récompense le skew négatif, illisible) est remplacé par `Rendement excédentaire vs marché − α·MaxDrawdown − pénalités de détresse`. Benchmark = **indice fixe de la carte** (anti-exploit « reste petit ») ; drawdown en **mark-to-market** (anti-exploit « diamond hands ») ; α=0.5 = point d'équilibre du défaut #4 à calibrer en J7. Affichage continu marché/joueur = pression FOMO. **Exception anti-script assumée** : le score est transparent et stable, pas bruité — l'anti-gaming vient de la structure, pas de l'obscurité. Défaut #1 résolu |
+| 2026-06-12 | **Tempo VERROUILLÉ (v1.6, §28)** : on calibre une **distribution d'expériences**, pas une durée. Cibles statistiques (~60 % 1 crise / 10-15 % 2 crises / **20-25 % sans crise** / crise <t.5 rare mais possible) = diagnostics à atteindre via les paramètres générateurs, **jamais** en forçant le timing. `F(0)` tirée en plage cachée ~0.10-0.35 (§23.1 — monde avec un passé, pas de départ mémorisable). Pas de fenêtre de grâce décrétée. Arc en 3 actes = conséquence statistique, pas structure. Budget épistémique ~50-60 PA (voir ou agir). Asymétrie montée/chute ≥ 2:1. **Critère d'or = « les signaux battent l'horloge », assertion de test automatisé au jalon J7** (le moteur peut prouver qu'il n'est pas scripté) |
 
 ---
 
@@ -670,6 +672,8 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 ```
 F(t+1) = clamp01( F(t) + accumulation(t) − purge(t) )
 ```
+
+**Fragilité initiale `F(0)` (DÉCISION, v1.6)** : tirée dans une **plage cachée ~0.10–0.35** (max < zone morte 0.40 → aucune crise possible au tour 1). Le monde naît avec un passé : on n'arrive pas dans un marché vierge mais dans un marché déjà plus ou moins chaud. Conséquence : pas de départ mémorisable (sinon « le tour 1 est toujours froid » → levier d'ouverture sans risque), et un skill dès le premier tour — LIRE au tour 1 peut révéler qu'on est né dans un marché tendu. Voir le tempo en §28.
 
 ### 23.2 Accumulation (ce qui gonfle la bulle)
 
@@ -993,3 +997,49 @@ Track Record = Rendement excédentaire − α · MaxDrawdown − pénalités de 
 ### 27.5 Neutralité archétypale (§26.1) — chacun bat le marché par son edge
 
 Vautour (cash → dislocation, faible drawdown propre) · Compounder (compounding non-leveragé, drawdown peu profond) · Sismographe (pari leveragé sur `M`, excédent ≫ drawdown *s'il lit juste*) · Architecte (alpha idiosyncratique, quasi market-neutral) · Prédateur (dislocations provoquées). La métrique ne connaît aucun profil.
+
+---
+
+## 28. Tempo et calibrage statistique (VERROUILLÉ, v1.6)
+
+> Le tempo d'un monde émergent ne se règle pas en durée (« la crise arrive vers le tour 9 » = script à retard) mais en **distribution d'expériences** vérifiée sur des milliers de parties simulées. On règle le *générateur*, jamais l'*issue*.
+
+### 28.1 Règle d'or du calibrage (anti-script)
+
+**Les cibles ci-dessous sont des diagnostics à vérifier en simulation, JAMAIS des contraintes injectées dans le moteur.** On les atteint en réglant les paramètres générateurs (plage de `F(0)`, poids d'accumulation §23.2, agressivité des IA). Si le moteur ne les atteint pas émergentiellement, on retouche le générateur — on **ne force jamais** le timing d'une crise pour « faire le quota ».
+
+### 28.2 Cibles statistiques (sur ~1 000 parties, IA standard + joueur moyen)
+
+| Cible | Valeur visée | Raison |
+| --- | --- | --- |
+| Parties à exactement 1 crise | ~60 % | l'expérience canonique |
+| Parties à 2 crises | ~10–15 % | les tables pyromanes doivent pouvoir brûler deux fois |
+| **Parties sans aucune crise** | **~20–25 %** | la branche « le hoarder perd » (§26.2) doit être *vécue*, pas théorique |
+| Crise avant le tour 5 | rare (<5 %) mais **jamais impossible** | protection du débutant **statistique**, pas décrétée |
+| Écart-type de la date de déclenchement | large (~3 tours) | empêche le méta-script statistique |
+
+Le bouton sensible est le **taux de parties sans crise** : trop bas (5 %) → le joueur *sait* que la crise vient (certitude apprise = script) ; trop haut (40 %) → trop de parties plates. **20–25 %** maintient le doute réel — réserver reste un pari, pas une préparation.
+
+### 28.3 Pas de fenêtre de grâce garantie
+
+Aucune règle « pas de crise avant le tour N » : ce serait un script *et* un exploit (levier à fond pendant la grâce). La sécurité du début **émerge** de `F(0)` médian-bas (§23.1) + zone morte (§23.4). Une crise au tour 3 est très improbable, jamais impossible — et si `F(0)` a été tiré haut, les signaux du tour 1 le laissent deviner.
+
+### 28.4 L'arc en trois actes — conséquence, pas structure
+
+Une partie médiane (12–15 tours) *produit* statistiquement : installation (~t.1–4, zone morte probable) → bulle (~t.5–9, le dilemme investi-vs-réserve) → résolution (~t.10–15, cascade ou atterrissage à vide). **C'est un fait statistique documenté, jamais une contrainte du moteur** : l'acte III peut tomber au tour 6 ou ne jamais venir.
+
+### 28.5 Le budget épistémique (tempo des PA)
+
+~12–15 tours × 4 PA ≈ **50–60 PA/partie** = le métronome côté joueur. La triangulation complète (3 signaux rafraîchis) coûte ~2–3 PA/tour, soit ~la moitié du budget : **voir ou agir, jamais tout à fait les deux**. Le prix de l'information est un paramètre de tempo : trop bas → l'état caché devient quasi public ; trop haut → jeu à l'aveugle, le skill central meurt.
+
+### 28.6 « Lentement, puis d'un coup »
+
+Asymétrie à graver : l'accumulation s'étale (typiquement plusieurs tours), la cascade libère vite (§24). **Ratio montée/chute ≥ 2:1** — propriété émergente à vérifier en simulation, pas une paire de constantes. La fragilité est un stock qui se construit lentement et se libère brutalement (le poids dramatique du krach).
+
+### 28.7 Le critère d'or — « les signaux battent l'horloge » (assertion de test J7)
+
+Danger résiduel : si 80 % des crises tombent tours 8–11, le joueur apprend *la fenêtre* sans lire un seul signal (méta-script statistique). D'où le critère **formalisé en test automatisé** :
+
+> **Le pouvoir prédictif du numéro de tour sur la crise doit être FAIBLE devant celui des signaux.** Mesurable en simulation (information mutuelle, ou précision d'un prédicteur « horloge seule » vs « signaux seuls »). Si l'horloge prédit presque aussi bien que les signaux → le tempo est devenu un script → recalibrer (élargir les plages de `F(0)`, la variance d'accumulation).
+
+Ce critère transforme le principe « grammaire connue, instance imprévisible » (§4.4) en **assertion vérifiable au jalon J7** : le moteur peut *prouver* qu'il n'est pas scripté.

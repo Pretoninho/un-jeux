@@ -1,6 +1,6 @@
 # Spécification du MVP web — VERROUILLÉ (proposition)
 
-> Version 0.4 — 12 juin 2026. Dérive du game-design-memo (v1.5).
+> Version 0.5 — 12 juin 2026. Dérive du game-design-memo (v1.6).
 > Objet : figer le périmètre exact de la première version jouable pour débloquer le code.
 > Tout ce qui n'est pas listé ici est **hors MVP**.
 
@@ -214,14 +214,14 @@ Aucune de ces valeurs n'est observable ni constante d'une partie à l'autre. Le 
 ## 12. Plan de construction par jalons
 
 1. **J1 — Squelette** : projet Svelte/Vite + TS, structure `engine/` vs `ui/`, données de la carte (§4) en dur.
-2. **J2 — Moteur sans UI** : état de partie, boucle de tour, jauge `F` (§23), rendements + corrélation. Testé en unitaire (parties simulées sans écran).
-3. **J3 — Cascade** : les 4 phases (§24) + mensonge des signaux. Testé en unitaire.
+2. **J2 — Moteur sans UI** : état de partie, boucle de tour, jauge `F` (§23) + `F(0)` en plage, moteur de prix (§25), score Track Record (§27). **Inclut un harness de simulation headless** (jouer N parties sans écran) — prérequis du calibrage J7.
+3. **J3 — Cascade** : la morphologie (§24) + mensonge des signaux. Testé en unitaire.
 4. **J4 — Les 2 IA** (§7) branchées dans la boucle.
-5. **J5 — UI vue principale** : carte SVG, actions, signaux, jauges visibles (réserve/réputation/stress).
-6. **J6 — Détail hexe + post-mortem** : modale + écran de fin avec courbe `F` révélée.
-7. **J7 — Calibrage** : régler les paramètres (§23.8, §24.6) jusqu'à ce que la boucle soit tendue.
+5. **J5 — UI vue principale** : carte SVG, actions, signaux, jauges visibles + bandeau Track Record (marché vs joueur, §27.4).
+6. **J6 — Détail hexe + post-mortem** : modale + écran de fin avec courbe `F` révélée + rapport Track Record.
+7. **J7 — Calibrage** : régler les paramètres (§23.8, §24.7, §25.10, α du score) via le harness jusqu'à atteindre les **cibles statistiques de tempo (§28.2)** et **valider le critère « les signaux battent l'horloge » (§28.7)**.
 
-**Chemin critique** : J2 → J3 (le moteur et la cascade). L'UI vient après et peut rester rustique tant que la boucle est juste.
+**Chemin critique** : J2 → J3 (le moteur et la cascade). Le harness de J2 est ce qui rend J7 mesurable. L'UI vient après et peut rester rustique tant que la boucle est juste.
 
 ---
 
