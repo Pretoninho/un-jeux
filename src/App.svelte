@@ -33,6 +33,10 @@
   let showDetail = $state(false);
   let transactions = $state<Array<{ turn: number; label: string; dir: 'long' | 'short'; pnl: number }>>([]);
   let profileLabel = $state(''); // libellé du profil joué (lu depuis la config, pas codé en dur)
+  let aiList = $state<Array<{ id: string; label: string; color: string }>>([]);
+
+  // Palette des IA (footprint visible sur la carte — premier pas vers les acteurs spatiaux, memo §31).
+  const AI_PALETTE = ['#e07a3a', '#5ab0a0', '#9b7ad9', '#c7a23a'];
 
   function recordTx(turn: number, hexId: string, dir: 'long' | 'short', pnl: number) {
     transactions = [{ turn, label: hexById(hexId)?.label ?? hexId, dir, pnl }, ...transactions].slice(0, 15);
@@ -101,6 +105,14 @@
       latentTotal += l;
       latentByHex[p.hexId] = (latentByHex[p.hexId] ?? 0) + l;
     }
+    // Footprint des IA : couleurs des adversaires présents par hexe (memo §31).
+    const aiPresence: Record<string, string[]> = {};
+    for (let i = 1; i < gs.actors.length; i++) {
+      const color = AI_PALETTE[(i - 1) % AI_PALETTE.length]!;
+      for (const hid of new Set(gs.actors[i]!.positions.map((p) => p.hexId))) {
+        (aiPresence[hid] ??= []).push(color);
+      }
+    }
     return {
       turn: gs.turn,
       horizon: gs.params.horizonTurns,
@@ -118,6 +130,7 @@
       delta,
       latentTotal,
       latentByHex,
+      aiPresence,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
@@ -135,6 +148,7 @@
   function newGame(s: number) {
     const cfg = presetExplore(s);
     profileLabel = cfg.archetype.label;
+    aiList = cfg.adversaires.map((a, i) => ({ id: a.id, label: a.label, color: AI_PALETTE[i % AI_PALETTE.length]! }));
     const init = buildInitialState(cfg);
     gs = init.state;
     rng = init.rng;
@@ -305,6 +319,11 @@
               {#if shown}
                 <polygon points={hexPointsPointy(pos[0], pos[1])} fill={hexFill(h.kind, h.cluster)} class:frontier={h.kind === 'frontiere'} />
                 {#if playerHex === h.id}<circle cx={pos[0]} cy={pos[1] - 17} r="4" class="token" />{/if}
+                {#if view.aiPresence[h.id]}
+                  {#each view.aiPresence[h.id] as col, i}
+                    <circle cx={pos[0] - (view.aiPresence[h.id].length - 1) * 4 + i * 8} cy={pos[1] - 24} r="3" fill={col} stroke="#0e1015" stroke-width="0.5" />
+                  {/each}
+                {/if}
                 <text x={pos[0]} y={pos[1] - 5} class="label">{h.label}</text>
                 {#if isInvestable(h)}
                   <text x={pos[0]} y={pos[1] + 9} class="vval" class:up={d > 0.05} class:down={d < -0.05}>
@@ -327,6 +346,15 @@
       </svg>
 
       <aside>
+        <section class="legend">
+          <h3>Carte <span class="hint">qui est où</span></h3>
+          <div class="leg-row"><span class="dot you"></span> Vous (token blanc)</div>
+          {#each aiList as ai}
+            <div class="leg-row"><span class="dot" style="background:{ai.color}"></span> {ai.label}</div>
+          {/each}
+          <div class="muted small">Présence IA visible seulement sur les hexes révélés.</div>
+        </section>
+
         <section class="signals">
           <h3>Signaux <span class="hint">~ bruités, F cachée</span></h3>
           <div class="bar-row">
@@ -452,6 +480,10 @@
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
   b.up, .up { color: #46b277; } b.down, .down { color: #e0564f; }
+  .legend { font-size: .78rem; }
+  .leg-row { display: flex; align-items: center; gap: .4rem; padding: .12rem 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.you { background: #f0f3f9; }
   .tx { font-size: .76rem; }
   .tx-row { display: flex; justify-content: space-between; padding: .12rem 0; border-bottom: 1px solid #22262f; }
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
