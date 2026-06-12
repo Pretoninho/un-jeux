@@ -49,6 +49,7 @@
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
   let openDir = $state<'long' | 'short'>('long'); // sens de la prochaine ouverture
+  let openLev = $state(0); // levier de la prochaine ouverture (0 = sans levier)
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
   let viewBox = $state('0 0 100 100');
 
@@ -105,6 +106,11 @@
       latentTotal += l;
       latentByHex[p.hexId] = (latentByHex[p.hexId] ?? 0) + l;
     }
+    // Levier max par hexe (pour l'affichage).
+    const leverageByHex: Record<string, number> = {};
+    for (const p of player.positions) {
+      leverageByHex[p.hexId] = Math.max(leverageByHex[p.hexId] ?? 0, p.leverage);
+    }
     // Footprint des IA : couleurs des adversaires présents par hexe (memo §31).
     const aiPresence: Record<string, string[]> = {};
     for (let i = 1; i < gs.actors.length; i++) {
@@ -130,6 +136,7 @@
       delta,
       latentTotal,
       latentByHex,
+      leverageByHex,
       aiPresence,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
@@ -195,7 +202,7 @@
     const equity = player.cash * frac;
     if (equity <= 0) return;
     player.cash -= equity;
-    player.positions.push({ hexId, direction, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    player.positions.push({ hexId, direction, equity, leverage: openLev, entryV: gs.market[hexId]!.V });
     playerHex = hexId; // déplacement
     reveal(hexId); // révèle les nouveaux voisins
     opensThisTurn += 1;
@@ -224,7 +231,7 @@
     // Renforce dans le sens dominant déjà détenu sur l'hexe.
     const dir = (view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long';
     player.cash -= equity;
-    player.positions.push({ hexId, direction: dir, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    player.positions.push({ hexId, direction: dir, equity, leverage: openLev, entryV: gs.market[hexId]!.V });
     spend(1);
   }
 
@@ -390,6 +397,7 @@
                 {#if e?.long}<span class="long-tag">long {e.long.toFixed(0)}</span>{/if}
                 {#if e?.short}<span class="short-tag">short {e.short.toFixed(0)}</span>{/if}
                 · P&L latent <b class:up={lat > 0.5} class:down={lat < -0.5}>{lat >= 0 ? '+' : ''}{lat.toFixed(1)}</b>
+                {#if view.leverageByHex[selected]}· levier <b>{view.leverageByHex[selected]}×</b>{/if}
               </div>
             {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
@@ -400,6 +408,13 @@
                 <button class:active={openDir === 'long'} onclick={() => (openDir = 'long')}>LONG</button>
                 <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
               </div>
+              <div class="lev-row">
+                <span>Levier</span>
+                <button class:active={openLev === 0} onclick={() => (openLev = 0)}>0×</button>
+                <button class:active={openLev === 2} onclick={() => (openLev = 2)}>2×</button>
+                <button class:active={openLev === 3} onclick={() => (openLev = 3)}>3×</button>
+              </div>
+              {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge</div>{/if}
               <div class="open-row">
                 <span>Ouvrir & aller</span>
                 <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < openCost()}>25%</button>
@@ -491,6 +506,9 @@
   .dir-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
   .dir-row button { margin: .25rem 0; }
   .dir-row button.active { background: #2f5d8a; border-color: #3b6ea0; }
+  .lev-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
+  .lev-row button { margin: .25rem 0; }
+  .lev-row button.active { background: #8a5a2f; border-color: #a06b3b; }
   .long-tag { color: #46b277; font-size: .72rem; margin-left: .3rem; }
   .short-tag { color: #d98cff; font-size: .72rem; margin-left: .3rem; }
   .pres { fill: #6aa6e0; font-size: 8px; text-anchor: middle; pointer-events: none; }
