@@ -11,6 +11,7 @@ export * from './fragility';
 export * from './signals';
 export * from './score';
 export * from './policy';
+export * from './ai';
 export * from './init';
 export * from './turn';
 export * from './simulate';

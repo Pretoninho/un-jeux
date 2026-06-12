@@ -6,6 +6,7 @@ import type { ConfigPartie } from './types';
 import type { GameState, SignalReading } from './state';
 import type { Policy } from './policy';
 import { alwaysReserve } from './policy';
+import { policyForProfile } from './ai';
 import { buildInitialState } from './init';
 import { runTurn } from './turn';
 import { trackRecord, type TrackRecord } from './score';
@@ -32,7 +33,11 @@ export interface SimOptions {
 /** Joue une partie complète et retourne l'état final. */
 export function runGame(config: ConfigPartie, options: SimOptions = {}): GameState {
   const { state, rng } = buildInitialState(config);
-  const policies = state.actors.map((_, i) => options.policies?.[i] ?? alwaysReserve);
+  // Par défaut : le joueur (acteur 0) reste en réserve (bot-archétypes = J7) ; chaque
+  // adversaire joue la fonction de réaction de son profil (memo §16). `options.policies`
+  // peut tout surcharger (fixtures de test).
+  const defaults: Policy[] = [alwaysReserve, ...config.adversaires.map((a) => policyForProfile(a))];
+  const policies = state.actors.map((_, i) => options.policies?.[i] ?? defaults[i] ?? alwaysReserve);
   const horizon = state.params.horizonTurns;
   for (let t = 0; t < horizon; t++) runTurn(state, policies, rng);
   return state;

@@ -54,6 +54,25 @@ export interface Archetype {
 }
 
 /**
+ * Fonction de réaction d'une IA (memo §16) — PARAMÈTRES en données, interprétés
+ * par une politique générique (engine/ai.ts). Ajouter une IA = un jeu de params.
+ */
+export interface AIBehavior {
+  /** Ce qui déclenche un achat : suivre la hausse, ou acheter la décote. */
+  entrySignal: 'momentum' | 'value';
+  /** Levier maximal utilisé (0 = jamais de levier). */
+  leverageAppetite: number;
+  /** Seuil de risque PERÇU (volatilité bruitée) au-delà duquel l'IA cesse/réduit. */
+  riskTolerance: number;
+  /** Vitesse de désengagement quand le risque perçu est haut (bas = « trop tard »). */
+  deRiskRate: number;
+  /** Fraction du cash déployée par action. */
+  sizing: number;
+  /** Décote minimale (V sous l'ancre estimée) pour acheter — entrée 'value'. */
+  decoteThreshold: number;
+}
+
+/**
  * Un profil d'adversaire IA. `kind: 'archetype'` = version IA d'un archétype
  * jouable ; `kind: 'pur'` = acteur de marché sans condition de victoire (memo §16).
  */
@@ -61,6 +80,8 @@ export interface ProfilIA {
   id: string;
   label: string;
   kind: 'archetype' | 'pur';
+  /** Paramètres de la fonction de réaction (memo §16). Absent = reste en réserve. */
+  behavior?: AIBehavior;
 }
 
 // ───────────────────── Configuration d'une partie (spec §11bis) ──────────────
