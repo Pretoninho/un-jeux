@@ -19,6 +19,7 @@
   let gs: GameState;
   let rng: Rng;
   let ai: Policy[];
+  let prevV: Record<string, number> = {}; // V du tour précédent → sens de la flèche
 
   let queued = $state<PlannedAction[]>([]);
   let seed = $state(1);
@@ -36,7 +37,11 @@
     const tr = trackRecord(player, gs.benchmarkHistory, gs.params.drawdownPenalty);
     const sig: SignalReading = gs.signalsHistory.at(-1) ?? computeSignals(gs, makeRng(gs.rngSeed));
     const market: Record<string, number> = {};
-    for (const [id, m] of Object.entries(gs.market)) market[id] = m.V;
+    const delta: Record<string, number> = {};
+    for (const [id, m] of Object.entries(gs.market)) {
+      market[id] = m.V;
+      delta[id] = m.V - (prevV[id] ?? m.V); // variation depuis le tour précédent
+    }
     return {
       turn: gs.turn,
       horizon: gs.params.horizonTurns,
@@ -45,6 +50,7 @@
       wealth,
       positions: new Set(player.positions.map((p) => p.hexId)),
       market,
+      delta,
       signals: sig,
       track: {
         you: wealth / 100 - 1,
@@ -64,6 +70,7 @@
     ai = cfg.adversaires.map(policyForProfile);
     queued = [];
     hexes = gs.map.hexes;
+    prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
     selected = null;
     log = [`Nouvelle partie — seed ${s}`];
     view = buildView();
@@ -86,6 +93,7 @@
 
   function endTurn() {
     if (!view || view.over) return;
+    prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V])); // snapshot avant résolution
     const human: Policy = { id: 'human', decide: () => (queued.length ? queued : [{ verb: 'RESERVER' }]) };
     runTurn(gs, [human, ...ai], rng);
     queued = [];
@@ -139,7 +147,14 @@
               />
               <text x={pos[0]} y={pos[1] - 6} class="label">{h.label}</text>
               {#if isInvestable(h)}
-                <text x={pos[0]} y={pos[1] + 12} class="vval">{view.market[h.id]?.toFixed(0)}</text>
+                {@const d = view.delta[h.id] ?? 0}
+                <text
+                  x={pos[0]}
+                  y={pos[1] + 12}
+                  class="vval"
+                  class:up={d > 0.05}
+                  class:down={d < -0.05}
+                >{view.market[h.id]?.toFixed(0)}{d > 0.05 ? ' ▲' : d < -0.05 ? ' ▼' : ''}</text>
               {/if}
             </g>
           {/if}
@@ -212,6 +227,8 @@
   polygon.frontier { opacity: .45; stroke-dasharray: 4 3; }
   .label { fill: #eef1f7; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
+  .vval.up { fill: #46b277; }
+  .vval.down { fill: #e0564f; }
   aside { display: flex; flex-direction: column; gap: .8rem; }
   section { background: #1a1d25; border: 1px solid #2a2f3a; border-radius: 8px; padding: .7rem; }
   h3 { margin: 0 0 .5rem; font-size: .9rem; display: flex; justify-content: space-between; align-items: baseline; }
