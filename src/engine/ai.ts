@@ -65,7 +65,7 @@ export function policyForProfile(profile: ProfilIA): Policy {
         if (risk < b.riskTolerance && actor.cash > 1) {
           const target = hottestHex(state);
           if (target) {
-            return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: target, equity: actor.cash * b.sizing, leverage: b.leverageAppetite }];
+            return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: target, equity: actor.cash * b.sizing, leverage: b.leverageAppetite, direction: 'long' }];
           }
         }
         // Risque perçu trop haut : on réduit LENTEMENT (le « trop tard »).
@@ -79,7 +79,7 @@ export function policyForProfile(profile: ProfilIA): Policy {
       if (actor.cash > 1) {
         const pick = mostUndervalued(state, rng);
         if (pick && pick.decote > b.decoteThreshold) {
-          return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: pick.hexId, equity: actor.cash * b.sizing, leverage: 0 }];
+          return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: pick.hexId, equity: actor.cash * b.sizing, leverage: 0, direction: 'long' }];
         }
       }
       return [{ verb: 'RESERVER' }];

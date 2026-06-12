@@ -9,10 +9,12 @@ import type { ActorState, GameState } from './state';
 import type { HexId } from './types';
 import type { Rng } from './rng';
 
+export type Direction = 'long' | 'short';
+
 export type PlannedAction =
   | { verb: 'RESERVER' }
-  | { verb: 'POSITIONNER'; op: 'ouvrir'; hexId: HexId; equity: number; leverage: number }
-  | { verb: 'POSITIONNER'; op: 'renforcer'; hexId: HexId; equity: number; leverage: number }
+  | { verb: 'POSITIONNER'; op: 'ouvrir'; hexId: HexId; equity: number; leverage: number; direction: Direction }
+  | { verb: 'POSITIONNER'; op: 'renforcer'; hexId: HexId; equity: number; leverage: number; direction: Direction }
   | { verb: 'POSITIONNER'; op: 'cloture_partielle'; hexId: HexId }
   | { verb: 'POSITIONNER'; op: 'fermer'; hexId: HexId };
 
@@ -42,7 +44,7 @@ export function steadyLong(leverage: number, fraction = 0.25): Policy {
       const hexes = investableHexes(state);
       const hexId = hexes[rng.int(0, hexes.length - 1)]!;
       const equity = actor.cash * fraction;
-      return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId, equity, leverage }];
+      return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId, equity, leverage, direction: 'long' }];
     },
   };
 }

@@ -36,6 +36,8 @@ export interface SignalReading {
 /** Une position ouverte sur un hexe. */
 export interface Position {
   hexId: HexId;
+  /** Sens : long (gagne si V monte) ou short (gagne si V chute). */
+  direction: 'long' | 'short';
   /** Capital propre engagé. */
   equity: number;
   /** Levier (0 = sans levier). Notionnel = equity × (1 + leverage). */

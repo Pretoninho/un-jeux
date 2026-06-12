@@ -8,7 +8,7 @@ import type { Policy, PlannedAction } from './policy';
 import { PA_PAR_TOUR } from '../data/actions';
 import { deriveRegime } from './regime';
 import { resolveMarket } from './market';
-import { actorWealth, applyMarginCalls, positionValue } from './portfolio';
+import { actorWealth, applyMarginCalls, positionValue, dirSign } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
 
@@ -26,14 +26,15 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
     const equity = Math.min(action.equity, actor.cash);
     if (equity <= 0) return;
     actor.cash -= equity;
-    actor.positions.push({ hexId: action.hexId, equity, leverage: action.leverage, entryV: m.V });
-    flux[action.hexId] = (flux[action.hexId] ?? 0) + equity * (1 + action.leverage);
+    actor.positions.push({ hexId: action.hexId, direction: action.direction, equity, leverage: action.leverage, entryV: m.V });
+    const sign = action.direction === 'short' ? -1 : 1; // long = achat (+), short = vente (−)
+    flux[action.hexId] = (flux[action.hexId] ?? 0) + sign * equity * (1 + action.leverage);
   } else if (action.op === 'cloture_partielle') {
     // Allège de moitié chaque position de l'hexe (memo §9bis).
     for (const pos of actor.positions) {
       if (pos.hexId !== action.hexId) continue;
       actor.cash += 0.5 * Math.max(0, positionValue(pos, m.V));
-      flux[action.hexId] = (flux[action.hexId] ?? 0) - 0.5 * pos.equity * (1 + pos.leverage);
+      flux[action.hexId] = (flux[action.hexId] ?? 0) - dirSign(pos) * 0.5 * pos.equity * (1 + pos.leverage);
       pos.equity *= 0.5;
     }
   } else if (action.op === 'fermer') {
@@ -41,7 +42,7 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
     for (const pos of actor.positions) {
       if (pos.hexId === action.hexId) {
         actor.cash += Math.max(0, positionValue(pos, m.V));
-        flux[action.hexId] = (flux[action.hexId] ?? 0) - pos.equity * (1 + pos.leverage);
+        flux[action.hexId] = (flux[action.hexId] ?? 0) - dirSign(pos) * pos.equity * (1 + pos.leverage);
       } else kept.push(pos);
     }
     actor.positions = kept;

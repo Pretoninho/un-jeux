@@ -38,6 +38,7 @@
   let presence = $state<Set<string>>(new Set()); // nœuds où le joueur s'est installé
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
+  let openDir = $state<'long' | 'short'>('long'); // sens de la prochaine ouverture
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
   let viewBox = $state('0 0 100 100');
 
@@ -92,8 +93,10 @@
       cash: player.cash,
       wealth,
       held: new Set(player.positions.map((p) => p.hexId)),
-      exposure: player.positions.reduce<Record<string, number>>((acc, p) => {
-        acc[p.hexId] = (acc[p.hexId] ?? 0) + p.equity;
+      exposure: player.positions.reduce<Record<string, { long: number; short: number; total: number }>>((acc, p) => {
+        const e = (acc[p.hexId] ??= { long: 0, short: 0, total: 0 });
+        e[p.direction] += p.equity;
+        e.total += p.equity;
         return acc;
       }, {}),
       market,
@@ -152,19 +155,19 @@
     view = buildView();
   }
 
-  function open(hexId: string, frac: number) {
+  function open(hexId: string, frac: number, direction: 'long' | 'short') {
     const cost = openCost();
     if (view?.over || !canOpen(hexId) || paLeft() < cost) return;
     const player = gs.actors[0]!;
     const equity = player.cash * frac;
     if (equity <= 0) return;
     player.cash -= equity;
-    player.positions.push({ hexId, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    player.positions.push({ hexId, direction, equity, leverage: 0, entryV: gs.market[hexId]!.V });
     playerHex = hexId; // déplacement
     reveal(hexId); // révèle les nouveaux voisins
     opensThisTurn += 1;
     selected = hexId;
-    log = [`Ouvre ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
+    log = [`Ouvre ${direction === 'short' ? 'SHORT' : 'LONG'} ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
   }
 
@@ -185,8 +188,10 @@
     const player = gs.actors[0]!;
     const equity = player.cash * 0.25;
     if (equity <= 0) return;
+    // Renforce dans le sens dominant déjà détenu sur l'hexe.
+    const dir = (view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long';
     player.cash -= equity;
-    player.positions.push({ hexId, equity, leverage: 0, entryV: gs.market[hexId]!.V });
+    player.positions.push({ hexId, direction: dir, equity, leverage: 0, entryV: gs.market[hexId]!.V });
     spend(1);
   }
 
@@ -286,7 +291,11 @@
                     {view.market[h.id]?.toFixed(0)}{d > 0.05 ? ' ▲' : d < -0.05 ? ' ▼' : ''}
                   </text>
                 {/if}
-                {#if view.held.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="expo">▣ {view.exposure[h.id]?.toFixed(0)}</text>{/if}
+                {#if view.held.has(h.id)}
+                  {@const e = view.exposure[h.id]}
+                  {@const net = (e?.short ?? 0) > (e?.long ?? 0) ? 'S' : 'L'}
+                  <text x={pos[0]} y={pos[1] + 21} class="expo" class:short={net === 'S'}>{net} {e?.total.toFixed(0)}</text>
+                {/if}
                 {#if presence.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="pres">★ présence</text>{/if}
               {:else}
                 <polygon points={hexPointsPointy(pos[0], pos[1])} class="fog" />
@@ -326,15 +335,26 @@
               <b>{descOf(h).court}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
               <button class="qmark" onclick={() => (showDetail = !showDetail)} title="Explication">?</button>
             </div>
-            {#if held}<div class="court">Exposition sur cet hexe : <b>{view.exposure[selected]?.toFixed(0)}</b></div>{/if}
+            {#if held}
+              {@const e = view.exposure[selected]}
+              <div class="court">Exposition : <b>{e?.total.toFixed(0)}</b>
+                {#if e?.long}<span class="long-tag">long {e.long.toFixed(0)}</span>{/if}
+                {#if e?.short}<span class="short-tag">short {e.short.toFixed(0)}</span>{/if}
+              </div>
+            {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
 
             {#if canOpen(selected)}
+              <div class="dir-row">
+                <span>Sens</span>
+                <button class:active={openDir === 'long'} onclick={() => (openDir = 'long')}>LONG</button>
+                <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
+              </div>
               <div class="open-row">
                 <span>Ouvrir & aller</span>
-                <button onclick={() => open(selected!, 0.25)} disabled={paLeft() < openCost()}>25%</button>
-                <button onclick={() => open(selected!, 0.5)} disabled={paLeft() < openCost()}>50%</button>
-                <button onclick={() => open(selected!, 1)} disabled={paLeft() < openCost()}>100%</button>
+                <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < openCost()}>25%</button>
+                <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < openCost()}>50%</button>
+                <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < openCost()}>100%</button>
               </div>
             {/if}
             {#if canOccupy(selected)}
@@ -396,6 +416,12 @@
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .expo.short { fill: #d98cff; }
+  .dir-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
+  .dir-row button { margin: .25rem 0; }
+  .dir-row button.active { background: #2f5d8a; border-color: #3b6ea0; }
+  .long-tag { color: #46b277; font-size: .72rem; margin-left: .3rem; }
+  .short-tag { color: #d98cff; font-size: .72rem; margin-left: .3rem; }
   .pres { fill: #6aa6e0; font-size: 8px; text-anchor: middle; pointer-events: none; }
   .hex.presence polygon { stroke: #6aa6e0; stroke-width: 3; }
   .pct { color: #7a8294; font-size: .78rem; }

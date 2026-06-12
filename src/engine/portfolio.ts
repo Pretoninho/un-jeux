@@ -4,11 +4,17 @@
 import type { ActorState, GameState, Position } from './state';
 import type { HexId } from './types';
 
+/** Signe directionnel d'une position (+1 long, −1 short) — pour le flux/impact. */
+export function dirSign(pos: Position): number {
+  return pos.direction === 'short' ? -1 : 1;
+}
+
 /** Valeur mark-to-market de l'équity d'une position (peut devenir négative). */
 export function positionValue(pos: Position, V: number): number {
   const notional = pos.equity * (1 + pos.leverage);
-  const pnl = notional * (V / pos.entryV - 1);
-  return pos.equity + pnl;
+  // long : gagne si V monte ; short : gagne si V chute.
+  const move = pos.direction === 'short' ? 1 - V / pos.entryV : V / pos.entryV - 1;
+  return pos.equity + notional * move;
 }
 
 /** Richesse mark-to-market d'un acteur = cash + valeur des positions (planchée à 0). */
@@ -81,7 +87,8 @@ export function applyMarginCalls(
       const lossFrac = notional > 0 ? -((value - pos.equity) / notional) : 0;
       if (pos.leverage > 0 && (value <= 0 || lossFrac >= thr)) {
         actor.cash += Math.max(0, value); // liquidation, on récupère ce qui reste
-        fluxByHex[pos.hexId] = (fluxByHex[pos.hexId] ?? 0) - notional; // vente forcée
+        // déboucler une position = flux de sens opposé (un long liquidé vend, un short rachète).
+        fluxByHex[pos.hexId] = (fluxByHex[pos.hexId] ?? 0) - dirSign(pos) * notional;
       } else {
         survivors.push(pos);
       }

@@ -18,7 +18,7 @@ function gameWith(actions: PlannedAction[]) {
 
 describe('opérations de POSITIONNER (memo §9bis)', () => {
   it('Ouvrir crée une position et ponctionne la réserve', () => {
-    const s = gameWith([{ verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_US', equity: 40, leverage: 0 }]);
+    const s = gameWith([{ verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_US', equity: 40, leverage: 0, direction: 'long' }]);
     const player = s.actors[0]!;
     expect(player.positions.some((p) => p.hexId === 'LC_US')).toBe(true);
     expect(player.cash).toBeLessThan(100);
@@ -26,7 +26,7 @@ describe('opérations de POSITIONNER (memo §9bis)', () => {
 
   it('Clôture partielle réduit de moitié l’équity engagée sur l’hexe', () => {
     const s = gameWith([
-      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_US', equity: 40, leverage: 0 },
+      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_US', equity: 40, leverage: 0, direction: 'long' },
       { verb: 'POSITIONNER', op: 'cloture_partielle', hexId: 'LC_US' },
     ]);
     const pos = s.actors[0]!.positions.find((p) => p.hexId === 'LC_US');
@@ -36,8 +36,8 @@ describe('opérations de POSITIONNER (memo §9bis)', () => {
 
   it('Renforcer ajoute de l’exposition sur l’hexe', () => {
     const s = gameWith([
-      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'IG_US', equity: 25, leverage: 0 },
-      { verb: 'POSITIONNER', op: 'renforcer', hexId: 'IG_US', equity: 25, leverage: 0 },
+      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'IG_US', equity: 25, leverage: 0, direction: 'long' },
+      { verb: 'POSITIONNER', op: 'renforcer', hexId: 'IG_US', equity: 25, leverage: 0, direction: 'long' },
     ]);
     const exposure = s.actors[0]!.positions.filter((p) => p.hexId === 'IG_US').length;
     expect(exposure).toBe(2); // deux apports d'exposition

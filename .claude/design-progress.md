@@ -85,7 +85,11 @@ Restent en J7 (vérifications **numériques**, pas de design) : α, coût du lev
 >
 > **Code : J5 ✅** — UI vue principale (`App.svelte`, `lib/layout.ts`). Carte SVG 13 hexes, signaux (3 barres, F cachée), actions (Ouvrir/Fermer/Réserver + PA), bandeau Track Record, journal, seed. Joueur humain = `Policy` UI → moteur inchangé. Build OK, 51 tests. **Coutures** : signaux gratuits (coût LIRE pas câblé) · clôture partielle/levier hors UI · 13 hexes (écart 13/16 ouvert). Prochaine étape : **J6 — détail d'hexe + post-mortem** (courbe `F` révélée).
 >
-> POSITIONNER (memo §9bis, v1.9) : 4 opérations — Ouvrir (1-2) · Renforcer (1-2) · **Clôture partielle (2)** · Fermer totale (1). En données : `src/data/actions.ts`.
+> **Proto exploration (UI, hors moteur)** : carte hexagonale **générée** (géométrie = adjacence), brouillard, déplacement par investissement, CHAIN (1 PA puis 2), S'installer sur nœuds (présence), exposition par hexe, Track Record en valeur absolue + %.
+>
+> **Restructuration archétypes (en cours)** : on bâtit d'abord un **profil NEUTRE** (`src/data/archetypes/neutre.ts`) = toutes les primitives, aucune spécificité → bac à sable de mécanique. **Primitive SHORT livrée** : `Position.direction` long/short, P&L miroir, appel de marge et flux sensibles au sens (moteur) + sélecteur Long/Short et affichage du sens (UI). 62 tests. Les archétypes (spécificités par-dessus le neutre) seront développés **un à la fois** ensuite.
+>
+> POSITIONNER (memo §9bis, v1.9) : Ouvrir (Long/Short) · Renforcer · **Clôture partielle (2)** · Fermer. En données : `src/data/actions.ts`.
 >
 > ⚠️ **À trancher avant J5** (memo §21) : écart de comptage carte — prose spec §4 = 16 hexes, liste d'adjacence = 13. Le code (`src/data/maps/mvp-16.ts`) suit l'adjacence (13 hexes : 8 marché · 3 nœuds · 2 frontière).
 

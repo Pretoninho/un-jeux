@@ -3,13 +3,13 @@
 
 import type { ConfigPartie } from '../engine/types';
 import { generateHexMap } from './maps/generate';
-import { VAUTOUR } from './archetypes/vautour';
+import { NEUTRE } from './archetypes/neutre';
 import { FONDS_LEVERAGE } from './profiles/fonds-leverage';
 import { VALUE_PATIENT } from './profiles/value-patient';
 
 export function presetExplore(seed: number, radius = 3): ConfigPartie {
   return {
-    archetype: VAUTOUR,
+    archetype: NEUTRE,
     adversaires: [FONDS_LEVERAGE, VALUE_PATIENT],
     carte: generateHexMap(seed, radius),
     seed,
