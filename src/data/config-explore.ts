@@ -7,7 +7,7 @@ import { NEUTRE } from './archetypes/neutre';
 import { FONDS_LEVERAGE } from './profiles/fonds-leverage';
 import { VALUE_PATIENT } from './profiles/value-patient';
 
-export function presetExplore(seed: number, radius = 3): ConfigPartie {
+export function presetExplore(seed: number, radius = 4): ConfigPartie {
   return {
     archetype: NEUTRE,
     adversaires: [FONDS_LEVERAGE, VALUE_PATIENT],

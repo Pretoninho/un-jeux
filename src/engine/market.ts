@@ -88,7 +88,10 @@ export function resolveMarket(state: GameState, fluxByHex: Record<string, number
     const flux = (fluxByHex[hex.id] ?? 0) * p.fluxImpact; // impact-prix (§25.4)
 
     const r = driftComp + factorComp + reversion + flux;
-    m.V = Math.max(1e-3, m.V * (1 + r));
+    // Borne le rendement d'un tour : un actif ne perd/gagne pas > ~50 % en un coup.
+    // Évite qu'un hexe s'effondre au plancher (« bloqué à 0 ») et plafonne les pics.
+    const rBounded = Math.max(-0.5, Math.min(0.5, r));
+    m.V = Math.max(1e-3, m.V * (1 + rBounded));
 
     // Ancre `A` (juste valeur) : suit la dérive FONDAMENTALE hors crise — donc une
     // hausse calme n'étire PAS la valorisation (la fragilité doit venir des

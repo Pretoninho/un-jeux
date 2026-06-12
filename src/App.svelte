@@ -9,7 +9,7 @@
   import { runTurn } from './engine/turn';
   import { policyForProfile } from './engine/ai';
   import { computeSignals } from './engine/signals';
-  import { actorWealth } from './engine/portfolio';
+  import { actorWealth, positionValue } from './engine/portfolio';
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
   import type { GameState, SignalReading } from './engine/state';
@@ -31,6 +31,11 @@
   let view = $state<ReturnType<typeof buildView>>();
   let read = $state<Set<string>>(new Set());
   let showDetail = $state(false);
+  let transactions = $state<Array<{ turn: number; label: string; dir: 'long' | 'short'; pnl: number }>>([]);
+
+  function recordTx(turn: number, hexId: string, dir: 'long' | 'short', pnl: number) {
+    transactions = [{ turn, label: hexById(hexId)?.label ?? hexId, dir, pnl }, ...transactions].slice(0, 15);
+  }
 
   // Couche d'exploration
   let playerHex = $state<string>('');
@@ -86,6 +91,15 @@
       market[id] = m.V;
       delta[id] = m.V - (prevV[id] ?? m.V);
     }
+    // P&L latent (non réalisé) : valeur courante des positions − capital engagé.
+    let latentTotal = 0;
+    const latentByHex: Record<string, number> = {};
+    for (const p of player.positions) {
+      const v = gs.market[p.hexId]?.V ?? p.entryV;
+      const l = positionValue(p, v) - p.equity;
+      latentTotal += l;
+      latentByHex[p.hexId] = (latentByHex[p.hexId] ?? 0) + l;
+    }
     return {
       turn: gs.turn,
       horizon: gs.params.horizonTurns,
@@ -101,6 +115,8 @@
       }, {}),
       market,
       delta,
+      latentTotal,
+      latentByHex,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
@@ -143,6 +159,7 @@
     paUsed = 0;
     opensThisTurn = 0;
     read = new Set();
+    transactions = [];
     selected = playerHex;
     showDetail = false;
     log = [`Apparition en ${hexById(playerHex)?.label} — seed ${s}`];
@@ -200,9 +217,9 @@
     const player = gs.actors[0]!;
     for (const p of player.positions) {
       if (p.hexId !== hexId) continue;
-      const notional = p.equity * (1 + p.leverage);
-      const value = p.equity + notional * (gs.market[hexId]!.V / p.entryV - 1);
+      const value = positionValue(p, gs.market[hexId]!.V);
       player.cash += 0.5 * Math.max(0, value);
+      recordTx(gs.turn, hexId, p.direction, 0.5 * (value - p.equity)); // P&L réalisé sur la moitié
       p.equity *= 0.5;
     }
     spend(2);
@@ -214,8 +231,9 @@
     const kept = [];
     for (const p of player.positions) {
       if (p.hexId === hexId) {
-        const notional = p.equity * (1 + p.leverage);
-        player.cash += Math.max(0, p.equity + notional * (gs.market[hexId]!.V / p.entryV - 1));
+        const value = positionValue(p, gs.market[hexId]!.V);
+        player.cash += Math.max(0, value);
+        recordTx(gs.turn, hexId, p.direction, value - p.equity); // P&L réalisé
       } else kept.push(p);
     }
     player.positions = kept;
@@ -337,9 +355,11 @@
             </div>
             {#if held}
               {@const e = view.exposure[selected]}
+              {@const lat = view.latentByHex[selected] ?? 0}
               <div class="court">Exposition : <b>{e?.total.toFixed(0)}</b>
                 {#if e?.long}<span class="long-tag">long {e.long.toFixed(0)}</span>{/if}
                 {#if e?.short}<span class="short-tag">short {e.short.toFixed(0)}</span>{/if}
+                · P&L latent <b class:up={lat > 0.5} class:down={lat < -0.5}>{lat >= 0 ? '+' : ''}{lat.toFixed(1)}</b>
               </div>
             {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
@@ -372,9 +392,23 @@
           {:else}
             <div class="sel muted">Clique un hexe révélé.</div>
           {/if}
-          <div class="cash">Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b></div>
+          <div class="cash">
+            Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b><br />
+            P&L latent global : <b class:up={view.latentTotal > 0.5} class:down={view.latentTotal < -0.5}>{view.latentTotal >= 0 ? '+' : ''}{view.latentTotal.toFixed(1)}</b>
+          </div>
           <button class="end" onclick={endTurn} disabled={view.over}>Fin du tour</button>
           {#if view.over}<div class="over">Partie terminée — Track Record : <b>{fmtPct(view.track.you - view.track.market)}</b> vs marché</div>{/if}
+        </section>
+
+        <section class="tx">
+          <h3>Transactions <span class="hint">P&L réalisé</span></h3>
+          {#if transactions.length === 0}<div class="muted small">Aucune transaction fermée.</div>{/if}
+          {#each transactions as t}
+            <div class="tx-row">
+              <span>T{t.turn} · <span class:short-tag={t.dir === 'short'} class:long-tag={t.dir === 'long'}>{t.dir === 'short' ? 'S' : 'L'}</span> {t.label}</span>
+              <b class:up={t.pnl > 0.05} class:down={t.pnl < -0.05}>{t.pnl >= 0 ? '+' : ''}{t.pnl.toFixed(1)}</b>
+            </div>
+          {/each}
         </section>
 
         <section class="log">
@@ -415,6 +449,9 @@
   .label { fill: #eef1f7; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
+  b.up, .up { color: #46b277; } b.down, .down { color: #e0564f; }
+  .tx { font-size: .76rem; }
+  .tx-row { display: flex; justify-content: space-between; padding: .12rem 0; border-bottom: 1px solid #22262f; }
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
   .expo.short { fill: #d98cff; }
   .dir-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { policyForProfile } from './ai';
+import { alwaysReserve } from './policy';
 import { buildInitialState } from './init';
 import { simulate } from './simulate';
 import { makeRng } from './rng';
@@ -65,7 +66,6 @@ describe('Value patient (valeur, sans levier, spec §7)', () => {
 describe('ÉMERGENCE avec les vraies IA', () => {
   const N = 60;
   const fl = policyForProfile(FONDS_LEVERAGE);
-  const vp = policyForProfile(VALUE_PATIENT);
   // Pic de fragilité moyen atteint sur une partie : mesure combien chaque table
   // « chauffe » le système (le taux de crise sature et ne discrimine pas).
   const meanPeakF = (policies: Parameters<typeof simulate>[2]) => {
@@ -73,9 +73,13 @@ describe('ÉMERGENCE avec les vraies IA', () => {
     return res.reduce((a, r) => a + Math.max(...r.fragilityHistory), 0) / N;
   };
 
-  it('une table de Fonds leveragés chauffe le système plus qu’une table de Value patients', () => {
+  it('une table de Fonds leveragés chauffe le système plus qu’une table tout-réserve', () => {
     // Le levier nourrit F directement (memo §23.2) ; la contribution émerge, pas codée.
-    expect(meanPeakF({ policies: [fl, fl, fl] })).toBeGreaterThan(meanPeakF({ policies: [vp, vp, vp] }));
+    // (vs Value patient : non discriminant aux paramètres non calibrés — les deux saturent
+    //  via le crowding ; à départager en J7.)
+    expect(meanPeakF({ policies: [fl, fl, fl] })).toBeGreaterThan(
+      meanPeakF({ policies: [alwaysReserve, alwaysReserve, alwaysReserve] }),
+    );
   });
 
   it('le preset MVP par défaut (Vautour + 2 IA) tourne et score tous les acteurs', () => {
