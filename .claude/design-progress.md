@@ -1,7 +1,11 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-12 — v1.10
+> Dernière mise à jour : 2026-06-12 — v1.11
+>
+> 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
+> 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
+> 🌐 **Archi multijoueur « plan & TICKs »** documentée (memo §31), non implémentée ; IA déjà visibles (footprint).
 
 ---
 
