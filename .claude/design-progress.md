@@ -73,7 +73,9 @@ Principe directeur : **chaque levier doit porter un coût symétrique** (règle 
 
 Restent en J7 (vérifications **numériques**, pas de design) : α, coût du levier, planchers, cibles de tempo (§28.2), critère signaux>horloge (§28.7), neutralité multi-profils (§28.8).
 
-> Backlog : T1 ✅ · T2 ✅ · T3 ✅ · T4 ✅ · T5 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅. **Design MVP complet, audité, chantier clos.** Prochaine étape : **code — jalon J1** (squelette Svelte/TS + interfaces + carte en données, spec §12).
+> Backlog design : T1 ✅ · T2 ✅ · T3 ✅ · T4 ✅ · T5 ✅ · T6 ✅ · T8 ✅ · T9 ✅ · A2 absorbée ✅. **Design MVP complet, audité, chantier clos.**
+>
+> **Code : J1 ✅** — squelette Svelte/Vite/TS. Moteur découplé (`src/engine/`, TS pur sans DOM), tout en données (`src/data/` : carte 16 hexes, Vautour, 2 profils IA, preset MVP). Anti-script porté par le code : RNG seedé (`rng.ts`) + paramètres en plages tirées par instance (`params.ts`, aligné v1.8 dont levier §29.3). 17 tests verts (intégrité/symétrie/connexité carte, reproductibilité RNG, plages des paramètres + `F(0)` < zone morte). Build OK. Prochaine étape : **J2 — moteur sans UI + harness `simulate`**.
 
 ---
 
