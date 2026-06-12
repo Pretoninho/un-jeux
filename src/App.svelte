@@ -45,7 +45,10 @@
   // Couche d'exploration
   let playerHex = $state<string>('');
   let revealed = $state<Set<string>>(new Set());
-  let presence = $state<Set<string>>(new Set()); // nœuds où le joueur s'est installé
+  let presenceUntil = $state<Record<string, number>>({}); // nœud -> tour jusqu'auquel la présence est active
+  const PRESENCE_TURNS = 3; // persistance après s'être installé (réglable ; futur bouton d'archétype)
+  const isPresent = (id: string) => (presenceUntil[id] ?? -1) >= gs.turn;
+  const presenceLeft = (id: string) => Math.max(0, (presenceUntil[id] ?? gs.turn) - gs.turn);
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
   let openDir = $state<'long' | 'short'>('long'); // sens de la prochaine ouverture
@@ -138,6 +141,10 @@
       latentByHex,
       leverageByHex,
       aiPresence,
+      // Financement débloqué = présence active à un nœud liquidité (PB) — memo §23.6.
+      pbActive: gs.map.hexes.some(
+        (h) => h.kind === 'noeud' && h.nodeType === 'liquidite' && (presenceUntil[h.id] ?? -1) >= gs.turn,
+      ),
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
@@ -177,7 +184,7 @@
     const spw = makeRng(s * 7 + 1);
     playerHex = spawnable[spw.int(0, spawnable.length - 1)] ?? spawnable[0]!;
     revealed = new Set();
-    presence = new Set();
+    presenceUntil = {};
     reveal(playerHex);
     paUsed = 0;
     opensThisTurn = 0;
@@ -215,12 +222,22 @@
     const cost = openCost(); // un déplacement : même contrainte de CHAIN que les ouvertures
     if (view?.over || !canOccupy(hexId) || paLeft() < cost) return;
     playerHex = hexId; // déplacement, sans position ni capital engagé
-    presence = new Set(presence).add(hexId); // présence établie (bénéfice à câbler)
+    presenceUntil = { ...presenceUntil, [hexId]: gs.turn + PRESENCE_TURNS }; // présence pour ~3 tours
     reveal(hexId);
     opensThisTurn += 1;
     selected = hexId;
     log = [`S'installe sur ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
+  }
+
+  // DÉPLACER : se déplacer sur un hexe marché adjacent SANS investir (1 PA, primitive).
+  function deplacer(hexId: string) {
+    if (view?.over || !canOpen(hexId) || paLeft() < 1) return;
+    playerHex = hexId;
+    reveal(hexId);
+    selected = hexId;
+    log = [`Se déplace en ${hexById(hexId)?.label} (1 PA)`, ...log].slice(0, 8);
+    spend(1);
   }
 
   function reinforce(hexId: string) {
@@ -265,6 +282,7 @@
 
   function readSignal(name: string) {
     if (view?.over || read.has(name) || paLeft() < 1) return;
+    if (name === 'financement' && !view?.pbActive) return; // Financement nécessite la présence au PB
     read = new Set(read).add(name);
   }
 
@@ -316,7 +334,7 @@
               class:owned={view.held.has(h.id)}
               class:here={playerHex === h.id}
               class:openable={canOpen(h.id) || canOccupy(h.id)}
-              class:presence={presence.has(h.id)}
+              class:presence={isPresent(h.id)}
               role="button"
               tabindex="0"
               onclick={() => shown && (selected = h.id)}
@@ -342,7 +360,7 @@
                   {@const net = (e?.short ?? 0) > (e?.long ?? 0) ? 'S' : 'L'}
                   <text x={pos[0]} y={pos[1] + 21} class="expo" class:short={net === 'S'}>{net} {e?.total.toFixed(0)}</text>
                 {/if}
-                {#if presence.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="pres">★ présence</text>{/if}
+                {#if isPresent(h.id)}<text x={pos[0]} y={pos[1] + 21} class="pres">★ {presenceLeft(h.id)}t</text>{/if}
               {:else}
                 <polygon points={hexPointsPointy(pos[0], pos[1])} class="fog" />
                 <text x={pos[0]} y={pos[1] + 4} class="fogq">?</text>
@@ -368,16 +386,25 @@
             <span>Volatilité</span>
             <div class="bar"><div class="fill" style="width:{view.signals.volatilite * 100}%"></div></div>
           </div>
-          {#each [['Écart crédit', 'ecartCredit'], ['Financement', 'financement']] as [name, key]}
-            <div class="bar-row">
-              <span>{name}</span>
-              {#if read.has(key)}
-                <div class="bar"><div class="fill" style="width:{(view.signals as any)[key] * 100}%"></div></div>
-              {:else}
-                <button class="lire" onclick={() => readSignal(key)} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
-              {/if}
-            </div>
-          {/each}
+          <div class="bar-row">
+            <span>Écart crédit</span>
+            {#if read.has('ecartCredit')}
+              <div class="bar"><div class="fill" style="width:{view.signals.ecartCredit * 100}%"></div></div>
+            {:else}
+              <button class="lire" onclick={() => readSignal('ecartCredit')} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
+            {/if}
+          </div>
+          <!-- Financement : nécessite une présence active au prime broker (PB) -->
+          <div class="bar-row">
+            <span>Financement</span>
+            {#if !view.pbActive}
+              <span class="locked">🔒 présence PB requise</span>
+            {:else if read.has('financement')}
+              <div class="bar"><div class="fill" style="width:{view.signals.financement * 100}%"></div></div>
+            {:else}
+              <button class="lire" onclick={() => readSignal('financement')} disabled={view.over || paLeft() < 1}>LIRE · 1 PA</button>
+            {/if}
+          </div>
         </section>
 
         <section class="actions">
@@ -421,11 +448,12 @@
                 <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < openCost()}>50%</button>
                 <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < openCost()}>100%</button>
               </div>
+              <button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA</button>
             {/if}
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
             {/if}
-            {#if presence.has(selected)}<div class="court">Présence établie (bénéfice du nœud à venir).</div>{/if}
+            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
@@ -533,6 +561,7 @@
   .open-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
   .open-row button { margin: .25rem 0; }
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
+  .locked { font-size: .72rem; color: #c79a4a; }
   .small { font-size: .72rem; } .muted { color: #7a8294; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }

@@ -18,13 +18,14 @@
 
 | Action | Coût PA | Effet |
 |---|---|---|
-| **OUVRIR (Long / Short)** | 1 (puis **2 en CHAIN**) | nouvelle position ; en exploration : **déplace** le joueur + **révèle** les voisins |
+| **DÉPLACER** | 1 | se déplacer sur un hexe marché adjacent **sans investir** + révèle les voisins (traverser / scouter) |
+| **OUVRIR (Long / Short / levier)** | 1 (puis **2 en CHAIN**) | nouvelle position ; en exploration : **déplace** le joueur + **révèle** les voisins. Levier joueur 0× / 2× / 3× |
 | **RENFORCER** | 1 | exposition additionnelle sur un hexe détenu |
 | **CLÔTURE PARTIELLE** | 2 | réduit de **−50 %** l'exposition sur l'hexe |
 | **FERMER** | 1 | solde la position (réalise le P&L) |
 | **LIRE** | 1 | 🟡 révèle un signal caché *pour ce tour* (UI seulement, voir §E) |
 | **RÉSERVER** | 0 | rester en cash (le joueur ne se déplace pas) |
-| **S'INSTALLER** | 1 (CHAIN) | 🟡 se déplacer sur un nœud (présence) — **bénéfice pas encore branché** |
+| **S'INSTALLER** | 1 (CHAIN) | se déplacer sur un nœud + **présence ~3 tours**. Nœud **PB** ✅ → débloque le signal **Financement** ; Notation/BC ⛔ à venir |
 
 - **CHAIN** (memo §9bis, exploration) : la 1ʳᵉ ouverture du tour coûte 1 PA, les ouvertures **enchaînées** ensuite coûtent **2 PA** → frein à la course sur la carte.
 
@@ -50,6 +51,7 @@
 - **3 signaux** (`engine/signals.ts`, memo §23.6) = lectures **bruitées et retardées** de `F`, ne la révèlent jamais exactement :
   - **Volatilité** (retard 0, gratuite) · **Écart de crédit** (retard 1) · **Financement** (retard 2).
   - 🟡 **Coût de LIRE** : implémenté **dans l'UI** (Volatilité gratuite ; Écart/Financement masqués, révélés par LIRE 1 PA chacun). Le moteur calcule les signaux par ailleurs.
+  - ✅ **Financement verrouillé sans le PB** : il n'est accessible (puis LIRE) que si tu as une **présence active à un nœud prime broker** (memo §11). Présence persistante ~3 tours (réglable ; futur bouton d'archétype).
 
 ## F. La crise — cascade & bull trap ✅ (memo §24)
 
@@ -77,7 +79,7 @@
 
 ## ⛔ Ce qui n'est PAS encore branché (à savoir)
 
-- **Bénéfices des nœuds** (BC = taux anticipés, PB = levier moins cher + Financement, Notation = signaux plus nets) : la présence est **cosmétique** (memo §21, §30.4).
+- **Bénéfices des nœuds** : **PB → Financement** ✅ câblé (UI) ; restent ⛔ **PB → levier moins cher** (avec le levier joueur / Sismographe), **Notation → signaux plus nets**, **BC → taux anticipés** (dépend de la banque centrale active, memo §21, §30.4).
 - **Frontières / exotiques** : infranchissables, **pas de déblocage** (memo §11, §21).
 - **LIRE** : son coût n'est câblé **que dans l'UI**.
 - **IA** : footprint visible mais **non spatiales** (pas de déplacement / chemin) — memo §31.
