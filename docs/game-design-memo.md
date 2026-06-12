@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.8 — 12 juin 2026.
+> Document de référence vivant. Version 1.9 — 12 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -161,12 +161,30 @@ Chaque action coûte des points d'action (PA). Valeurs de prototype.
 | Verbe | Coût | Description | Dimension 4X |
 |---|---|---|---|
 | **LIRE** | 1 PA | Envoyer des analystes, acheter des données, interpréter les signaux de fragilité. L'information se périme. | eXplore |
-| **POSITIONNER** | 1–2 PA | Ouvrir, redimensionner, fermer des positions. Les positions de taille ont un impact prix. | eXploit |
+| **POSITIONNER** | 1–2 PA | Ouvrir / renforcer / clôturer (partiellement ou totalement) des positions. Les positions de taille ont un impact prix. Détail des coûts en §9bis. | eXploit |
 | **CONSTRUIRE** | 2 PA | Avancer dans l'arbre de compétences, recruter des équipes, ouvrir des desks. | eXpand |
 | **NÉGOCIER** | 1 PA | Gérer les LPs, courtiser les régulateurs, lancer des raids activistes, débaucher des équipes. | eXterminate / Diplomatie |
 | **RÉSERVER** | 0 PA | Ne rien déployer. Garder des liquidités sèches. **C'est une action explicite**, pas une absence d'action. | — |
 
 **Double effet de chaque action** : effet personnel (position, firme) ET effet systémique (jauge de fragilité). Cette double comptabilité est permanente et en partie cachée.
+
+### 9bis. Opérations de POSITIONNER et coûts (amendé v1.9)
+
+L'ancien « redimensionner (augmenter ou réduire) » est scindé pour éviter une option morte (voir audit ci-dessous) :
+
+| Opération | Coût | Rôle |
+|---|---|---|
+| **Ouvrir** | 1–2 PA (selon impact-prix) | nouvelle position |
+| **Renforcer** | 1–2 PA (selon impact-prix) | augmenter une position existante |
+| **Clôture partielle** | **2 PA** | alléger / scale-out — le seul moyen de réduire sans solder |
+| **Fermer (totale)** | 1 PA | sortie nette, réalise tout le P&L |
+
+**Pourquoi la clôture partielle coûte plus cher que la sortie totale** :
+- C'est le **geste de la décision sous incertitude** — quand on ne sait pas si le rebond est un piège ou un vrai plancher (§24.2), en retirer une part et garder le reste *est* le « je ne sais pas » rendu jouable. La décisivité (sortir net, 1 PA) est bon marché ; l'hésitation gérée (rester à moitié exposé, 2 PA) se paie.
+- **Garde-fou anti-gaming du score** (§27) : une réduction d'exposition précise et bon marché serait un cadran à raboter le MaxDrawdown à vil prix. À 2 PA (la moitié du tour) **et** exposition résiduelle conservée, la précision a un coût — pas d'effaceur de drawdown gratuit.
+- Le joueur paniqué garde toujours une **sortie d'urgence à 1 PA** (Fermer totale).
+
+*Audit anti-script* : pas de timeline (option du joueur) ✓ · non dominée (l'overlap « redimensionner à la baisse » est supprimé) ✓ · neutre entre archétypes (§26) ✓ · sert le cœur épistémique au lieu de le contourner ✓. **Tests comportementaux (l'exposition baisse vraiment, effet sur drawdown/`flux`) au jalon J2** ; au J1, seul le catalogue d'actions et ses coûts sont testés (`src/data/actions.ts`).
 
 ---
 
@@ -660,6 +678,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **Tempo VERROUILLÉ (v1.6, §28)** : on calibre une **distribution d'expériences**, pas une durée. Cibles statistiques (~60 % 1 crise / 10-15 % 2 crises / **20-25 % sans crise** / crise <t.5 rare mais possible) = diagnostics à atteindre via les paramètres générateurs, **jamais** en forçant le timing. `F(0)` tirée en plage cachée ~0.10-0.35 (§23.1 — monde avec un passé, pas de départ mémorisable). Pas de fenêtre de grâce décrétée. Arc en 3 actes = conséquence statistique, pas structure. Budget épistémique ~50-60 PA (voir ou agir). Asymétrie montée/chute ≥ 2:1. **Critère d'or = « les signaux battent l'horloge », assertion de test automatisé au jalon J7** (le moteur peut prouver qu'il n'est pas scripté) |
 | 2026-06-12 | **Périmètre MVP VERROUILLÉ — T8 (v1.7)** : les 4 questions de la spec §13 validées (Vautour seul archétype *livré*, carte 16 hexes, stack Svelte/TS/SVG, ~30-45 min). **Exigence d'extensibilité élevée en principe** : archétypes / profils IA / cartes = données interchangeables, moteur N-profils dès J1, harness `simulate(config, n)` paramétrable (spec §11bis). **Calibrage multi-profils (§28.8)** : catch d'audit — tuner contre un seul bot re-scripterait la physique autour du Vautour ; parade = cibles de tempo multi-bots + assertion de neutralité en J7 (aucun profil ne domine strictement les Track Records). Design MVP complet : prochaine étape = code (J1) |
 | 2026-06-12 | **Défauts résiduels #2/#3/#4 RÉSOLUS (v1.8, §29) — chantier script stratégique CLOS** : (#2) purge de `F` symétrique agrégée, proportionnelle à la part de capital — fin du forfait −0.05, tragédie des communs restaurée (§23.3) ; (#3) bruit en deux composantes, planchers irréductibles en plages (Vol 0.20→0.10, Crédit 0.10→0.06, Financement base relevée 0.08→0.04), délais irréductibles — l'infrastructure achète de la netteté, jamais de la certitude (§23.6, §29.2) ; (#4) mécanique du levier complète : coût croissant avec L et la détresse, **appel de marge** = mécanisme de transmission des cascades (vente forcée → flux → contagion endogène), test de viabilité du bot leveragé en assertion J7 (§29.3). Les 5 défauts de §26.3 sont résolus |
+| 2026-06-12 | **POSITIONNER affiné (v1.9, §9bis)** : ajout de la **clôture partielle à 2 PA** (scale-out). L'ancien « redimensionner (augmenter ou réduire) » est scindé en `renforcer` (1-2 PA) et `clôture partielle` (2 PA) pour éviter une option morte. Coûts : Ouvrir 1-2 · Renforcer 1-2 · Clôture partielle 2 · Fermer totale 1. Rationale : la clôture partielle est le geste de la décision sous incertitude (§24.2) ; décisivité bon marché (sortie nette 1 PA) vs hésitation gérée (2 PA) ; garde-fou anti-gaming du drawdown (§27). Encodé en catalogue de données (`src/data/actions.ts`), 8 tests. Tests comportementaux en J2 |
 | 2026-06-12 | **J1 LIVRÉ (code, commit `3345179`)** : squelette Svelte/Vite/TS. Moteur découplé (`src/engine/`, TS pur sans DOM), tout en données (`src/data/` : carte, Vautour, 2 profils IA, preset). Anti-script porté par la structure : RNG seedé + paramètres en plages tirées par instance (`params.ts`, aligné v1.8). 17 tests verts, build OK. **Question ouverte ajoutée (§21)** : écart de comptage carte — prose §4 = 16 hexes, adjacence = 13 ; le code suit l'adjacence ; à trancher avant J5 |
 
 ---

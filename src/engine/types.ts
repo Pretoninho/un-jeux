@@ -76,3 +76,26 @@ export interface ConfigPartie {
   carte: GameMap;
   seed: number;
 }
+
+// ──────────────────── Catalogue d'actions (memo §9, §9bis) ───────────────────
+
+/** Verbes du MVP (les 5 du jeu complet moins CONSTRUIRE/NÉGOCIER). */
+export type Verbe = 'LIRE' | 'POSITIONNER' | 'RESERVER';
+
+/** Opérations de POSITIONNER (memo §9bis). */
+export type PositionOp = 'ouvrir' | 'renforcer' | 'cloture_partielle' | 'fermer';
+
+/**
+ * Définition d'une action. Le coût est un intervalle [paMin, paMax] : fixe quand
+ * paMin === paMax, variable selon l'impact-prix sinon (memo §9bis). C'est de la
+ * donnée — les coûts se règlent sans toucher au moteur (calibrage J7).
+ */
+export interface ActionDef {
+  id: string;
+  verbe: Verbe;
+  /** Présent uniquement pour POSITIONNER. */
+  op?: PositionOp;
+  label: string;
+  paMin: number;
+  paMax: number;
+}

@@ -117,7 +117,7 @@ INFO   ↔ IG_US, LIQ
 | Verbe | Coût | Effet MVP |
 |---|---|---|
 | **LIRE** | 1 PA | rafraîchit un signal (valable 1 tour) ou pose/déplace un analyste (signal continu) |
-| **POSITIONNER** | 1–2 PA | ouvre / redimensionne / ferme une position (impact prix si taille) |
+| **POSITIONNER** | 1–2 PA | ouvre / renforce (1–2) · **clôture partielle (2)** · ferme totale (1) — voir memo §9bis. Impact prix si taille |
 | **RÉSERVER** | 0 PA | garde la réserve sèche ; purge `F` via la **baisse du levier agrégé, proportionnelle à sa part du capital** (memo §23.3 v1.8) ; accumule la ressource Réserve sèche du Vautour. Coût réel : carry + drift abandonnés (memo §25.5) |
 
 Ordre du tour : actions joueur → actions des 2 IA → résolution marché (rendements, mise à jour `F`, test de crise §23.4 / avancée de cascade §24).
