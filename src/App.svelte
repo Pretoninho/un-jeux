@@ -208,18 +208,23 @@
   }
 
   function open(hexId: string, frac: number, direction: 'long' | 'short') {
-    const cost = openCost();
-    if (view?.over || !canOpen(hexId) || paLeft() < cost) return;
+    const here = hexId === playerHex; // investir « ici » (hexe courant) = sans se déplacer
+    const h = hexById(hexId);
+    const valid = here ? !!h && isInvestable(h) : canOpen(hexId);
+    const cost = here ? 1 : openCost(); // sur place = 1 PA fixe (pas de mouvement, pas de CHAIN)
+    if (view?.over || !valid || paLeft() < cost) return;
     const player = gs.actors[0]!;
     const equity = player.cash * frac;
     if (equity <= 0) return;
     player.cash -= equity;
     player.positions.push({ hexId, direction, equity, leverage: openLev, entryV: gs.market[hexId]!.V });
-    playerHex = hexId; // déplacement
-    reveal(hexId); // révèle les nouveaux voisins
-    opensThisTurn += 1;
+    if (!here) {
+      playerHex = hexId; // déplacement
+      reveal(hexId); // révèle les nouveaux voisins
+      opensThisTurn += 1;
+    }
     selected = hexId;
-    log = [`Ouvre ${direction === 'short' ? 'SHORT' : 'LONG'} ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
+    log = [`${here ? 'Investit' : 'Ouvre'} ${direction === 'short' ? 'SHORT' : 'LONG'} ${h?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
   }
 
@@ -416,6 +421,9 @@
           {#if selected}
             {@const h = hexById(selected)}
             {@const held = view.held.has(selected)}
+            {@const here = playerHex === selected}
+            {@const canInvest = canOpen(selected) || (here && !!h && isInvestable(h))}
+            {@const oCost = here ? 1 : openCost()}
             <div class="sel">
               <b>{descOf(h).court}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
               <button class="qmark" onclick={() => (showDetail = !showDetail)} title="Explication">?</button>
@@ -432,7 +440,7 @@
             {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
 
-            {#if canOpen(selected)}
+            {#if canInvest}
               <div class="dir-row">
                 <span>Sens</span>
                 <button class:active={openDir === 'long'} onclick={() => (openDir = 'long')}>LONG</button>
@@ -446,12 +454,12 @@
               </div>
               {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge</div>{/if}
               <div class="open-row">
-                <span>Ouvrir & aller</span>
-                <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < openCost()}>25%</button>
-                <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < openCost()}>50%</button>
-                <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < openCost()}>100%</button>
+                <span>{here ? 'Ouvrir ici' : 'Ouvrir & aller'}</span>
+                <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < oCost}>25%</button>
+                <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < oCost}>50%</button>
+                <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < oCost}>100%</button>
               </div>
-              <button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA</button>
+              {#if canOpen(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA</button>{/if}
             {/if}
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
@@ -462,8 +470,8 @@
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
               <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1}>Fermer (totale) · 1 PA</button>
             {/if}
-            {#if !canOpen(selected) && !canOccupy(selected) && !held && playerHex !== selected}
-              <div class="muted small">Pas adjacent / non accessible.</div>
+            {#if !canInvest && !canOccupy(selected) && !held}
+              <div class="muted small">{here ? 'Rien à faire sur cet hexe.' : 'Pas adjacent / non accessible.'}</div>
             {/if}
           {:else}
             <div class="sel muted">Clique un hexe révélé.</div>
