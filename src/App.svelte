@@ -31,6 +31,7 @@
   let view = $state<ReturnType<typeof buildView>>();
   let read = $state<Set<string>>(new Set());
   let showDetail = $state(false);
+  let debug = $state(false); // 🐞 révèle l'état caché (F, ancres) pour les tests
   let transactions = $state<Array<{ turn: number; label: string; dir: 'long' | 'short'; pnl: number }>>([]);
   let profileLabel = $state(''); // libellé du profil joué (lu depuis la config, pas codé en dur)
   let aiList = $state<Array<{ id: string; label: string; color: string }>>([]);
@@ -101,9 +102,11 @@
     const sig: SignalReading = computeSignals(gs, makeRng(gs.rngSeed * 1000003 + gs.turn), infoActive ? 0.5 : 1);
     const market: Record<string, number> = {};
     const delta: Record<string, number> = {};
+    const anchorByHex: Record<string, number> = {}; // ancre A cachée (debug)
     for (const [id, m] of Object.entries(gs.market)) {
       market[id] = m.V;
       delta[id] = m.V - (prevV[id] ?? m.V);
+      anchorByHex[id] = m.A;
     }
     // P&L latent (non réalisé) : valeur courante des positions − capital engagé.
     let latentTotal = 0;
@@ -148,6 +151,11 @@
       aiPresence,
       pbActive: hasNode('liquidite'), // débloque le Financement + levier moins cher (memo §11)
       infoActive,
+      // État caché révélé en mode debug uniquement.
+      fReal: gs.fragility,
+      regimeReal: gs.regime,
+      crisisPhase: gs.crisis.active ? gs.crisis.phase : gs.crisis.recoveryTurnsLeft > 0 ? 'recovery' : 'none',
+      anchorByHex,
       signals: sig,
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
@@ -389,6 +397,19 @@
           <div class="muted small">Présence IA visible seulement sur les hexes révélés.</div>
         </section>
 
+        {#if debug}
+          <section class="debug">
+            <h3>🐞 Debug <span class="hint">état caché</span></h3>
+            <div class="bar-row">
+              <span>Fragilité F</span>
+              <div class="bar"><div class="fill" style="width:{view.fReal * 100}%"></div></div>
+            </div>
+            <div class="small">F = <b>{view.fReal.toFixed(3)}</b> · {view.fReal < 0.4 ? 'zone morte (pas de crise possible)' : view.fReal >= 0.85 ? 'PLAFOND (krach imminent)' : 'zone roulette'}</div>
+            <div class="small">Régime réel : <b>{view.regimeReal}</b>{#if view.crisisPhase !== 'none'} · phase <b>{view.crisisPhase}</b>{/if}</div>
+            <div class="muted small">A = ancre cachée (juste valeur), visible par hexe sélectionné.</div>
+          </section>
+        {/if}
+
         <section class="signals">
           <h3>Signaux <span class="hint">{view.infoActive ? '✨ Notation : plus nets' : '~ bruités, F cachée'}</span></h3>
           <div class="bar-row">
@@ -438,6 +459,9 @@
               </div>
             {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
+            {#if debug && h && (h.kind === 'marche' || h.kind === 'frontiere')}
+              <div class="small" style="color:#9b7ad9">🐞 V {view.market[selected]?.toFixed(1)} · A {view.anchorByHex[selected]?.toFixed(1)} · écart {(((view.market[selected] ?? 0) / (view.anchorByHex[selected] ?? 1) - 1) * 100).toFixed(0)}%</div>
+            {/if}
 
             {#if canInvest}
               <div class="dir-row">
@@ -502,6 +526,7 @@
         <section class="newgame">
           <input type="number" bind:value={seed} min="1" />
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
+          <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
         </section>
       </aside>
     </div>
@@ -537,6 +562,8 @@
   .leg-row { display: flex; align-items: center; gap: .4rem; padding: .12rem 0; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .dot.you { background: #f0f3f9; }
+  .debug { border-color: #4a3f6b; }
+  .newgame button.active { background: #4a3f6b; border-color: #6b5a9b; }
   .tx { font-size: .76rem; }
   .tx-row { display: flex; justify-content: space-between; padding: .12rem 0; border-bottom: 1px solid #22262f; }
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
