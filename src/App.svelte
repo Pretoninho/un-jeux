@@ -35,6 +35,7 @@
   // Couche d'exploration
   let playerHex = $state<string>('');
   let revealed = $state<Set<string>>(new Set());
+  let presence = $state<Set<string>>(new Set()); // nœuds où le joueur s'est installé
   let paUsed = $state(0);
   let opensThisTurn = $state(0);
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
@@ -67,6 +68,11 @@
     const h = hexById(id);
     return !!h && isInvestable(h) && revealed.has(id) && neighborsOfPlayer().includes(id);
   };
+  // S'installer : se déplacer sur un nœud adjacent (présence, sans investir).
+  const canOccupy = (id: string) => {
+    const h = hexById(id);
+    return !!h && h.kind === 'noeud' && revealed.has(id) && neighborsOfPlayer().includes(id);
+  };
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -93,6 +99,7 @@
       market,
       delta,
       signals: sig,
+      marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
       over: gs.turn >= gs.params.horizonTurns,
     };
@@ -128,6 +135,7 @@
     const spw = makeRng(s * 7 + 1);
     playerHex = spawnable[spw.int(0, spawnable.length - 1)] ?? spawnable[0]!;
     revealed = new Set();
+    presence = new Set();
     reveal(playerHex);
     paUsed = 0;
     opensThisTurn = 0;
@@ -157,6 +165,18 @@
     opensThisTurn += 1;
     selected = hexId;
     log = [`Ouvre ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
+    spend(cost);
+  }
+
+  function occupy(hexId: string) {
+    const cost = openCost(); // un déplacement : même contrainte de CHAIN que les ouvertures
+    if (view?.over || !canOccupy(hexId) || paLeft() < cost) return;
+    playerHex = hexId; // déplacement, sans position ni capital engagé
+    presence = new Set(presence).add(hexId); // présence établie (bénéfice à câbler)
+    reveal(hexId);
+    opensThisTurn += 1;
+    selected = hexId;
+    log = [`S'installe sur ${hexById(hexId)?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
   }
 
@@ -227,8 +247,9 @@
         <span>Tour <b>{view.turn}/{view.horizon}</b></span>
         <span>Régime <b class:crise={view.regime === 'crise'}>{view.regime}</b></span>
         <span class="track">
-          Vous <b class:neg={view.track.you < 0}>{fmtPct(view.track.you)}</b>
-          · Marché <b>{fmtPct(view.track.market)}</b>
+          Vous <b class:neg={view.track.you < 0}>{view.wealth.toFixed(0)}</b> <span class="pct">({fmtPct(view.track.you)})</span>
+          · Marché <b>{view.marketWealth.toFixed(0)}</b> <span class="pct">({fmtPct(view.track.market)})</span>
+          · Écart <b class:neg={view.wealth < view.marketWealth}>{(view.wealth - view.marketWealth >= 0 ? '+' : '') + (view.wealth - view.marketWealth).toFixed(0)}</b>
           · Pire séquence <b class="neg">−{(view.track.drawdown * 100).toFixed(0)}%</b>
         </span>
       </div>
@@ -248,7 +269,8 @@
               class:selected={selected === h.id}
               class:owned={view.held.has(h.id)}
               class:here={playerHex === h.id}
-              class:openable={canOpen(h.id)}
+              class:openable={canOpen(h.id) || canOccupy(h.id)}
+              class:presence={presence.has(h.id)}
               role="button"
               tabindex="0"
               onclick={() => shown && (selected = h.id)}
@@ -265,6 +287,7 @@
                   </text>
                 {/if}
                 {#if view.held.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="expo">▣ {view.exposure[h.id]?.toFixed(0)}</text>{/if}
+                {#if presence.has(h.id)}<text x={pos[0]} y={pos[1] + 21} class="pres">★ présence</text>{/if}
               {:else}
                 <polygon points={hexPointsPointy(pos[0], pos[1])} class="fog" />
                 <text x={pos[0]} y={pos[1] + 4} class="fogq">?</text>
@@ -314,13 +337,17 @@
                 <button onclick={() => open(selected!, 1)} disabled={paLeft() < openCost()}>100%</button>
               </div>
             {/if}
+            {#if canOccupy(selected)}
+              <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
+            {/if}
+            {#if presence.has(selected)}<div class="court">Présence établie (bénéfice du nœud à venir).</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
               <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1}>Fermer (totale) · 1 PA</button>
             {/if}
-            {#if !canOpen(selected) && !held && playerHex !== selected}
-              <div class="muted small">Pas adjacent / non investissable.</div>
+            {#if !canOpen(selected) && !canOccupy(selected) && !held && playerHex !== selected}
+              <div class="muted small">Pas adjacent / non accessible.</div>
             {/if}
           {:else}
             <div class="sel muted">Clique un hexe révélé.</div>
@@ -369,6 +396,9 @@
   .vval { fill: #aeb6c6; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .vval.up { fill: #46b277; } .vval.down { fill: #e0564f; }
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .pres { fill: #6aa6e0; font-size: 8px; text-anchor: middle; pointer-events: none; }
+  .hex.presence polygon { stroke: #6aa6e0; stroke-width: 3; }
+  .pct { color: #7a8294; font-size: .78rem; }
   aside { display: flex; flex-direction: column; gap: .8rem; }
   section { background: #1a1d25; border: 1px solid #2a2f3a; border-radius: 8px; padding: .7rem; }
   h3 { margin: 0 0 .5rem; font-size: .9rem; display: flex; justify-content: space-between; align-items: baseline; }

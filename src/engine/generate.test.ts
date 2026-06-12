@@ -27,7 +27,7 @@ describe('carte générée (géométrie = adjacence)', () => {
   it('les voisins ne sont QUE des hexes adjacents géométriquement', () => {
     const map = generateHexMap(3, 3);
     const byId = new Map(map.hexes.map((h) => [h.id, h]));
-    const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    const DIRS: Array<[number, number]> = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
     for (const h of map.hexes) {
       const { q, r } = h.coord!;
       const geo = new Set(DIRS.map(([dq, dr]) => `h_${q + dq}_${r + dr}`).filter((id) => byId.has(id)));
