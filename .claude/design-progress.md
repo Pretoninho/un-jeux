@@ -93,7 +93,10 @@
 
 6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
 7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
-8. **Crédit-coupons + Banque centrale** (spec `docs/spec-credit-coupons.md`, design validé b+c) : le crédit devient un émetteur de coupons (taux + RCE + défaut), la BC (nœud FED, déjà sur le board) une fonction de réaction lisible influençable. Sous-système entier = phase 2, pas MVP-critique.
+8. **Crédit-coupons + Banque centrale** (spec `docs/spec-credit-coupons.md` **close**, b+c). Sous-système entier = phase 2, pas MVP-critique.
+   - ✅ **Phase 2a étape 1 (2026-06-13)** : moteur autonome `src/engine/credit.ts` + 18 tests — formation du taux (r_BC + spread_qualité + spread_F + prime de terme), réaction BC lisible, carnet court/long, portage long/short, défaut tout-ou-rien en crise, échéance vrai-bond. **Pas encore branché** dans la boucle de tour.
+   - 🔧 **Décision archi (même jour)** : le flux RNG du **monde** est découplé de celui des **params** (`init.ts`) → ajouter des paramètres ne décale plus le comportement seedé (tests/calibrage stables). La phase 2a en ajoutera beaucoup. Re-vérifié : agrégat tempo 28/59/13 ✓, duel levier/value 40 % (bande 40-60) ✓.
+   - ⏭️ **Étape 2 (à faire)** : intégration — sortir le crédit du monde `V`, benchmark alpha-pur, comptabilité richesse des coupons, IA qui jouent les coupons, UI.
 
 ### C. Backlog design (hors MVP)
 

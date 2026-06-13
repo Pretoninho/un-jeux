@@ -46,7 +46,7 @@ Coupon = {
   emetteur   : HexId       // IG_EU, IG_US, IG_EM, HY_US
   taux  r    : number      // rendement/tour, fixé à l'émission (§3)
   RCE        : number      // Rounds until Coupon Expires (maturité), tiré dans un menu (§5)
-  notionnel U: number      // UNITAIRE et fixe (ex. 10 % du capital de départ)
+  notionnel U: number      // CHOISI une fois par le joueur à l'ouverture, puis VERROUILLÉ
   statut     : 'offert' | 'tenu_long' | 'tenu_short' | 'expiré' | 'défaut'
 }
 ```
@@ -126,9 +126,10 @@ baisse** = tu gagnes. Anticiper la BC (§4) pilote ce choix.
 
 ## 6. Payoffs long / short (une seule position par coupon)
 
-Borne validée : sur un coupon donné, un joueur est **LONG XOR SHORT, une seule fois**, taille
-fixe `U`, **non redimensionnable**. La conviction s'exprime par le **nombre de coupons** pris
-dans le carnet, pas par le sizing.
+Borne validée : sur un coupon donné, un joueur est **LONG XOR SHORT, une seule fois**. La
+taille `U` est **choisie une fois à l'ouverture puis VERROUILLÉE** (non redimensionnable). La
+conviction s'exprime donc par **la taille (choisie une fois) ET le nombre de coupons** pris
+dans le carnet.
 
 | | Mise en place | Par tour | À l'échéance (survie) | Si DÉFAUT |
 | --- | --- | --- | --- | --- |
@@ -156,6 +157,9 @@ de l'exposition crédit, le joueur **doit prendre un nouveau coupon** du carnet 
 - Le défaut tombe en **cascade** (plusieurs coupons d'un coup) → renforce le « tout corrélé
   en crise » et donne enfin au crédit son drame propre (aujourd'hui les crises sont
   pilotées par les actions).
+- **TOUT-OU-RIEN** (décision actée) : pas de taux de recouvrement. Un coupon en défaut perd
+  **tout** le principal `U` + les coupons restants. Plus punitif, plus lisible — le défaut
+  doit faire mal pour que le portage HY soit un vrai pari, pas un péage.
 
 ---
 
@@ -177,10 +181,10 @@ Le crédit ne fait pas que **réagir** à `F` (via défaut/spread) — il doit a
 - **P&L des coupons** (portage reçu/payé, principal, pertes de défaut) → cash → richesse →
   Track Record comme le reste. Les pertes de défaut creusent le **drawdown** → pénalisées
   par α (§27). Cohérent, rien à inventer côté score.
-- ⚠️ **Benchmark à reprendre** : il inclut aujourd'hui le `carry` crédit et les prix crédit.
-  En sortant le crédit du monde `V`, il faut redéfinir le benchmark (option simple : le
-  benchmark ne couvre que les actions/alternatifs, et le crédit devient de l'**alpha pur**
-  — tes décisions de coupons contre « ne rien faire »). À trancher à l'implémentation.
+- **Benchmark = ALPHA PUR (décision actée)** : en sortant le crédit du monde `V`, le
+  benchmark ne couvre **que les actions/alternatifs**. Le crédit devient de l'**alpha pur**
+  — tes décisions de coupons sont jugées contre « ne rien faire » (0). Plus simple à coder
+  et conceptuellement net : le coupon est un choix actif, pas une exposition passive.
 
 ---
 
@@ -200,12 +204,13 @@ Le crédit ne fait pas que **réagir** à `F` (via défaut/spread) — il doit a
 
 ---
 
-## 11. Questions ouvertes (à trancher avant code)
+## 11. Décisions actées (2026-06-13) — spec close
 
-- **Taille `U`** : unité fixe (ex. 10 % du capital) ou choisie une fois par le joueur puis
-  verrouillée ? (la spec suppose **unité fixe** = plus lisible.)
-- **Principal** : un coupon rend-il `U` à l'échéance (vrai bond) ou est-il pur flux de
-  portage sans principal ? (la spec suppose **avec principal** → le défaut a des dents.)
-- **Benchmark** : crédit en alpha pur, ou benchmark mixte actions+« IG roulé » ?
-- **Défaut partiel** (recovery rate) ou tout-ou-rien ? (commencer **tout-ou-rien**, plus
-  lisible ; recovery = raffinement.)
+- **Taille `U`** : ✅ **choisie une fois par le joueur** à l'ouverture, puis verrouillée
+  (pas d'unité fixe). Conviction = taille + nombre de coupons.
+- **Principal** : ✅ **vrai bond** — `U` rendu à l'échéance, perdu en défaut (le défaut a
+  des dents).
+- **Benchmark** : ✅ **alpha pur** — benchmark actions/alternatifs seul, crédit = alpha (§9).
+- **Défaut** : ✅ **tout-ou-rien** (pas de recovery), plus punitif (§7).
+
+**La spec est close. Implémentation : phase 2a (§10).**

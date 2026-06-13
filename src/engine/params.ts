@@ -129,6 +129,24 @@ export const PARAM_RANGES = {
   signalNoiseSpread: r(0.06, 0.12), // Écart de crédit : retard 1
   signalNoiseFinance: r(0.04, 0.08), // Financement : retard 2, bruit faible
   bounceDetune: r(0.15, 0.30), // détente des signaux pendant le rebond — le mensonge (§24.2)
+
+  // ── Crédit-coupons & Banque centrale (spec docs/spec-credit-coupons.md, phase 2a) ──
+  // Taux directeur BC = fonction de réaction LISIBLE à l'état caché (b) : monte en
+  // surchauffe (F au-dessus de la zone morte), coupe en crise. Lissé (θ) → anticipable.
+  // Points de départ ; calibrage individuel = phase 2b.
+  bcRateBase: r(0.005, 0.015), // taux directeur de repos
+  bcReactF: r(0.04, 0.08), // φ — sensibilité du taux cible à (F − zone morte)
+  bcReactCrisis: r(0.02, 0.04), // ψ — coupe d'urgence en crise
+  bcSmoothing: r(0.30, 0.50), // θ — vitesse d'ajustement vers la cible (lissage → anticipable)
+  // Coupon = r_BC + spread_qualité (carry de l'émetteur) + spread_F + prime de terme.
+  couponSpreadF: r(0.05, 0.10), // κ — élargissement de crédit par unité de (F − zone morte)
+  couponTermPremium: r(0.004, 0.010), // prime de terme : la maturité longue paie plus que la courte
+  couponRceCourt: r(2, 2), // maturité courte (tours) — fixe assumé (lisibilité de la courbe)
+  couponRceLong: r(5, 5), // maturité longue (tours) — fixe assumé
+  // Défaut : SEULEMENT en crise touchant le crédit. Proba/tour croît avec la qualité
+  // (spread structurel de l'émetteur) et avec F. TOUT-OU-RIEN (perte totale du principal).
+  couponDefaultBase: r(0.05, 0.10), // proba de base/tour en crise crédit (émetteur IG de réf.)
+  couponDefaultFSlope: r(0.6, 1.0), // pente de la proba en (F − zone morte)
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -148,6 +166,8 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'cascadeLeg3Turns',
     'horizonTurns',
     'recoveryTurns',
+    'couponRceCourt',
+    'couponRceLong',
   ]);
 
   const out = {} as InstanceParams;

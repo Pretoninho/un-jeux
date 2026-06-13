@@ -14,8 +14,12 @@ export interface InitResult {
 }
 
 export function buildInitialState(config: ConfigPartie): InitResult {
+  // Deux flux RNG INDÉPENDANTS, tous deux dérivés du seed (reproductibilité intacte) :
+  //  - `rng` (monde) : ne dépend QUE du seed → ajouter des paramètres ne décale jamais
+  //    le comportement seedé (tests, calibrage). Crucial : la phase 2a ajoute des params.
+  //  - flux params (salé) : tire les InstanceParams sans toucher au flux du monde.
   const rng = makeRng(config.seed);
-  const params = drawInstanceParams(rng); // consomme le rng, qui continue ensuite
+  const params = drawInstanceParams(makeRng((config.seed ^ 0x9e3779b9) >>> 0));
 
   const market: GameState['market'] = {};
   for (const hex of config.carte.hexes) {
