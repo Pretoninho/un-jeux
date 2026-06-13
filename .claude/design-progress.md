@@ -1,7 +1,19 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.15
+> Dernière mise à jour : 2026-06-13 — v1.16
+>
+> 🎯 **Calibrage J7 — TEMPO LIVRÉ (2026-06-13)** : tempo réglé via les paramètres générateurs
+> (`src/engine/params.ts`), aucun timing forcé. Cause racine corrigée : le terme de
+> valorisation (`×100`) écrasait l'accumulation et **noyait le levier** → F était pilotée
+> par les IA, pas par le joueur. Rééquilibré → le **levier redevient le moteur**. Cibles
+> §28.2 atteintes : sans-crise **24 %** ✓, crise<t5 **<1 %** ✓, **signaux > horloge** (§28.7)
+> ✓, drawdown qui mord (23-58 %) ✓, doubles pyromanes **~11 %** (lev4) ✓. Instrument :
+> `scripts/calibrate.ts` (`npx vite-node`). Garde anti-régression : `src/engine/calibration.test.ts`.
+> **Restent en J7** (non faits) : α (`drawdownPenalty`), coût/viabilité du levier (§29.3),
+> assertion de neutralité §28.8 → voir « Ce qui reste à développer », A.1.
+> ⚠️ **Décision design** : reset post-crise relevé (`resetFactor` 0.32-0.48) → **n'est plus
+> « quasi-total »** (§23.5 assoupli) pour permettre le rallumage pyromane.
 >
 > 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
 >
@@ -10,6 +22,7 @@
 > 🧭 **Spawn (décision 2026-06-13)** : clusters gardés contigus (adjacence = corrélation) ; remplacer le spawn aléatoire (proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multi (memo §22, §21, conforme §11). À implémenter avec les archétypes / le setup §31.
 >
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
+> 🧠 **Le « pourquoi » du système : `docs/systeme-pourquoi.md`** (modèle mental du créateur — pourquoi chaque pièce est ainsi + guide « comment lire une partie »).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
 > 🌐 **Archi multijoueur « plan & TICKs »** documentée (memo §31), non implémentée ; IA déjà visibles (footprint).
 
@@ -54,15 +67,35 @@
 
 ## Ce qui reste à développer
 
-Par ordre de priorité (feuille de route §16) :
+État réel (post-J7). Le design MVP est clos ; le moteur tourne et est calibré
+(tempo §28.2 + critère §28.7). Reste, par ordre de priorité :
 
-1. ~~**Définition du MVP web**~~ — **PROPOSÉ (v0.1)** : périmètre figé dans `docs/mvp-spec.md` (Vautour + 2 IA, 3 verbes, carte 16 hexes, 1 cycle). En attente de validation, puis code.
-2. **Structure détaillée de l'arbre de compétences** (hors MVP)
-3. **Génération procédurale de la carte** (phase 2)
-4. **2 archétypes manquants** à définir
-5. **Noms in-game définitifs** des archétypes
+### A. Chantiers code immédiats (MVP)
 
-> Prochaine étape concrète : valider `docs/mvp-spec.md` (§13) → démarrer le code (jalons §12).
+1. **Fin de J7 — vérifs numériques restantes** (le tempo §28.2 et signaux>horloge §28.7 sont ✅) :
+   - **α (`drawdownPenalty`)** encore figé à 0.5-0.5 → calibrer le point d'équilibre du défaut #4 (§27.4).
+   - **Coût / viabilité du levier** (`leverageBorrowRate`, seuil de marge §29.3) → vérifier que le levier n'est ni mort ni dominant.
+   - **Assertion de neutralité §28.8** : test automatisé « aucun profil ne domine strictement les Track Records » (l'instrument `simulate` + Track Records par acteur est déjà prêt).
+2. **Coutures UI (dette J5)** :
+   - **Câbler le coût LIRE** — les signaux sont gratuits aujourd'hui (le budget épistémique §28.5 ne mord pas).
+   - **Clôture partielle + levier joueur dans l'UI** (existent au moteur, pas exposés proprement).
+   - **Écart carte 13 vs 16 hexes** à trancher/refermer (prose spec §4 = 16, adjacence = 13).
+3. **Nouveaux nœuds à effets** (§11, piste tranchée) : placer des **nœuds VIDES d'abord**, câbler la mécanique ensuite, **un à la fois** (Chambre de compensation, Réseau d'initiés → 4ᵉ signal, Bourse → impact-prix, Desk recherche, Banque d'investissement → frontières, Média → réputation).
+4. **Archétypes par-dessus le profil NEUTRE** — **un à la fois** (définir → tester → équilibrer → valider → suivant, §30). Le neutre + primitive SHORT sont livrés ; les spécificités sont la couche suivante.
+5. **Spawn par affinité / draft de zones** (§22, §11) : remplacer le spawn **aléatoire** du proto par un placement choisi par affinité d'archétype (clusters gardés contigus).
+
+### B. Phase 2
+
+6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
+7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
+
+### C. Backlog design (hors MVP)
+
+8. **Arbre de compétences détaillé** (§8).
+9. **2 archétypes manquants** à définir + **noms in-game définitifs** des 5 archétypes.
+10. **Tutoriel** — approche hybride pressentie (agenda en 6 points), **réservé pour plus tard**.
+
+> Prochaine étape concrète recommandée : soit **finir J7** (α + levier + neutralité §28.8, l'outillage est prêt), soit attaquer les **nœuds vides** (3) / le **1ᵉʳ archétype** (4). Les coutures UI (2) sont à refermer avant tout test joueur réel.
 
 ---
 
@@ -102,7 +135,17 @@ Restent en J7 (vérifications **numériques**, pas de design) : α, coût du lev
 >
 > **Bénéfices des nœuds câblés (prototype)** : **PB → Financement** (flux continu gratuit sur présence) · **PB → levier −50 %** (`borrowMultiplier`, moteur) · **Notation → signaux plus nets** (plancher de bruit irréductible §29.2). **BC → taux anticipés** reste ⛔ (dépend du chantier « réveiller la BC »). **Présence à durée ~3 tours** (`presenceUntil`) = futur bouton d'archétype. **Levier joueur** 0/2/3× exposé (UI). Primitive **DÉPLACER** (bouger sans investir, 1 PA) + **« Ouvrir ici »** (investir sur l'hexe courant). **Mode debug 🐞** (révèle F / régime / phase / ancres A). Réf : `docs/mecaniques.md`.
 >
-> 🎯 **PROCHAIN CHANTIER — Calibrage J7 (autre session)**. Diagnostic (seed 3 rejoué + partie testée) : **tempo trop rapide** (F franchit le plafond 0.85 dès le tour ~6) et **amplitudes trop fortes** (marché ×2 en 12 tours, joueur +434 %, drawdown ~0 % → trop facile). À régler : poids d'accumulation (`accLeverage/accCrowding/accValuation`) + purge, drifts/vols des régimes, vers les cibles §28.2 (~60 % 1 crise / 20-25 % sans crise) et un drawdown qui mord. Outils prêts : harness `simulate`, critère §28.7, mode debug.
+> ✅ **Calibrage J7 — LIVRÉ**. Diagnostic d'origine confirmé puis corrigé. **Cause racine** :
+> `accValuation × stretch × 100` dominait (~0.10-0.19/tour) → F pilotée par les IA, levier noyé,
+> crise quasi certaine dès le tour 4. **Réglages** (tous en plages, `params.ts`) : valorisation
+> ramenée au niveau levier/crowding, levier relevé (`accLeverage` 0.08-0.16 = moteur), purge
+> élargie (0.020-0.058 = variance de pente → parties calmes), `crisisK` adouci (0.7-1.1),
+> `f0` élargi (0.08-0.36), drifts bull/tension abaissés, cascades raccourcies, horizon 13-16,
+> reset relevé 0.32-0.48 (§23.5 assoupli, décision design). **Résultats** (800 parties/profil) :
+> sans-crise 24 % ✓ · crise<t5 <1 % ✓ · F(t6)~0.50 (plus de plafond précoce) ✓ · drawdown
+> 23-58 % ✓ · signaux>horloge ✓ · doubles lev4 ~11 % ✓ · 1-crise ~72-83 % (canonique). Le
+> **comportement façonne la distribution** : hoarder 38 % calme / 1 % double, pyromane 6 % / 11 %.
+> Outils : `scripts/calibrate.ts` (instrument), `calibration.test.ts` (6 assertions anti-régression).
 >
 > POSITIONNER (memo §9bis, v1.9) : Ouvrir (Long/Short) · Renforcer · **Clôture partielle (2)** · Fermer. En données : `src/data/actions.ts`.
 >
