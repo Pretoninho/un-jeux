@@ -168,6 +168,16 @@ export const PARAM_RANGES = {
   // Verrou de sortie des hexes `illiquid` (immobilier). TRANSPARENT (affiché au joueur),
   // mais tiré par instance pour qu'on ne mémorise pas « toujours 3 ». Entier.
   lockupTurns: r(2, 3), // tours pendant lesquels une position illiquide ne peut être fermée
+
+  // ── Carry du cash en réserve (viabilité du hoarder en campagne, PATH B) ──
+  // La poudre sèche AU-DESSUS d'une franchise encaisse le taux directeur r_BC (le cash
+  // gagne le taux sans risque). Recette « conservatrice » mesurée (scripts/cash-carry.ts) :
+  // réhabilite la réserve comme pari (gagne les krachs) sans la rendre dominante (reste
+  // perdante en moyenne car r_BC < carry risqué), et la franchise protège l'incitation aux
+  // hexes carry (seul un hoarding ASSUMÉ, grosse réserve, est payé). Neutre (tous acteurs),
+  // sans effet sur la distribution de crises (couche richesse pure). TRANSPARENT (affiché).
+  // Franchise relative au capital de départ (= 100) → ~0.5× ; tirée pour ne pas mémoriser. Entier.
+  cashCarryFloor: r(40, 60),
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -191,6 +201,7 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'couponRceLong',
     'lockupTurns',
     'bcMeetingEvery',
+    'cashCarryFloor',
   ]);
 
   const out = {} as InstanceParams;

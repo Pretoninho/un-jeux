@@ -194,6 +194,7 @@
       bcRate: gs.credit.bc.rate,
       bcDelta: gs.credit.bc.rate - prevBcRate,
       bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
+      cashCarryFloor: gs.params.cashCarryFloor, // franchise : la réserve au-dessus encaisse r_BC
       bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
       // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
       bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
@@ -667,6 +668,12 @@
           {/if}
           <div class="cash">
             Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b><br />
+            {#if view.cash > view.cashCarryFloor}
+              {@const carry = view.bcRate * (view.cash - view.cashCarryFloor)}
+              💰 Poudre sèche : <b class="up">+{carry.toFixed(2)}/t</b> <span class="muted">(r_BC {(view.bcRate * 100).toFixed(2)}% sur la réserve au-dessus de {view.cashCarryFloor})</span><br />
+            {:else}
+              <span class="muted">💤 Réserve sous la franchise ({view.cashCarryFloor}) — pas de carry cash.</span><br />
+            {/if}
             P&L latent global : <b class:up={view.latentTotal > 0.5} class:down={view.latentTotal < -0.5}>{view.latentTotal >= 0 ? '+' : ''}{view.latentTotal.toFixed(1)}</b>
           </div>
           <button class="end" onclick={endTurn} disabled={view.over}>Fin du tour</button>
