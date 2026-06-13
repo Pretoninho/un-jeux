@@ -27,6 +27,7 @@
 >
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
 > 🧠 **Le « pourquoi » du système : `docs/systeme-pourquoi.md`** (modèle mental du créateur — pourquoi chaque pièce est ainsi + guide « comment lire une partie »).
+> 💳 **Spec crédit-coupons + BC : `docs/spec-credit-coupons.md`** (proposition design, phase 2 — crédit = émetteur de coupons, BC = fonction de réaction lisible **+** nœud FED influençable).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
 > 🌐 **Archi multijoueur « plan & TICKs »** documentée (memo §31), non implémentée ; IA déjà visibles (footprint).
 
@@ -92,6 +93,7 @@
 
 6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
 7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
+8. **Crédit-coupons + Banque centrale** (spec `docs/spec-credit-coupons.md`, design validé b+c) : le crédit devient un émetteur de coupons (taux + RCE + défaut), la BC (nœud FED, déjà sur le board) une fonction de réaction lisible influençable. Sous-système entier = phase 2, pas MVP-critique.
 
 ### C. Backlog design (hors MVP)
 
