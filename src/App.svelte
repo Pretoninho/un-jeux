@@ -338,6 +338,16 @@
     read = new Set(read).add(name);
   }
 
+  // 🐞 Test : force F juste sous le plafond → la prochaine Fin du tour déclenche une crise
+  // quasi certaine (memo §23.4). Sert à tester le défaut des coupons en crise de façon
+  // reproductible. Debug uniquement.
+  function forceHighF() {
+    if (!gs || view?.over) return;
+    gs.fragility = 0.84; // plafond = 0.85 → proba de crise ≈ 1
+    log = ['🐞 F forcée à 0.84 — finis le tour pour déclencher la cascade', ...log].slice(0, 8);
+    view = buildView();
+  }
+
   function endTurn() {
     if (!view || view.over) return;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
@@ -445,6 +455,8 @@
             <div class="small">F = <b>{view.fReal.toFixed(3)}</b> · {view.fReal < 0.4 ? 'zone morte (pas de crise possible)' : view.fReal >= 0.85 ? 'PLAFOND (krach imminent)' : 'zone roulette'}</div>
             <div class="small">Régime réel : <b>{view.regimeReal}</b>{#if view.crisisPhase !== 'none'} · phase <b>{view.crisisPhase}</b>{/if}</div>
             <div class="muted small">A = ancre cachée (juste valeur), visible par hexe sélectionné.</div>
+            <button onclick={forceHighF} disabled={view.over}>💥 Forcer F haut → crise au prochain tour</button>
+            <div class="muted small">Test du défaut des coupons : prends un LONG sur un crédit « risque élevé », clique ici, puis Fin du tour.</div>
           </section>
         {/if}
 
