@@ -3,13 +3,15 @@
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
 > Dernière mise à jour : 2026-06-13 — v1.16
 >
-> 🎯 **Calibrage J7 — LIVRÉ (2026-06-13)** : tempo réglé via les paramètres générateurs
+> 🎯 **Calibrage J7 — TEMPO LIVRÉ (2026-06-13)** : tempo réglé via les paramètres générateurs
 > (`src/engine/params.ts`), aucun timing forcé. Cause racine corrigée : le terme de
 > valorisation (`×100`) écrasait l'accumulation et **noyait le levier** → F était pilotée
 > par les IA, pas par le joueur. Rééquilibré → le **levier redevient le moteur**. Cibles
 > §28.2 atteintes : sans-crise **24 %** ✓, crise<t5 **<1 %** ✓, **signaux > horloge** (§28.7)
 > ✓, drawdown qui mord (23-58 %) ✓, doubles pyromanes **~11 %** (lev4) ✓. Instrument :
 > `scripts/calibrate.ts` (`npx vite-node`). Garde anti-régression : `src/engine/calibration.test.ts`.
+> **Restent en J7** (non faits) : α (`drawdownPenalty`), coût/viabilité du levier (§29.3),
+> assertion de neutralité §28.8 → voir « Ce qui reste à développer », A.1.
 > ⚠️ **Décision design** : reset post-crise relevé (`resetFactor` 0.32-0.48) → **n'est plus
 > « quasi-total »** (§23.5 assoupli) pour permettre le rallumage pyromane.
 >
@@ -64,15 +66,35 @@
 
 ## Ce qui reste à développer
 
-Par ordre de priorité (feuille de route §16) :
+État réel (post-J7). Le design MVP est clos ; le moteur tourne et est calibré
+(tempo §28.2 + critère §28.7). Reste, par ordre de priorité :
 
-1. ~~**Définition du MVP web**~~ — **PROPOSÉ (v0.1)** : périmètre figé dans `docs/mvp-spec.md` (Vautour + 2 IA, 3 verbes, carte 16 hexes, 1 cycle). En attente de validation, puis code.
-2. **Structure détaillée de l'arbre de compétences** (hors MVP)
-3. **Génération procédurale de la carte** (phase 2)
-4. **2 archétypes manquants** à définir
-5. **Noms in-game définitifs** des archétypes
+### A. Chantiers code immédiats (MVP)
 
-> Prochaine étape concrète : valider `docs/mvp-spec.md` (§13) → démarrer le code (jalons §12).
+1. **Fin de J7 — vérifs numériques restantes** (le tempo §28.2 et signaux>horloge §28.7 sont ✅) :
+   - **α (`drawdownPenalty`)** encore figé à 0.5-0.5 → calibrer le point d'équilibre du défaut #4 (§27.4).
+   - **Coût / viabilité du levier** (`leverageBorrowRate`, seuil de marge §29.3) → vérifier que le levier n'est ni mort ni dominant.
+   - **Assertion de neutralité §28.8** : test automatisé « aucun profil ne domine strictement les Track Records » (l'instrument `simulate` + Track Records par acteur est déjà prêt).
+2. **Coutures UI (dette J5)** :
+   - **Câbler le coût LIRE** — les signaux sont gratuits aujourd'hui (le budget épistémique §28.5 ne mord pas).
+   - **Clôture partielle + levier joueur dans l'UI** (existent au moteur, pas exposés proprement).
+   - **Écart carte 13 vs 16 hexes** à trancher/refermer (prose spec §4 = 16, adjacence = 13).
+3. **Nouveaux nœuds à effets** (§11, piste tranchée) : placer des **nœuds VIDES d'abord**, câbler la mécanique ensuite, **un à la fois** (Chambre de compensation, Réseau d'initiés → 4ᵉ signal, Bourse → impact-prix, Desk recherche, Banque d'investissement → frontières, Média → réputation).
+4. **Archétypes par-dessus le profil NEUTRE** — **un à la fois** (définir → tester → équilibrer → valider → suivant, §30). Le neutre + primitive SHORT sont livrés ; les spécificités sont la couche suivante.
+5. **Spawn par affinité / draft de zones** (§22, §11) : remplacer le spawn **aléatoire** du proto par un placement choisi par affinité d'archétype (clusters gardés contigus).
+
+### B. Phase 2
+
+6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
+7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
+
+### C. Backlog design (hors MVP)
+
+8. **Arbre de compétences détaillé** (§8).
+9. **2 archétypes manquants** à définir + **noms in-game définitifs** des 5 archétypes.
+10. **Tutoriel** — approche hybride pressentie (agenda en 6 points), **réservé pour plus tard**.
+
+> Prochaine étape concrète recommandée : soit **finir J7** (α + levier + neutralité §28.8, l'outillage est prêt), soit attaquer les **nœuds vides** (3) / le **1ᵉʳ archétype** (4). Les coutures UI (2) sont à refermer avant tout test joueur réel.
 
 ---
 
