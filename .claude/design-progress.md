@@ -1,7 +1,22 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.18
+> Dernière mise à jour : 2026-06-13 — v1.19
+>
+> 🎭 **Archétypes — réflexion ouverte + RÈGLE DES POUVOIRS (2026-06-13)** : on est prêt à concevoir
+> (physique calibrée + archi data-driven + pouvoir prouvé `ignoreLockup`). **Règle clé** : un pouvoir
+> peut être EXAGÉRÉ en magnitude mais doit être NEUTRE EN ESPÉRANCE (asymétrie ≠ dominance). Formes
+> sûres : conditionnelle / contrainte appariée / coût d'opportunité. Anti-pattern fatal : **buff plat
+> sur une grandeur qui COMPOSE**. Méthode **un à la fois** (§30) ; commencer par victoire « Score »
+> (Vautour) car victoires différenciées (AUM/domination/science) non implémentées.
+>
+> 🔧 **Fix crédit A — baseline coupon assaini (2026-06-13)** : le coupon-long pur gagnait ~48 % (4 causes :
+> compounding sans risque, esquive de F, **suppression de crises via le dénominateur du levier**, non-concurrence
+> IA). **Fix A** = exclure la richesse-coupon du dénominateur (`fixLeverageDenom` défaut 1) → baseline **48 %→31 %**
+> (neutre), suppression de crises tuée, **calibration intouchée**. Suffisant seul ; B/C en flags off. Méthode :
+> faits mesurés (`scripts/credit-baseline.ts`) → fixes 1 à 1 (`scripts/credit-fixes.ts`) jusqu'à neutralité.
+> 🧪 **Pile de mesure (hors moteur sauf fixes)** : `bc-cadence`, `horizon`, `cash-carry`, `asset-ideas`,
+> `leverage-caps`, `archetype-carry-skill` (cooldown), `credit-baseline`, `credit-fixes`. Tous reproductibles.
 >
 > 🏦 **Session 2026-06-13 (suite) — BC vivante, campagne, hoarder réhabilité** :
 > 1. **Crédit traversable + nœud BC utile** : « se déplacer (sans investir) » étendu au crédit
