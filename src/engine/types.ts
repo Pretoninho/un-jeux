@@ -116,6 +116,12 @@ export interface ConfigPartie {
   adversaires: ProfilIA[];
   carte: GameMap;
   seed: number;
+  /**
+   * Surcharge optionnelle de paramètres d'instance, appliquée APRÈS le tirage seedé.
+   * Sert au calibrage/expérience (ex. fixer `bcMeetingEvery`) sans perturber le flux
+   * du monde ni la reproductibilité. Absent = partie 100 % tirée du seed.
+   */
+  paramsOverride?: Partial<import('./params').InstanceParams>;
 }
 
 // ──────────────────── Catalogue d'actions (memo §9, §9bis) ───────────────────

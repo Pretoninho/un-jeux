@@ -143,6 +143,11 @@ export const PARAM_RANGES = {
   bcReactF: r(0.04, 0.08), // φ — sensibilité du taux cible à (F − zone morte)
   bcReactCrisis: r(0.02, 0.04), // ψ — coupe d'urgence en crise
   bcSmoothing: r(0.30, 0.50), // θ — vitesse d'ajustement vers la cible (lissage → anticipable)
+  // Cadence de réunion de la BC (spec §4c, idée « FED annonce de façon planifiée ») : la
+  // BC ne réajuste `r_BC` que tous les `bcMeetingEvery` tours ; le taux est FIGÉ entre deux
+  // réunions. 1 = réaction continue (comportement historique, reproductibilité intacte).
+  // Entier. Le calibrage/expérience peut le pousser (ex. 4-6) — voir scripts/bc-cadence.ts.
+  bcMeetingEvery: r(1, 1),
   // Coupon = r_BC + spread_qualité (carry de l'émetteur) + spread_F + prime de terme.
   couponSpreadF: r(0.05, 0.10), // κ — élargissement de crédit par unité de (F − zone morte)
   couponTermPremium: r(0.004, 0.010), // prime de terme : la maturité longue paie plus que la courte
@@ -179,6 +184,7 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'couponRceCourt',
     'couponRceLong',
     'lockupTurns',
+    'bcMeetingEvery',
   ]);
 
   const out = {} as InstanceParams;

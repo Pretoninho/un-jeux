@@ -11,7 +11,7 @@ import { resolveMarket } from './market';
 import { actorWealth, applyMarginCalls, positionValue, dirSign, lockTurnsLeft } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
-import { bcReact, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
+import { bcReact, bcMeets, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
 
 const PA_COST: Record<string, number> = {
   RESERVER: 0, ouvrir: 1, renforcer: 1, cloture_partielle: 2, fermer: 1, ouvrir_coupon: 1,
@@ -93,8 +93,11 @@ function accrueCarryAndCost(state: GameState): void {
  */
 function runCreditLifecycle(state: GameState, rng: Rng): void {
   // 1. Banque centrale : fonction de réaction LISIBLE au F caché (monte en surchauffe,
-  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal).
-  bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params);
+  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal). Si la BC statue par
+  //    réunions (bcMeetingEvery > 1), le taux n'est révisé qu'aux réunions, figé entre deux.
+  if (bcMeets(state.turn, state.params.bcMeetingEvery)) {
+    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params);
+  }
 
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).
   const inCreditCrisis = state.crisis.active; // toute crise systémique touche le crédit (M domine)

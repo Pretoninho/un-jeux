@@ -85,6 +85,16 @@ function excessF(fragility: number, p: InstanceParams): number {
 }
 
 /**
+ * Réunion de la BC ce tour-ci ? (spec §4c, idée « annonce planifiée ».) `every <= 1` =
+ * réaction continue (un réajustement par tour, comportement historique). Sinon la BC ne
+ * statue qu'aux tours multiples de `every` : entre deux réunions, `r_BC` reste FIGÉ → le
+ * taux devient une décision discrète et anticipable (forward guidance sous présence FED).
+ */
+export function bcMeets(turn: number, every: number): boolean {
+  return every <= 1 || turn % every === 0;
+}
+
+/**
  * Fonction de réaction de la BC (spec §4b). La cible monte avec la surchauffe (F
  * au-dessus de la zone morte) et plonge en crise ; le taux s'y ajuste GRADUELLEMENT
  * (lissage θ) → partiellement anticipable. Mute `bc`. Plancher à 0 (pas de taux négatif).
