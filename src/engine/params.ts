@@ -24,7 +24,7 @@ export const PARAM_RANGES = {
   //                    élargie (J7) pour étaler QUAND F entre en zone de tir → étale
   //                    la date de crise (protège le critère §28.7) et nourrit les
   //                    parties sans crise (§28.2).
-  accLeverage: r(0.08, 0.16), // poids du levier (§23.2) — LE moteur de fragilité. C'est un
+  accLeverage: r(0.09, 0.18), // poids du levier (§23.2) — LE moteur de fragilité. C'est un
   //                             driver GLOBAL : il scale avec le levier AGRÉGÉ (les 2 IA +
   //                             le joueur), pas seulement le joueur → c'est lui qui cale le
   //                             taux de crise de la partie par défaut (joueur + IA standard).
@@ -152,6 +152,11 @@ export const PARAM_RANGES = {
   // (spread structurel de l'émetteur) et avec F. TOUT-OU-RIEN (perte totale du principal).
   couponDefaultBase: r(0.05, 0.10), // proba de base/tour en crise crédit (émetteur IG de réf.)
   couponDefaultFSlope: r(0.6, 1.0), // pente de la proba en (F − zone morte)
+
+  // ── Illiquidité (spec immobilier) ──
+  // Verrou de sortie des hexes `illiquid` (immobilier). TRANSPARENT (affiché au joueur),
+  // mais tiré par instance pour qu'on ne mémorise pas « toujours 3 ». Entier.
+  lockupTurns: r(2, 3), // tours pendant lesquels une position illiquide ne peut être fermée
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -173,6 +178,7 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'recoveryTurns',
     'couponRceCourt',
     'couponRceLong',
+    'lockupTurns',
   ]);
 
   const out = {} as InstanceParams;

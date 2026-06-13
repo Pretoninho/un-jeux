@@ -8,7 +8,7 @@ import type { Policy, PlannedAction } from './policy';
 import { PA_PAR_TOUR } from '../data/actions';
 import { deriveRegime } from './regime';
 import { resolveMarket } from './market';
-import { actorWealth, applyMarginCalls, positionValue, dirSign } from './portfolio';
+import { actorWealth, applyMarginCalls, positionValue, dirSign, lockTurnsLeft } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
 import { bcReact, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
@@ -42,11 +42,17 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
     // Ouvrir = nouvelle position ; Renforcer = exposition additionnelle (memo §9bis).
     const equity = Math.min(action.equity, actor.cash);
     if (equity <= 0) return;
+    const hex = state.map.hexes.find((h) => h.id === action.hexId);
+    // Illiquidité (spec immo) : long-only (pas de short) et SANS levier (option a → pas
+    // d'appel de marge sur un asset bloqué). `entryTurn` arme le verrou de sortie.
+    const direction = hex?.longOnly ? 'long' : action.direction;
+    const leverage = hex?.illiquid ? 0 : action.leverage;
     actor.cash -= equity;
-    actor.positions.push({ hexId: action.hexId, direction: action.direction, equity, leverage: action.leverage, entryV: m.V });
-    const sign = action.direction === 'short' ? -1 : 1; // long = achat (+), short = vente (−)
-    flux[action.hexId] = (flux[action.hexId] ?? 0) + sign * equity * (1 + action.leverage);
+    actor.positions.push({ hexId: action.hexId, direction, equity, leverage, entryV: m.V, entryTurn: state.turn });
+    const sign = direction === 'short' ? -1 : 1; // long = achat (+), short = vente (−)
+    flux[action.hexId] = (flux[action.hexId] ?? 0) + sign * equity * (1 + leverage);
   } else if (action.op === 'cloture_partielle') {
+    if (lockTurnsLeft(action.hexId, actor, state) > 0) return; // position illiquide encore verrouillée
     // Allège de moitié chaque position de l'hexe (memo §9bis).
     for (const pos of actor.positions) {
       if (pos.hexId !== action.hexId) continue;
@@ -55,6 +61,7 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
       pos.equity *= 0.5;
     }
   } else if (action.op === 'fermer') {
+    if (lockTurnsLeft(action.hexId, actor, state) > 0) return; // position illiquide encore verrouillée
     const kept: Position[] = [];
     for (const pos of actor.positions) {
       if (pos.hexId === action.hexId) {

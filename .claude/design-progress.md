@@ -105,6 +105,11 @@
    - ✅ **Phase 2a étape 3 — INCRÉMENT B (2026-06-13)** : (a) **IA reach-for-yield** — `AIBehavior.couponAppetite` (fonds leveragé = 0.2) : en période calme l'IA chasse le coupon le plus juteux (HY long) → crowd crédit → nourrit `F`, et le HY défaut le plus en crise (boucle de fragilité fermée). Re-calibré : duel **58 %** (cible 40-60 ✓), tempo 27/62/11. (b) **UI coupons** (`App.svelte`) — section « Crédit · Banque centrale » (taux BC + flèche de tendance = lit F en filigrane ; coupons détenus avec RCE + risque) ; panneau de trade sur hexe crédit (carnet court/long, taux, échéance, risque ; LONG/SHORT + taille 25/50/100 %). 93 tests + svelte-check 0 erreur.
    - 🎯 **Sous-système crédit-coupons COMPLET** (moteur + IA + UI). Reste optionnel : early-close des coupons, recovery rate, BC influençable (info-edge/influence), maturités variées par émetteur.
 
+9. **Illiquidité immobilier** (spec immo, créateur 2026-06-13) — l'illiquidité attaque le skill central (sortir avant le krach) : l'immo devient l'asset qu'on **ne peut pas fuir**, son carry devient une vraie prime d'illiquidité.
+   - ✅ **Livré** : flags de données `Hex.longOnly` + `Hex.illiquid` ; **long-only + SANS levier** (option a, décision créateur → pas de contradiction avec l'appel de marge) ; **verrou de sortie** `lockupTurns` (param tiré 2-3, transparent/affiché) ; `Position.entryTurn` arme le verrou, renforcer **re-verrouille** (tranche la + récente fait foi) ; pouvoir d'archétype `ignoreLockup` (sur `Archetype` + `ActorState`) qui contourne. Posé sur IMMO (MVP) et les **alternatifs marché** (générateur, carry 0.03 le justifie ; PEVC carry 0 exclu en MVP). UI : panneau adapté (pas de SHORT/levier, notice illiquidité, compte à rebours du verrou, sortie désactivée). 5 tests `illiquid.test.ts`.
+   - 🔧 **Re-calibré** : l'immo sans-levier a refroidi le système (sans-crise 31 %) → `accLeverage` relevé (0.09-0.18) → tempo **26/65**, duel **54 %** (✓). 98 tests verts.
+   - ⏭️ **Optionnel plus tard** : spirale de marge sur immo leveragé (options b/c), sensibilité de l'immo au taux directeur BC, un archétype « spécialiste immo » porteur d'`ignoreLockup`.
+
 ### C. Backlog design (hors MVP)
 
 8. **Arbre de compétences détaillé** (§8).

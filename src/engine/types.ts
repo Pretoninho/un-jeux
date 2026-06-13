@@ -29,6 +29,15 @@ export interface Hex {
   gamma?: number; // exposition au facteur cluster C
   /** Portage par tour (memo §25.5). */
   carry?: number;
+  /**
+   * Contraintes d'illiquidité (spec immobilier) — données, posées sur l'hexe :
+   *  - `longOnly` : interdit le short (on ne short pas un immeuble).
+   *  - `illiquid` : la sortie de position est bloquée pendant `lockupTurns` (param tiré
+   *    par instance). Couple naturellement avec un carry élevé = prime d'illiquidité.
+   * Un archétype avec `ignoreLockup` échappe au verrou. Pas de levier sur ces hexes.
+   */
+  longOnly?: boolean;
+  illiquid?: boolean;
   /** Adjacence = corrélation (memo §11). Doit être symétrique (testé). */
   neighbors: HexId[];
   /** Coordonnées axiales (q, r) — présentes pour les cartes générées (géométrie =
@@ -54,6 +63,8 @@ export interface Archetype {
   /** Part du capital placée en réserve sèche au départ (0..1). */
   startingReserveRatio: number;
   startingHex: HexId;
+  /** Pouvoir d'archétype : échappe au verrou d'illiquidité (sortie immédiate, spec immo). */
+  ignoreLockup?: boolean;
 }
 
 /**

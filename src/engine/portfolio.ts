@@ -10,6 +10,22 @@ export function dirSign(pos: Position): number {
   return pos.direction === 'short' ? -1 : 1;
 }
 
+/**
+ * Verrou d'illiquidité (spec immobilier) : tours restants avant de pouvoir fermer une
+ * position sur cet hexe. 0 = libre. La tranche la PLUS RÉCENTE fait foi (renforcer
+ * re-verrouille). Un acteur `ignoreLockup` (pouvoir d'archétype) n'est jamais verrouillé.
+ */
+export function lockTurnsLeft(hexId: HexId, actor: ActorState, state: GameState): number {
+  if (actor.ignoreLockup) return 0;
+  const hex = state.map.hexes.find((h) => h.id === hexId);
+  if (!hex?.illiquid) return 0;
+  let unlock = 0;
+  for (const pos of actor.positions) {
+    if (pos.hexId === hexId) unlock = Math.max(unlock, (pos.entryTurn ?? 0) + state.params.lockupTurns);
+  }
+  return Math.max(0, unlock - state.turn);
+}
+
 /** Valeur mark-to-market de l'équity d'une position (peut devenir négative). */
 export function positionValue(pos: Position, V: number): number {
   const notional = pos.equity * (1 + pos.leverage);

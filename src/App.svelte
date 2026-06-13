@@ -9,7 +9,7 @@
   import { runTurn } from './engine/turn';
   import { policyForProfile } from './engine/ai';
   import { computeSignals } from './engine/signals';
-  import { actorWealth, positionValue } from './engine/portfolio';
+  import { actorWealth, positionValue, lockTurnsLeft } from './engine/portfolio';
   import { openCouponPosition, type CouponMaturity } from './engine/credit';
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
@@ -133,6 +133,12 @@
     for (const p of player.positions) {
       leverageByHex[p.hexId] = Math.max(leverageByHex[p.hexId] ?? 0, p.leverage);
     }
+    // Verrou d'illiquidité : tours restants avant sortie, par hexe détenu (spec immo).
+    const lockByHex: Record<string, number> = {};
+    for (const hid of new Set(player.positions.map((p) => p.hexId))) {
+      const left = lockTurnsLeft(hid, player, gs);
+      if (left > 0) lockByHex[hid] = left;
+    }
     // Footprint des IA : couleurs des adversaires présents par hexe (memo §31).
     const aiPresence: Record<string, string[]> = {};
     for (let i = 1; i < gs.actors.length; i++) {
@@ -159,6 +165,8 @@
       latentTotal,
       latentByHex,
       leverageByHex,
+      lockByHex,
+      lockupTurns: gs.params.lockupTurns,
       aiPresence,
       pbActive: hasNode('liquidite'), // débloque le Financement + levier moins cher (memo §11)
       infoActive,
@@ -239,15 +247,18 @@
     const player = gs.actors[0]!;
     const equity = player.cash * frac;
     if (equity <= 0) return;
+    // Illiquidité (spec immo) : long-only + sans levier ; entryTurn arme le verrou.
+    const dir = h?.longOnly ? 'long' : direction;
+    const lev = h?.illiquid ? 0 : openLev;
     player.cash -= equity;
-    player.positions.push({ hexId, direction, equity, leverage: openLev, entryV: gs.market[hexId]!.V });
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
     if (!here) {
       playerHex = hexId; // déplacement
       reveal(hexId); // révèle les nouveaux voisins
       opensThisTurn += 1;
     }
     selected = hexId;
-    log = [`${here ? 'Investit' : 'Ouvre'} ${direction === 'short' ? 'SHORT' : 'LONG'} ${h?.label} (${cost} PA)`, ...log].slice(0, 8);
+    log = [`${here ? 'Investit' : 'Ouvre'} ${dir === 'short' ? 'SHORT' : 'LONG'} ${h?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
   }
 
@@ -297,15 +308,19 @@
     const player = gs.actors[0]!;
     const equity = player.cash * 0.25;
     if (equity <= 0) return;
-    // Renforce dans le sens dominant déjà détenu sur l'hexe.
-    const dir = (view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long';
+    const h = hexById(hexId);
+    // Renforce dans le sens dominant déjà détenu sur l'hexe (forcé long si longOnly).
+    const dir = h?.longOnly ? 'long' : ((view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long');
+    const lev = h?.illiquid ? 0 : openLev;
     player.cash -= equity;
-    player.positions.push({ hexId, direction: dir, equity, leverage: openLev, entryV: gs.market[hexId]!.V });
+    // entryTurn : renforcer un illiquide RE-VERROUILLE (la tranche la plus récente fait foi).
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
     spend(1);
   }
 
   function partial(hexId: string) {
     if (view?.over || !view?.held.has(hexId) || paLeft() < 2) return;
+    if (lockTurnsLeft(hexId, gs.actors[0]!, gs) > 0) return; // illiquide encore verrouillé
     const player = gs.actors[0]!;
     for (const p of player.positions) {
       if (p.hexId !== hexId) continue;
@@ -319,6 +334,7 @@
 
   function close(hexId: string) {
     if (view?.over || !view?.held.has(hexId) || paLeft() < 1) return;
+    if (lockTurnsLeft(hexId, gs.actors[0]!, gs) > 0) return; // illiquide encore verrouillé
     const player = gs.actors[0]!;
     const kept = [];
     for (const p of player.positions) {
@@ -522,6 +538,9 @@
             {@const here = playerHex === selected}
             {@const canInvest = canOpen(selected) || (here && !!h && isInvestable(h))}
             {@const credit = isCredit(h)}
+            {@const illiquid = !!h?.illiquid}
+            {@const longOnly = !!h?.longOnly}
+            {@const locked = view.lockByHex[selected] ?? 0}
             {@const oCost = here ? 1 : openCost()}
             <div class="sel">
               <b>{descOf(h).court}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
@@ -536,6 +555,7 @@
                 · P&L latent <b class:up={lat > 0.5} class:down={lat < -0.5}>{lat >= 0 ? '+' : ''}{lat.toFixed(1)}</b>
                 {#if view.leverageByHex[selected]}· levier <b>{view.leverageByHex[selected]}×</b>{/if}
               </div>
+              {#if locked > 0}<div class="court lockwarn">🔒 Verrouillé — sortie impossible avant <b>{locked} tour{locked > 1 ? 's' : ''}</b> (illiquide).</div>{/if}
             {/if}
             {#if showDetail}<div class="long">{descOf(h).long}</div>{/if}
             {#if debug && h && (h.kind === 'marche' || h.kind === 'frontiere')}
@@ -543,18 +563,25 @@
             {/if}
 
             {#if canInvest}
-              <div class="dir-row">
+              {#if illiquid}
+                <div class="muted small">🔒 <b>Illiquide</b> — long-only, sans levier · sortie bloquée <b>{view.lockupTurns} tours</b> après l'ouverture (carry élevé = prime d'illiquidité).</div>
+              {/if}
+              <div class="dir-row" class:longonly={longOnly}>
                 <span>Sens</span>
                 <button class:active={openDir === 'long'} onclick={() => (openDir = 'long')}>LONG</button>
-                <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
+                {#if !longOnly}
+                  <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
+                {/if}
               </div>
-              <div class="lev-row">
-                <span>Levier</span>
-                <button class:active={openLev === 0} onclick={() => (openLev = 0)}>0×</button>
-                <button class:active={openLev === 2} onclick={() => (openLev = 2)}>2×</button>
-                <button class:active={openLev === 3} onclick={() => (openLev = 3)}>3×</button>
-              </div>
-              {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge{#if view.pbActive} · <span style="color:#5ab0a0">PB actif : intérêt −50%</span>{/if}</div>{/if}
+              {#if !illiquid}
+                <div class="lev-row">
+                  <span>Levier</span>
+                  <button class:active={openLev === 0} onclick={() => (openLev = 0)}>0×</button>
+                  <button class:active={openLev === 2} onclick={() => (openLev = 2)}>2×</button>
+                  <button class:active={openLev === 3} onclick={() => (openLev = 3)}>3×</button>
+                </div>
+                {#if openLev > 0}<div class="muted small">⚠️ amplifie gains ET pertes · intérêt d'emprunt chaque tour · risque d'appel de marge{#if view.pbActive} · <span style="color:#5ab0a0">PB actif : intérêt −50%</span>{/if}</div>{/if}
+              {/if}
               <div class="open-row">
                 <span>{here ? 'Ouvrir ici' : 'Ouvrir & aller'}</span>
                 <button onclick={() => open(selected!, 0.25, openDir)} disabled={paLeft() < oCost}>25%</button>
@@ -596,9 +623,9 @@
             {/if}
             {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
             {#if held}
-              <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
-              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
-              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1}>Fermer (totale) · 1 PA</button>
+              <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA{#if illiquid} · re-verrouille{/if}</button>
+              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2 || locked > 0}>Clôture partielle (−50%) · 2 PA</button>
+              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || locked > 0}>Fermer (totale) · 1 PA{#if locked > 0} · 🔒{/if}</button>
             {/if}
             {#if !canInvest && !canOccupy(selected) && !held && !credit}
               <div class="muted small">{here ? 'Rien à faire sur cet hexe.' : 'Pas adjacent / non accessible.'}</div>
@@ -677,6 +704,8 @@
   .expo { fill: #e8b54a; font-size: 9px; text-anchor: middle; pointer-events: none; }
   .expo.short { fill: #d98cff; }
   .dir-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
+  .dir-row.longonly { grid-template-columns: auto 1fr; }
+  .lockwarn { color: #d99a4a; }
   .dir-row button { margin: .25rem 0; }
   .dir-row button.active { background: #2f5d8a; border-color: #3b6ea0; }
   .lev-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }

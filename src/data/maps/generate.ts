@@ -78,6 +78,9 @@ export function generateHexMap(seed: number, radius = 3): GameMap {
     const cluster = clusterOf(q, r);
     const p = PROFILE[cluster];
     const short: Record<Cluster, string> = { credit: 'Créd', actions: 'Act', alternatifs: 'Alt' };
+    // Alternatifs marché = bucket illiquide (immo/PE) : long-only + verrou de sortie,
+    // payé par leur carry (spec immobilier). Frontière alt (dérivés) reste liquide.
+    const illiquidAlt = cluster === 'alternatifs' && kind === 'marche';
     return {
       id,
       label: short[cluster],
@@ -86,6 +89,7 @@ export function generateHexMap(seed: number, radius = 3): GameMap {
       beta: p.beta,
       gamma: p.gamma,
       carry: kind === 'frontiere' ? p.carry * 1.5 : p.carry,
+      ...(illiquidAlt ? { longOnly: true, illiquid: true } : {}),
       neighbors,
       coord: { q, r },
     };

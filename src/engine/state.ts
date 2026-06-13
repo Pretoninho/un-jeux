@@ -45,6 +45,8 @@ export interface Position {
   leverage: number;
   /** Valorisation `V` de l'hexe à l'entrée (référence du P&L). */
   entryV: number;
+  /** Tour d'ouverture — sert au verrou d'illiquidité (spec immobilier). */
+  entryTurn?: number;
 }
 
 /** État d'un acteur (joueur ou IA). */
@@ -59,6 +61,8 @@ export interface ActorState {
   wealthHistory: number[];
   /** Multiplicateur du coût d'emprunt (1 = normal ; <1 = levier moins cher, ex. présence PB). */
   borrowMultiplier?: number;
+  /** Pouvoir d'archétype : échappe au verrou d'illiquidité (spec immobilier). */
+  ignoreLockup?: boolean;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */

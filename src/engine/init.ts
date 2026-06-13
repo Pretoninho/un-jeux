@@ -39,8 +39,10 @@ export function buildInitialState(config: ConfigPartie): InitResult {
     wealthHistory: [START_CAPITAL],
   });
 
+  const player = mkActor(config.archetype.id);
+  player.ignoreLockup = config.archetype.ignoreLockup; // pouvoir d'archétype (spec immo)
   const actors: ActorState[] = [
-    mkActor(config.archetype.id),
+    player,
     ...config.adversaires.map((a) => mkActor(a.id)),
   ];
 
