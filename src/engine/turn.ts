@@ -93,10 +93,13 @@ function accrueCarryAndCost(state: GameState): void {
  */
 function runCreditLifecycle(state: GameState, rng: Rng): void {
   // 1. Banque centrale : fonction de réaction LISIBLE au F caché (monte en surchauffe,
-  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal). Si la BC statue par
-  //    réunions (bcMeetingEvery > 1), le taux n'est révisé qu'aux réunions, figé entre deux.
-  if (bcMeets(state.turn, state.params.bcMeetingEvery)) {
-    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params);
+  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal). En mode réunions
+  //    (bcMeetingEvery > 1) le taux n'est révisé qu'aux réunions — et de façon DÉCISIVE
+  //    (saut à la cible, smoothing=1 : à la réunion la BC pose le taux où F l'exige) ;
+  //    figé entre deux. En continu (=1) on garde le lissage θ historique.
+  const every = state.params.bcMeetingEvery;
+  if (bcMeets(state.turn, every)) {
+    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params, every > 1 ? 1 : state.params.bcSmoothing);
   }
 
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).

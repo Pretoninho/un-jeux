@@ -104,10 +104,11 @@ export function bcReact(
   fragility: number,
   inCrisis: boolean,
   p: InstanceParams,
+  smoothing: number = p.bcSmoothing,
 ): void {
   const target = p.bcRateBase + p.bcReactF * excessF(fragility, p) - (inCrisis ? p.bcReactCrisis : 0);
   bc.target = Math.max(0, target);
-  bc.rate = Math.max(0, bc.rate + p.bcSmoothing * (bc.target - bc.rate));
+  bc.rate = Math.max(0, bc.rate + smoothing * (bc.target - bc.rate));
 }
 
 /**

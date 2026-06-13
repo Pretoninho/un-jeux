@@ -194,6 +194,9 @@
       bcRate: gs.credit.bc.rate,
       bcDelta: gs.credit.bc.rate - prevBcRate,
       bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
+      bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
+      // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
+      bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
       couponBook: gs.credit.book.map((c) => ({ issuer: c.issuer, maturity: c.maturity, rate: c.rate, rce: c.rce, qualitySpread: c.qualitySpread })),
       couponPositions: player.couponPositions.map((cp) => ({ issuer: cp.issuer, side: cp.side, rate: cp.rate, notional: cp.notional, rceLeft: cp.rceLeft, qualitySpread: cp.qualitySpread })),
     };
@@ -522,23 +525,27 @@
           <div class="bar-row">
             <span>Taux BC</span>
             <span><b>{(view.bcRate * 100).toFixed(2)}%</b>
-              {#if view.bcDelta > 0.0005}<span class="down"> ▲ resserre (surchauffe)</span>
-              {:else if view.bcDelta < -0.0005}<span class="up"> ▼ soutien (crise)</span>
+              {#if view.bcDelta > 0.0005}<span class="down"> ▲ a resserré (surchauffe)</span>
+              {:else if view.bcDelta < -0.0005}<span class="up"> ▼ a soutenu (crise)</span>
+              {:else if view.bcMeetingEvery > 1}<span class="muted"> — figé hors réunion</span>
               {:else}<span class="muted"> — stable</span>{/if}
             </span>
           </div>
+          {#if view.bcMeetingEvery > 1}
+            <div class="court" style="margin:.2rem 0">🏛️ Réunions <b>tous les {view.bcMeetingEvery} tours</b> · prochaine dans <b class:down={view.bcNextMeetingIn <= 1}>{view.bcNextMeetingIn} tour{view.bcNextMeetingIn > 1 ? 's' : ''}</b> — taux figé d'ici là.</div>
+          {/if}
           {#if view.bcActive}
             <div class="bar-row">
-              <span>Cible BC ✨</span>
+              <span>{view.bcMeetingEvery > 1 ? 'Décision réunion ✨' : 'Cible BC ✨'}</span>
               <span><b>{(view.bcTarget * 100).toFixed(2)}%</b>
                 {#if view.bcTarget - view.bcRate > 0.0005}<span class="down"> ▲ va resserrer</span>
                 {:else if view.bcTarget - view.bcRate < -0.0005}<span class="up"> ▼ va soutenir</span>
-                {:else}<span class="muted"> — au repos</span>{/if}
+                {:else}<span class="muted"> — inchangé</span>{/if}
               </span>
             </div>
-            <div class="muted small">✨ Présence Banque centrale : cible de taux <b>anticipée</b> — où la BC pilote le taux avant qu'il n'y arrive.</div>
+            <div class="muted small">✨ Présence Banque centrale : {view.bcMeetingEvery > 1 ? 'la décision de la prochaine réunion, lue à l\'avance (forward guidance)' : 'cible de taux anticipée'} — où la BC pose le taux avant qu'il n'y arrive.</div>
           {:else}
-            <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée.</div>
+            <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée{#if view.bcMeetingEvery > 1}, mais figé entre les réunions{/if}.</div>
           {/if}
           {#if view.couponPositions.length}
             <div class="court" style="margin-top:.4rem">Coupons détenus :</div>

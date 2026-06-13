@@ -63,7 +63,10 @@ describe('intégration crédit-coupons dans le tour', () => {
   });
 
   it('la Banque centrale réagit : son taux MONTE quand le levier pousse F en surchauffe', () => {
-    const { state, rng } = buildInitialState(presetMvp(7));
+    // On teste la FONCTION DE RÉACTION (câblage bcReact), donc en mode continu : avec des
+    // réunions espacées, la surchauffe peut tomber ENTRE deux réunions et se résoudre en
+    // crise avant la suivante (comportement réel, couvert par le test de cadence ci-dessous).
+    const { state, rng } = buildInitialState({ ...presetMvp(7), paramsOverride: { bcMeetingEvery: 1 } });
     const base = state.credit.bc.rate;
     // Trois fonds leveragés poussent F au-dessus de la zone morte → la BC doit resserrer.
     const policies = [steadyLong(4), steadyLong(4), steadyLong(4)];
@@ -73,5 +76,21 @@ describe('intégration crédit-coupons dans le tour', () => {
       maxRate = Math.max(maxRate, state.credit.bc.rate);
     }
     expect(maxRate).toBeGreaterThan(base + 1e-3); // la fonction de réaction a resserré
+  });
+
+  it('réunions planifiées : le taux est FIGÉ entre deux réunions et ne bouge qu’aux réunions', () => {
+    // Cadence forcée à 4. Trois fonds leveragés chauffent F → la BC voudrait resserrer,
+    // mais ne le peut QU’aux tours 4 et 8. Entre deux, r_BC ne doit pas bouger d’un iota.
+    const { state, rng } = buildInitialState({ ...presetMvp(7), paramsOverride: { bcMeetingEvery: 4 } });
+    const policies = [steadyLong(4), steadyLong(4), steadyLong(4)];
+    const rates: number[] = [state.credit.bc.rate];
+    for (let t = 0; t < 8; t++) {
+      runTurn(state, policies, rng);
+      rates.push(state.credit.bc.rate);
+    }
+    // rates[i] = taux après le tour i. Hors réunion (tours 1-3, 5-7) → identique au précédent.
+    for (const t of [1, 2, 3, 5, 6, 7]) expect(rates[t]).toBe(rates[t - 1]);
+    // Au moins une réunion (t4 ou t8) a effectivement bougé le taux.
+    expect(rates[4] !== rates[3] || rates[8] !== rates[7]).toBe(true);
   });
 });
