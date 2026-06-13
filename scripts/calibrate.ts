@@ -5,13 +5,15 @@
 //
 // Lancer :  npx vite-node scripts/calibrate.ts [N]
 //
-// Rappel des cibles (memo §28.2, sur ~1000 parties, multi-profils §28.8) :
-//   • exactement 1 crise        ~60 %
-//   • 2 crises                  ~10-15 %
-//   • AUCUNE crise              ~20-25 %   (le « hoarder perd » doit être vécu)
-//   • crise avant le tour 5     < 5 % mais jamais impossible
-//   • écart-type de la date     large (~3 tours)
-//   • montée/chute              ≥ 2:1 (§28.6)
+// Rappel des cibles — PATH B (CAMPAGNE multi-cycles, horizon 28-40t) :
+//   • ≥1 crise par campagne      ~90 %     (la campagne traverse en général le cycle)
+//   • exactement 1 crise         ~45 %
+//   • 2+ crises                  ~45 %     (multi-cycles : courant pour tout le monde)
+//   • AUCUNE crise               ~8-11 %   (rare mais pas impossible)
+//   • crises/partie (moyenne)    ~1.4
+//   • écart-type de la date      large (σ ~8t sur l'horizon → non apprenable)
+//   • §28.8 : aucun profil ne domine (duel levier~value ~50 %) ; la réserve devient une
+//     tactique défensive (~3-4 % de victoires) plutôt qu'un win-con co-égal
 //   • §28.7 : l'horloge prédit la crise BIEN MOINS que les signaux
 
 import { simulate, type SimResult } from '../src/engine/simulate';
@@ -150,10 +152,10 @@ const agg = {
   one: mean(rows.map((r) => r.one)),
   twoPlus: mean(rows.map((r) => r.twoPlus)),
 };
-console.log(`\n--- Agrégat multi-profils (cible §28.2) ---`);
-console.log(`  sans crise : ${pct(agg.zero)}   (cible 20-25%)`);
-console.log(`  1 crise    : ${pct(agg.one)}   (cible ~60%)`);
-console.log(`  2+ crises  : ${pct(agg.twoPlus)}   (cible 10-15%)`);
+console.log(`\n--- Agrégat multi-profils (cible PATH B campagne) ---`);
+console.log(`  sans crise : ${pct(agg.zero)}   (cible ~8-11%)`);
+console.log(`  1 crise    : ${pct(agg.one)}   (cible ~45%)`);
+console.log(`  2+ crises  : ${pct(agg.twoPlus)}   (cible ~45%)`);
 
 // Trajectoire MOYENNE de F (vraie courbe cachée) — pour voir la vitesse de montée.
 // On la calcule sur deux profils contrastés. La zone morte est à 0.40.

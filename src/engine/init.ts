@@ -20,7 +20,9 @@ export function buildInitialState(config: ConfigPartie): InitResult {
   //    le comportement seedé (tests, calibrage). Crucial : la phase 2a ajoute des params.
   //  - flux params (salé) : tire les InstanceParams sans toucher au flux du monde.
   const rng = makeRng(config.seed);
-  const params = drawInstanceParams(makeRng((config.seed ^ 0x9e3779b9) >>> 0));
+  // Tirage seedé, puis surcharge optionnelle (calibrage/expérience — n'altère pas le flux
+  // du monde `rng`, donc la reproductibilité du comportement seedé reste intacte).
+  const params = { ...drawInstanceParams(makeRng((config.seed ^ 0x9e3779b9) >>> 0)), ...config.paramsOverride };
 
   // Le CRÉDIT a quitté le monde `V` (spec crédit-coupons) : ses hexes n'ont pas de prix
   // `V`, ils émettent des coupons (state.credit). Seuls actions/alternatifs sont V-cotés.

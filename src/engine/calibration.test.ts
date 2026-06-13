@@ -55,10 +55,13 @@ describe('Calibrage J7 — la fragilité est pilotée par le COMPORTEMENT (§23.
   const passif = run(steadyLong(0)); // sans levier
   const pyromane = run(steadyLong(4)); // levier max
 
-  it('un jeu prudent (sans levier) laisse un VRAI quota de parties calmes', () => {
+  it('un jeu prudent (sans levier) laisse encore des CAMPAGNES calmes (mais c’est rare)', () => {
+    // PATH B (campagne multi-cycles) : sur 28-40 tours, même un jeu prudent traverse en
+    // général ≥1 crise → le quota de parties 100 % calmes FOND (vs ~50 % en 1-cycle), sans
+    // pour autant tomber à « crise certaine ». C'est l'intention assumée du multi-cycles.
     const calm = rate(passif, (r) => r.crisisCount === 0);
-    expect(calm).toBeGreaterThan(0.30); // ni « crise certaine » (le bug baseline = 0 %)…
-    expect(calm).toBeLessThan(0.70); // …ni « jamais de crise »
+    expect(calm).toBeGreaterThan(0.06); // une campagne entièrement calme reste possible…
+    expect(calm).toBeLessThan(0.40); // …mais ce n'est plus le cas modal (≠ 1-cycle)
   });
 
   it('le levier agressif rend la crise quasi inévitable (le levier EST le moteur)', () => {
@@ -66,10 +69,13 @@ describe('Calibrage J7 — la fragilité est pilotée par le COMPORTEMENT (§23.
     expect(calm).toBeLessThan(0.15);
   });
 
-  it('les tables pyromanes brûlent DEUX fois, le prudent quasi jamais (§28.2)', () => {
+  it('les tables pyromanes brûlent PLUS souvent que le prudent (le levier reste le moteur)', () => {
+    // En campagne, les crises multiples deviennent courantes pour tout le monde ; ce qui
+    // doit tenir, c'est l'ORDRE : le pyromane brûle bien plus que le prudent (le moteur =
+    // le levier, pas l'horloge). On vérifie l'écart, pas un seuil absolu de 1-cycle.
     const dbl = (rs: SimResult[]) => rate(rs, (r) => r.crisisCount >= 2);
-    expect(dbl(pyromane)).toBeGreaterThan(dbl(passif));
-    expect(dbl(pyromane)).toBeGreaterThan(0.10); // cible 10-15 % réservée aux pyromanes
+    expect(dbl(pyromane)).toBeGreaterThan(dbl(passif) + 0.15); // écart net pyromane ≫ prudent
+    expect(dbl(pyromane)).toBeGreaterThan(0.40); // multi-cycles : le pyromane brûle souvent 2+
   });
 
   it('la crise précoce (avant t5) reste rare en jeu modéré — protection du débutant', () => {
@@ -109,7 +115,10 @@ describe('Calibrage J7 — neutralité §28.8 (aucun profil ne domine les Track 
     const ids = ['vautour', 'fonds_leverage', 'value_patient'];
     const top1 = (id: string) =>
       rate(def, (r) => ids.every((o) => score(r, o) <= score(r, id)));
-    // Même le hoarder (réserve) gagne dans les parties à krach → branche « le hoarder gagne ».
-    for (const id of ids) expect(top1(id)).toBeGreaterThan(0.05);
+    // PATH B : sur une CAMPAGNE, la réserve pure (Vautour) rate trop de compounding pour
+    // rester un win-con à part entière — elle devient une TACTIQUE défensive qui ne gagne
+    // que les campagnes les plus dévastées (~3-4 %). Le plancher reflète ce glissement
+    // assumé : le hoarder n'est pas MORT (il gagne encore parfois), mais n'est plus co-égal.
+    for (const id of ids) expect(top1(id)).toBeGreaterThan(0.02);
   });
 });

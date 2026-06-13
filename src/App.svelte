@@ -103,6 +103,16 @@
   const canTradeCoupon = (id: string) => isCredit(hexById(id)) && revealed.has(id);
   // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
   const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
+  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent — marché V
+  // OU émetteur de crédit, FRONTIÈRE VERROUILLÉE comprise (HY_US). Le crédit a quitté le
+  // monde V (coupons), mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds
+  // derrière (ex. IG_US → Banque centrale). Marcher sur un crédit verrouillé reste permis
+  // (du gameplay : on s'y faufile) même si l'ouverture, elle, reste bloquée par la frontière.
+  const canMoveTo = (id: string) => {
+    const h = hexById(id);
+    const walkable = !!h && (isInvestable(h) || isCredit(h));
+    return walkable && revealed.has(id) && neighborsOfPlayer().includes(id);
+  };
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -169,6 +179,7 @@
       lockupTurns: gs.params.lockupTurns,
       aiPresence,
       pbActive: hasNode('liquidite'), // débloque le Financement + levier moins cher (memo §11)
+      bcActive: hasNode('reglementaire'), // présence Banque centrale → cible de taux anticipée (memo §11)
       infoActive,
       // État caché révélé en mode debug uniquement.
       fReal: gs.fragility,
@@ -182,6 +193,11 @@
       // Crédit-coupons : taux directeur (lit F en filigrane), carnet offert, coupons détenus.
       bcRate: gs.credit.bc.rate,
       bcDelta: gs.credit.bc.rate - prevBcRate,
+      bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
+      cashCarryFloor: gs.params.cashCarryFloor, // franchise : la réserve au-dessus encaisse r_BC
+      bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
+      // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
+      bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
       couponBook: gs.credit.book.map((c) => ({ issuer: c.issuer, maturity: c.maturity, rate: c.rate, rce: c.rce, qualitySpread: c.qualitySpread })),
       couponPositions: player.couponPositions.map((cp) => ({ issuer: cp.issuer, side: cp.side, rate: cp.rate, notional: cp.notional, rceLeft: cp.rceLeft, qualitySpread: cp.qualitySpread })),
     };
@@ -293,9 +309,10 @@
     spend(cost);
   }
 
-  // DÉPLACER : se déplacer sur un hexe marché adjacent SANS investir (1 PA, primitive).
+  // DÉPLACER : se déplacer sur un hexe traversable adjacent (marché V ou crédit) SANS
+  // investir (1 PA, primitive). Traverser le crédit = atteindre les nœuds derrière.
   function deplacer(hexId: string) {
-    if (view?.over || !canOpen(hexId) || paLeft() < 1) return;
+    if (view?.over || !canMoveTo(hexId) || paLeft() < 1) return;
     playerHex = hexId;
     reveal(hexId);
     selected = hexId;
@@ -416,7 +433,7 @@
               class:selected={selected === h.id}
               class:owned={view.held.has(h.id)}
               class:here={playerHex === h.id}
-              class:openable={canOpen(h.id) || canOccupy(h.id)}
+              class:openable={canMoveTo(h.id) || canOccupy(h.id)}
               class:presence={isPresent(h.id)}
               role="button"
               tabindex="0"
@@ -509,12 +526,28 @@
           <div class="bar-row">
             <span>Taux BC</span>
             <span><b>{(view.bcRate * 100).toFixed(2)}%</b>
-              {#if view.bcDelta > 0.0005}<span class="down"> ▲ resserre (surchauffe)</span>
-              {:else if view.bcDelta < -0.0005}<span class="up"> ▼ soutien (crise)</span>
+              {#if view.bcDelta > 0.0005}<span class="down"> ▲ a resserré (surchauffe)</span>
+              {:else if view.bcDelta < -0.0005}<span class="up"> ▼ a soutenu (crise)</span>
+              {:else if view.bcMeetingEvery > 1}<span class="muted"> — figé hors réunion</span>
               {:else}<span class="muted"> — stable</span>{/if}
             </span>
           </div>
-          <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée.</div>
+          {#if view.bcMeetingEvery > 1}
+            <div class="court" style="margin:.2rem 0">🏛️ Réunions <b>tous les {view.bcMeetingEvery} tours</b> · prochaine dans <b class:down={view.bcNextMeetingIn <= 1}>{view.bcNextMeetingIn} tour{view.bcNextMeetingIn > 1 ? 's' : ''}</b> — taux figé d'ici là.</div>
+          {/if}
+          {#if view.bcActive}
+            <div class="bar-row">
+              <span>{view.bcMeetingEvery > 1 ? 'Décision réunion ✨' : 'Cible BC ✨'}</span>
+              <span><b>{(view.bcTarget * 100).toFixed(2)}%</b>
+                {#if view.bcTarget - view.bcRate > 0.0005}<span class="down"> ▲ va resserrer</span>
+                {:else if view.bcTarget - view.bcRate < -0.0005}<span class="up"> ▼ va soutenir</span>
+                {:else}<span class="muted"> — inchangé</span>{/if}
+              </span>
+            </div>
+            <div class="muted small">✨ Présence Banque centrale : {view.bcMeetingEvery > 1 ? 'la décision de la prochaine réunion, lue à l\'avance (forward guidance)' : 'cible de taux anticipée'} — où la BC pose le taux avant qu'il n'y arrive.</div>
+          {:else}
+            <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée{#if view.bcMeetingEvery > 1}, mais figé entre les réunions{/if}.</div>
+          {/if}
           {#if view.couponPositions.length}
             <div class="court" style="margin-top:.4rem">Coupons détenus :</div>
             {#each view.couponPositions as cp}
@@ -588,7 +621,6 @@
                 <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < oCost}>50%</button>
                 <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < oCost}>100%</button>
               </div>
-              {#if canOpen(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA</button>{/if}
             {/if}
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
@@ -621,7 +653,8 @@
                 <div class="muted small">Émetteur non révélé — explore pour y accéder.</div>
               {/if}
             {/if}
-            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
+            {#if canMoveTo(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA{#if credit} · traverser le crédit{/if}</button>{/if}
+            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}{#if hexById(selected)?.nodeType === 'reglementaire'} · <b>cible de taux BC anticipée</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA{#if illiquid} · re-verrouille{/if}</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2 || locked > 0}>Clôture partielle (−50%) · 2 PA</button>
@@ -635,6 +668,12 @@
           {/if}
           <div class="cash">
             Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b><br />
+            {#if view.cash > view.cashCarryFloor}
+              {@const carry = view.bcRate * (view.cash - view.cashCarryFloor)}
+              💰 Poudre sèche : <b class="up">+{carry.toFixed(2)}/t</b> <span class="muted">(r_BC {(view.bcRate * 100).toFixed(2)}% sur la réserve au-dessus de {view.cashCarryFloor})</span><br />
+            {:else}
+              <span class="muted">💤 Réserve sous la franchise ({view.cashCarryFloor}) — pas de carry cash.</span><br />
+            {/if}
             P&L latent global : <b class:up={view.latentTotal > 0.5} class:down={view.latentTotal < -0.5}>{view.latentTotal >= 0 ? '+' : ''}{view.latentTotal.toFixed(1)}</b>
           </div>
           <button class="end" onclick={endTurn} disabled={view.over}>Fin du tour</button>

@@ -11,7 +11,7 @@ import { resolveMarket } from './market';
 import { actorWealth, applyMarginCalls, positionValue, dirSign, lockTurnsLeft } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
-import { bcReact, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
+import { bcReact, bcMeets, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
 
 const PA_COST: Record<string, number> = {
   RESERVER: 0, ouvrir: 1, renforcer: 1, cloture_partielle: 2, fermer: 1, ouvrir_coupon: 1,
@@ -93,8 +93,14 @@ function accrueCarryAndCost(state: GameState): void {
  */
 function runCreditLifecycle(state: GameState, rng: Rng): void {
   // 1. Banque centrale : fonction de réaction LISIBLE au F caché (monte en surchauffe,
-  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal).
-  bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params);
+  //    coupe en crise) → le ton de la BC trahit F (quasi-4ᵉ signal). En mode réunions
+  //    (bcMeetingEvery > 1) le taux n'est révisé qu'aux réunions — et de façon DÉCISIVE
+  //    (saut à la cible, smoothing=1 : à la réunion la BC pose le taux où F l'exige) ;
+  //    figé entre deux. En continu (=1) on garde le lissage θ historique.
+  const every = state.params.bcMeetingEvery;
+  if (bcMeets(state.turn, every)) {
+    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params, every > 1 ? 1 : state.params.bcSmoothing);
+  }
 
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).
   const inCreditCrisis = state.crisis.active; // toute crise systémique touche le crédit (M domine)
@@ -162,6 +168,11 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
   // 4bis. Crédit-coupons : BC réagit à F, portage/défaut/échéance, rollover du carnet.
   runCreditLifecycle(state, rng);
 
+  // 4ter. Carry du cash en réserve (viabilité hoarder, PATH B) : la poudre sèche au-dessus
+  //   de la franchise gagne le taux directeur r_BC. APRÈS la réaction BC (taux du tour à
+  //   jour), AVANT la comptabilité de richesse (entre dans wealthHistory ce tour-ci).
+  accrueCashCarry(state);
+
   // Signaux observés du tour (memo §23.6). RNG dédié, dérivé du seed+tour, pour ne
   // pas perturber la dynamique : les signaux sont purement observationnels.
   const sigRng = makeRng(state.rngSeed * 1000003 + state.turn);
@@ -175,6 +186,23 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
   state.benchmarkHistory.push(lastBench * (1 + benchReturn));
 
   for (const actor of state.actors) actor.wealthHistory.push(actorWealth(actor, state.market));
+}
+
+/**
+ * Carry du cash en réserve (PATH B). La trésorerie non déployée au-dessus de la franchise
+ * `cashCarryFloor` encaisse le taux directeur r_BC (le cash gagne le taux sans risque).
+ * Neutre : s'applique à TOUS les acteurs (le seuil fait le tri, seul un gros cash est payé).
+ * Ne touche pas F (couche richesse). r_BC < carry risqué en régime calme → la réserve reste
+ * un pari perdant en moyenne, mais gagnant dans les krachs (la BC coupe peu, le cash survit).
+ */
+function accrueCashCarry(state: GameState): void {
+  const r = state.credit.bc.rate;
+  if (r <= 0) return;
+  const floor = state.params.cashCarryFloor;
+  for (const actor of state.actors) {
+    const base = actor.cash - floor;
+    if (base > 0) actor.cash += r * base;
+  }
 }
 
 function avgCarry(state: GameState): number {

@@ -121,11 +121,14 @@ export const PARAM_RANGES = {
   // au J2 (avec leurs planchers tirés en plages), pas comme scalaires plats ici.
 
   // ── Tempo (memo §28) ──
-  horizonTurns: r(13, 16), // durée d'un cycle MVP (§28.2, §28.5 « ~12-15 ») — haut de
-  //                          plage (J7) : laisse à une table pyromane le temps de
-  //                          rallumer une 2ᵉ crise après la cascade + recovery.
-  recoveryTurns: r(1, 3), // fenêtre de recovery après une cascade (§24) — raccourcie
-  //                         (J7) pour que le ré-armement de F démarre plus tôt.
+  // PATH B (décision : campagne multi-cycles). Horizon allongé : la partie n'est plus UN
+  // cycle (~13-16t, §28.5) mais une SUITE de booms-busts. Conséquence ASSUMÉE et mesurée
+  // (scripts/horizon.ts) : ~1.2-1.7 crise/partie, la branche « sans crise » se raréfie
+  // (~8-11 %), le skill devient la navigation de cycles répétés. Bandes §28.2 re-ciblées
+  // en conséquence (calibration.test.ts). La neutralité §28.8 tient à tout horizon (mesuré).
+  horizonTurns: r(28, 40), // durée d'une CAMPAGNE multi-cycles (PATH B) — large = peu apprenable
+  recoveryTurns: r(1, 3), // fenêtre de recovery après une cascade (§24) — courte → F se ré-arme
+  //                         vite, ce qui nourrit les cycles suivants de la campagne.
 
   // ── Signaux observables (memo §23.6, §29.2) ──
   // Bruit total par signal (le plancher irréductible est inclus). Tirés en plages
@@ -143,6 +146,14 @@ export const PARAM_RANGES = {
   bcReactF: r(0.04, 0.08), // φ — sensibilité du taux cible à (F − zone morte)
   bcReactCrisis: r(0.02, 0.04), // ψ — coupe d'urgence en crise
   bcSmoothing: r(0.30, 0.50), // θ — vitesse d'ajustement vers la cible (lissage → anticipable)
+  // Cadence de réunion de la BC (spec §4c, idée « FED annonce de façon planifiée », ACTIVÉE) :
+  // la BC ne statue sur `r_BC` que tous les `bcMeetingEvery` tours ; le taux est FIGÉ entre
+  // deux réunions, et la décision est DÉCISIVE (saut à la cible, cf. turn.ts) → événement
+  // discret, anticipable par le calendrier + le forward guidance (présence FED). Tiré 4-5
+  // par instance (qu'on ne mémorise pas « toujours 4 »). 1 = réaction continue (legacy/tests).
+  // Mesuré (scripts/bc-cadence.ts) : sans effet sur la distribution de crises/neutralité
+  // (la BC lit F, ne la pilote pas) ; dégrade le 4ᵉ signal de façon contrôlée (staleness).
+  bcMeetingEvery: r(4, 5),
   // Coupon = r_BC + spread_qualité (carry de l'émetteur) + spread_F + prime de terme.
   couponSpreadF: r(0.05, 0.10), // κ — élargissement de crédit par unité de (F − zone morte)
   couponTermPremium: r(0.004, 0.010), // prime de terme : la maturité longue paie plus que la courte
@@ -157,6 +168,16 @@ export const PARAM_RANGES = {
   // Verrou de sortie des hexes `illiquid` (immobilier). TRANSPARENT (affiché au joueur),
   // mais tiré par instance pour qu'on ne mémorise pas « toujours 3 ». Entier.
   lockupTurns: r(2, 3), // tours pendant lesquels une position illiquide ne peut être fermée
+
+  // ── Carry du cash en réserve (viabilité du hoarder en campagne, PATH B) ──
+  // La poudre sèche AU-DESSUS d'une franchise encaisse le taux directeur r_BC (le cash
+  // gagne le taux sans risque). Recette « conservatrice » mesurée (scripts/cash-carry.ts) :
+  // réhabilite la réserve comme pari (gagne les krachs) sans la rendre dominante (reste
+  // perdante en moyenne car r_BC < carry risqué), et la franchise protège l'incitation aux
+  // hexes carry (seul un hoarding ASSUMÉ, grosse réserve, est payé). Neutre (tous acteurs),
+  // sans effet sur la distribution de crises (couche richesse pure). TRANSPARENT (affiché).
+  // Franchise relative au capital de départ (= 100) → ~0.5× ; tirée pour ne pas mémoriser. Entier.
+  cashCarryFloor: r(40, 60),
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -179,6 +200,8 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'couponRceCourt',
     'couponRceLong',
     'lockupTurns',
+    'bcMeetingEvery',
+    'cashCarryFloor',
   ]);
 
   const out = {} as InstanceParams;

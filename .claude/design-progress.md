@@ -1,7 +1,27 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.17
+> Dernière mise à jour : 2026-06-13 — v1.18
+>
+> 🏦 **Session 2026-06-13 (suite) — BC vivante, campagne, hoarder réhabilité** :
+> 1. **Crédit traversable + nœud BC utile** : « se déplacer (sans investir) » étendu au crédit
+>    (`canMoveTo`, frontière crédit HY_US comprise — on traverse, l'ouverture reste bloquée) →
+>    la FED redevient atteignable ; **info-edge** branché (présence FED révèle `bc.target` 1 tour
+>    à l'avance, forward guidance, spec §4c).
+> 2. **BC par réunions planifiées** (`bcMeetingEvery` 4-5, décisive) : `r_BC` figé entre réunions,
+>    posé à la cible aux réunions. **Mesuré neutre** (distribution de crises identique → la BC lit F,
+>    ne la pilote pas) ; dégrade le 4ᵉ signal de façon contrôlée → le forward guidance prend de la valeur.
+> 3. **PATH B — campagne multi-cycles** : `horizonTurns` **28-40** (au lieu de 13-16). Distribution
+>    re-ciblée (**sans ~8 / 1 crise ~46 / 2+ ~45**, ~1.4 crise/partie) ; bandes `calibration.test.ts`
+>    mises à jour ; la **branche sans-crise s'efface** (pilier 1-cycle abandonné, assumé).
+> 4. **Carry du cash en réserve** (`cashCarryFloor` r(40,60), cash gagne **r_BC** au-dessus) :
+>    réhabilite le hoarder en campagne (top1 3.5 %→**9.2 %**) **sans casser le garde-fou** (score moyen
+>    −62 %, perd au calme/gagne aux krachs) ni cannibaliser le carry (value 38 %, duel 55 %).
+>    Cannibalisation = **seuil de taux** (cash effectif < bande carry LC ~1.5-2 %) ; franchise = levier
+>    de protection orthogonal. **Couche richesse pure → F/crises inchangées, calibration-safe.**
+> 5. **Infra** : `ConfigPartie.paramsOverride` (surcharge de params post-tirage, n'altère pas le flux
+>    du monde) ; **outils de mesure** `scripts/bc-cadence.ts`, `scripts/horizon.ts`, `scripts/cash-carry.ts`.
+> **99 tests verts · svelte-check 0 · build OK.**
 >
 > 🎯 **Calibrage J7 — COMPLET (2026-06-13)** : tempo + neutralité réglés via les paramètres
 > générateurs (`src/engine/params.ts`), aucun timing/résultat forcé. **2 causes racines
@@ -103,7 +123,16 @@
    - 🔧 **Décision archi** : flux RNG du **monde** découplé de celui des **params** (`init.ts`) → ajouter des params ne décale plus le comportement seedé (indispensable, la phase 2a en ajoute beaucoup).
    - ✅ **Phase 2a étape 2 — INTÉGRATION MOTEUR (2026-06-13)** : le crédit a quitté le monde `V` (init exclut le cluster crédit du `market`), coupons branchés dans `runTurn` (cycle BC→défaut→portage→échéance→rollover), richesse + crowding comptent les coupons, benchmark **alpha-pur**, IA tradent actions/alt. Action `ouvrir_coupon` (long XOR short, taille verrouillée). **93 tests verts** (+5 intégration). **Re-calibré** : retirer les hexes crédit (défensifs) a fait tomber le duel levier/value à 28 % → réglé par la **dynamique** (`leverageBorrowRate`↓ 0.015-0.03, `marginCallThreshold`↑ 0.35-0.55, α **fixe** 0.35) → duel **50 %**, tempo **26/62/12** ✓.
    - ✅ **Phase 2a étape 3 — INCRÉMENT B (2026-06-13)** : (a) **IA reach-for-yield** — `AIBehavior.couponAppetite` (fonds leveragé = 0.2) : en période calme l'IA chasse le coupon le plus juteux (HY long) → crowd crédit → nourrit `F`, et le HY défaut le plus en crise (boucle de fragilité fermée). Re-calibré : duel **58 %** (cible 40-60 ✓), tempo 27/62/11. (b) **UI coupons** (`App.svelte`) — section « Crédit · Banque centrale » (taux BC + flèche de tendance = lit F en filigrane ; coupons détenus avec RCE + risque) ; panneau de trade sur hexe crédit (carnet court/long, taux, échéance, risque ; LONG/SHORT + taille 25/50/100 %). 93 tests + svelte-check 0 erreur.
-   - 🎯 **Sous-système crédit-coupons COMPLET** (moteur + IA + UI). Reste optionnel : early-close des coupons, recovery rate, BC influençable (info-edge/influence), maturités variées par émetteur.
+   - ✅ **BC = nœud vivant (2026-06-13)** : (a) **crédit traversable** — `canMoveTo` autorise « se déplacer (sans investir) » sur le crédit (frontière verrouillée HY_US comprise : on traverse, l'ouverture reste bloquée) → la **FED**, enfouie derrière IG_US, redevient atteignable ; (b) **info-edge (spec §4c)** — sous présence FED, l'UI révèle `bc.target` un tour à l'avance (« Cible BC / Décision réunion ✨ », forward guidance) ; (c) **réunions planifiées** — `bcMeetingEvery` (4-5) : `r_BC` figé entre réunions, **décisif** à la réunion (`bcReact` θ optionnel, `bcMeets`). **Mesuré neutre** (`scripts/bc-cadence.ts`) : crises/neutralité inchangées (la BC lit F, ne la pilote pas) ; le 4ᵉ signal se dégrade de façon contrôlée → la staleness + le forward guidance créent l'intérêt.
+   - 🎯 **Sous-système crédit-coupons COMPLET** (moteur + IA + UI + BC vivante). Reste optionnel : early-close des coupons, recovery rate, **BC influençable phase 2b (lobbying)**, maturités variées par émetteur.
+
+10. **Campagne multi-cycles (PATH B, décision créateur 2026-06-13)** — la partie devient une SUITE de booms-busts, plus un cycle unique.
+    - ✅ **Livré** : `horizonTurns` **r(13,16) → r(28,40)**. Distribution re-ciblée (mesurée `scripts/horizon.ts`) : **sans ~8 % · 1 crise ~46 % · 2+ ~45 %**, ~1.4 crise/partie, date très étalée (σ ~8t → §28.7 OK). Neutralité §28.8 tient à tout horizon. **Bandes `calibration.test.ts` mises à jour** : quota calme 0.06-0.40 ; « pyromane brûle 2× » → ordre + seuil multi-cycles ; plancher top1 réserve 0.05→0.02.
+    - ⚠️ **Conséquence assumée** : la **branche sans-crise s'efface** (le pilier 1-cycle « le hoarder évite le krach et gagne » se raréfie) → motive l'item 11.
+
+11. **Carry du cash en réserve (réhabilite le hoarder, 2026-06-13)** — la poudre sèche au-dessus d'une franchise gagne le taux directeur `r_BC`.
+    - ✅ **Livré** : `cashCarryFloor` r(40,60) entier (~0.5× capital, transparent) ; `turn.ts` (4ter) `accrueCashCarry` après la réaction BC → `cash += r_BC · max(0, cash − franchise)` pour **tous les acteurs** (neutre), **sans toucher F**. UI : « 💰 Poudre sèche +x/t » / « 💤 sous la franchise ». Recette **conservatrice (k=1·r_BC, R_min~50)** choisie après panel large (`scripts/cash-carry.ts`).
+    - 📊 **Mesuré** : hoarder top1 **3.5 %→9.2 %** (re-win-con) mais score moyen **−62 %** (garde-fou « le hoarder peut perdre » intact : gagne les krachs, coule au calme) · value 47 %→**38 %** (cannibalisation bornée par la franchise) · duel **55 %** (§28.8 ✓) · **crises inchangées** (couche richesse). **Cannibalisation = seuil de taux** (cash effectif < bande carry LC ~1.5-2 %) ; `r_BC` ~1.4 % la respecte. Synergie BC : la patience est mieux payée quand la BC resserre (avant le krach).
 
 9. **Illiquidité immobilier** (spec immo, créateur 2026-06-13) — l'illiquidité attaque le skill central (sortir avant le krach) : l'immo devient l'asset qu'on **ne peut pas fuir**, son carry devient une vraie prime d'illiquidité.
    - ✅ **Livré** : flags de données `Hex.longOnly` + `Hex.illiquid` ; **long-only + SANS levier** (option a, décision créateur → pas de contradiction avec l'appel de marge) ; **verrou de sortie** `lockupTurns` (param tiré 2-3, transparent/affiché) ; `Position.entryTurn` arme le verrou, renforcer **re-verrouille** (tranche la + récente fait foi) ; pouvoir d'archétype `ignoreLockup` (sur `Archetype` + `ActorState`) qui contourne. Posé sur IMMO (MVP) et les **alternatifs marché** (générateur, carry 0.03 le justifie ; PEVC carry 0 exclu en MVP). UI : panneau adapté (pas de SHORT/levier, notice illiquidité, compte à rebours du verrou, sortie désactivée). 5 tests `illiquid.test.ts`.
