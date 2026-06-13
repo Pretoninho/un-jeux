@@ -35,11 +35,12 @@ describe('opérations de POSITIONNER (memo §9bis)', () => {
   });
 
   it('Renforcer ajoute de l’exposition sur l’hexe', () => {
+    // LC_EM (actions) : le crédit a quitté le monde V (coupons), on teste sur un V-marché.
     const s = gameWith([
-      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'IG_US', equity: 25, leverage: 0, direction: 'long' },
-      { verb: 'POSITIONNER', op: 'renforcer', hexId: 'IG_US', equity: 25, leverage: 0, direction: 'long' },
+      { verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_EM', equity: 25, leverage: 0, direction: 'long' },
+      { verb: 'POSITIONNER', op: 'renforcer', hexId: 'LC_EM', equity: 25, leverage: 0, direction: 'long' },
     ]);
-    const exposure = s.actors[0]!.positions.filter((p) => p.hexId === 'IG_US').length;
+    const exposure = s.actors[0]!.positions.filter((p) => p.hexId === 'LC_EM').length;
     expect(exposure).toBe(2); // deux apports d'exposition
   });
 });

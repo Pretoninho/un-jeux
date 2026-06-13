@@ -3,6 +3,7 @@
 
 import type { ActorState, GameState, Position } from './state';
 import type { HexId } from './types';
+import { couponPositionValue } from './credit';
 
 /** Signe directionnel d'une position (+1 long, −1 short) — pour le flux/impact. */
 export function dirSign(pos: Position): number {
@@ -24,6 +25,9 @@ export function actorWealth(actor: ActorState, market: GameState['market']): num
     const m = market[pos.hexId];
     if (m) w += Math.max(0, positionValue(pos, m.V));
   }
+  // Coupons : long = pair (+U), short = dette (−U). PAS de plancher par position : la
+  // dette du short est réelle (compensée par le cash reçu à l'entrée). Cf. credit.ts.
+  for (const cp of actor.couponPositions) w += couponPositionValue(cp);
   return w;
 }
 
@@ -55,6 +59,11 @@ export function crowdingIndex(state: GameState): number {
       const cl = clusterOf.get(pos.hexId) ?? 'actions';
       byCluster[cl] = (byCluster[cl] ?? 0) + notional;
       total += notional;
+    }
+    // Le crédit a quitté le monde V : sa concentration vient des coupons (reach-for-yield).
+    for (const cp of actor.couponPositions) {
+      byCluster.credit = (byCluster.credit ?? 0) + cp.notional;
+      total += cp.notional;
     }
   }
   if (total <= 0) return 0;

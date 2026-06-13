@@ -4,6 +4,7 @@ import type { ConfigPartie } from './types';
 import type { GameState, ActorState } from './state';
 import { makeRng, type Rng } from './rng';
 import { drawInstanceParams } from './params';
+import { initCredit } from './credit';
 
 const START_CAPITAL = 100;
 const START_V = 100;
@@ -21,9 +22,11 @@ export function buildInitialState(config: ConfigPartie): InitResult {
   const rng = makeRng(config.seed);
   const params = drawInstanceParams(makeRng((config.seed ^ 0x9e3779b9) >>> 0));
 
+  // Le CRÉDIT a quitté le monde `V` (spec crédit-coupons) : ses hexes n'ont pas de prix
+  // `V`, ils émettent des coupons (state.credit). Seuls actions/alternatifs sont V-cotés.
   const market: GameState['market'] = {};
   for (const hex of config.carte.hexes) {
-    if (hex.kind === 'marche' || hex.kind === 'frontiere') {
+    if ((hex.kind === 'marche' || hex.kind === 'frontiere') && hex.cluster !== 'credit') {
       market[hex.id] = { V: START_V, A: START_V };
     }
   }
@@ -32,6 +35,7 @@ export function buildInitialState(config: ConfigPartie): InitResult {
     id,
     cash: START_CAPITAL,
     positions: [],
+    couponPositions: [],
     wealthHistory: [START_CAPITAL],
   });
 
@@ -60,6 +64,7 @@ export function buildInitialState(config: ConfigPartie): InitResult {
       recoveryTurnsLeft: 0,
     },
     market,
+    credit: initCredit(config.carte, params.f0, params),
     actors,
     fragilityHistory: [params.f0],
     crisisTurns: [],

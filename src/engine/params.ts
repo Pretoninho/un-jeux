@@ -102,8 +102,13 @@ export const PARAM_RANGES = {
   // encaisse le carry sur tout le notionnel mais ne paie l'emprunt que sur la part
   // empruntée à taux plus bas → revenu net sans risque qui compose. À ~carry, le levier
   // devient CARRY-NEUTRE et ne fait plus qu'amplifier le risque-prix (le but, §29.3).
-  leverageBorrowRate: r(0.03, 0.05), // taux d'emprunt/tour par unité de levier
-  marginCallThreshold: r(0.25, 0.40), // drawdown mark-to-market d'une position leveragée → liquidation forcée
+  // RE-CALIBRÉ (sortie du crédit du monde V) : retirer les 3 hexes crédit (β bas, carry
+  // régulier) a privé le levier de son terrain défensif → il n'amplifiait plus qu'un
+  // univers actions/alt volatil = pari perdant (duel levier/value tombé à 28 %). Baissé
+  // (coût d'emprunt) + seuil de marge relevé (le levier survit aux creux) → duel re-centré
+  // à ~50 %. α reste FIXE à 0.35 (un α négatif aurait fallu, donc on règle la dynamique).
+  leverageBorrowRate: r(0.015, 0.03), // taux d'emprunt/tour par unité de levier
+  marginCallThreshold: r(0.35, 0.55), // drawdown mark-to-market d'une position leveragée → liquidation forcée
 
   // ── Score (memo §27.4) ──
   drawdownPenalty: r(0.35, 0.35), // α — point d'équilibre du défaut #4 (§27.4). FIXE

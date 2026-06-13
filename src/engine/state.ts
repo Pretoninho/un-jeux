@@ -5,6 +5,7 @@
 
 import type { GameMap, HexId } from './types';
 import type { InstanceParams } from './params';
+import type { CouponPosition, CreditState } from './credit';
 
 /** Régime émergent (memo §15) — une LECTURE de F + tendance, jamais un script. */
 export type Regime = 'bull' | 'tension' | 'crise' | 'recovery';
@@ -52,6 +53,8 @@ export interface ActorState {
   /** Liquidités non déployées (réserve sèche). */
   cash: number;
   positions: Position[];
+  /** Positions sur coupons de crédit (hors monde `V`, spec crédit-coupons). */
+  couponPositions: CouponPosition[];
   /** Historique de richesse mark-to-market, par tour (pour le drawdown, §27). */
   wealthHistory: number[];
   /** Multiplicateur du coût d'emprunt (1 = normal ; <1 = levier moins cher, ex. présence PB). */
@@ -79,6 +82,8 @@ export interface GameState {
   crisis: CrisisState;
 
   market: Record<HexId, HexMarket>;
+  /** Sous-système crédit : Banque centrale + carnet de coupons (hors monde `V`). */
+  credit: CreditState;
   actors: ActorState[];
 
   /** Trace pour le harness / J7 (memo §28.7) — la VRAIE courbe de F. */

@@ -26,7 +26,7 @@ function estimateAnchor(trueA: number, rng: Rng, noiseFloor: number): number {
 }
 
 const investableHexes = (state: GameState): HexId[] =>
-  state.map.hexes.filter((h) => h.kind === 'marche').map((h) => h.id);
+  state.map.hexes.filter((h) => h.kind === 'marche' && h.cluster !== 'credit').map((h) => h.id);
 
 /** Hexe le plus monté (proxy de momentum : V le plus haut). */
 function hottestHex(state: GameState): HexId | undefined {

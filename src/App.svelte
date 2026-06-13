@@ -60,7 +60,10 @@
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
   let viewBox = $state('0 0 100 100');
 
-  const isInvestable = (h: Hex) => h.kind === 'marche';
+  // Le crédit a quitté le monde V (coupons, spec crédit-coupons) → non V-investissable.
+  // L'UI coupons dédiée arrive en incrément B ; ici on évite surtout d'ouvrir une
+  // position-V fantôme sur un hexe sans prix (sinon `gs.market[id]` est undefined).
+  const isInvestable = (h: Hex) => h.kind === 'marche' && h.cluster !== 'credit';
 
   // Descriptions génériques (carte générée → pas d'entrée dans le lexique fixe).
   const CLUSTER_DESC: Record<string, [string, string]> = {

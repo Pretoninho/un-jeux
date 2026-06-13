@@ -18,6 +18,10 @@
 > ⚠️ **Décisions design J7** : (a) reset relevé (`resetFactor` 0.32-0.48) → §23.5 **assoupli**
 > (plus « quasi-total ») pour le rallumage pyromane ; (b) α **fixe** à 0.35 (score transparent
 > §27.3) ; (c) marché à dérive ~nulle (le levier amplifie un pari, pas un gain garanti, §29.3).
+> 🔄 **Re-calibré 2026-06-13 (intégration crédit-coupons, voir tâche B.8)** : le crédit a
+> quitté le monde `V` → retirer les hexes crédit défensifs a fait chuter le duel à 28 %,
+> rétabli à **~50 %** via `leverageBorrowRate`↓ (0.015-0.03) + `marginCallThreshold`↑
+> (0.35-0.55) ; tempo **26/62/12**. Chiffres ci-dessus (28/59/13, duel 46 %) = état pré-crédit.
 >
 > 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
 >
@@ -94,9 +98,10 @@
 6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
 7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
 8. **Crédit-coupons + Banque centrale** (spec `docs/spec-credit-coupons.md` **close**, b+c). Sous-système entier = phase 2, pas MVP-critique.
-   - ✅ **Phase 2a étape 1 (2026-06-13)** : moteur autonome `src/engine/credit.ts` + 18 tests — formation du taux (r_BC + spread_qualité + spread_F + prime de terme), réaction BC lisible, carnet court/long, portage long/short, défaut tout-ou-rien en crise, échéance vrai-bond. **Pas encore branché** dans la boucle de tour.
-   - 🔧 **Décision archi (même jour)** : le flux RNG du **monde** est découplé de celui des **params** (`init.ts`) → ajouter des paramètres ne décale plus le comportement seedé (tests/calibrage stables). La phase 2a en ajoutera beaucoup. Re-vérifié : agrégat tempo 28/59/13 ✓, duel levier/value 40 % (bande 40-60) ✓.
-   - ⏭️ **Étape 2 (à faire)** : intégration — sortir le crédit du monde `V`, benchmark alpha-pur, comptabilité richesse des coupons, IA qui jouent les coupons, UI.
+   - ✅ **Phase 2a étape 1** : moteur autonome `src/engine/credit.ts` + 18 tests — taux (r_BC + spread_qualité + spread_F + prime de terme), réaction BC lisible, carnet court/long, portage long/short, défaut tout-ou-rien, échéance vrai-bond.
+   - 🔧 **Décision archi** : flux RNG du **monde** découplé de celui des **params** (`init.ts`) → ajouter des params ne décale plus le comportement seedé (indispensable, la phase 2a en ajoute beaucoup).
+   - ✅ **Phase 2a étape 2 — INTÉGRATION MOTEUR (2026-06-13)** : le crédit a quitté le monde `V` (init exclut le cluster crédit du `market`), coupons branchés dans `runTurn` (cycle BC→défaut→portage→échéance→rollover), richesse + crowding comptent les coupons, benchmark **alpha-pur**, IA tradent actions/alt. Action `ouvrir_coupon` (long XOR short, taille verrouillée). **93 tests verts** (+5 intégration). **Re-calibré** : retirer les hexes crédit (défensifs) a fait tomber le duel levier/value à 28 % → réglé par la **dynamique** (`leverageBorrowRate`↓ 0.015-0.03, `marginCallThreshold`↑ 0.35-0.55, α **fixe** 0.35) → duel **50 %**, tempo **26/62/12** ✓.
+   - ⏭️ **Étape 3 (incrément B, à faire)** : UI coupons (le joueur ouvre/lit les coupons depuis la carte ; aujourd'hui l'UI guarde juste le crédit comme non-V) + **IA qui jouent les coupons** (reach-for-yield HY → nourrit F en retour, boucle de fragilité du design).
 
 ### C. Backlog design (hors MVP)
 
