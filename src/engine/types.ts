@@ -65,6 +65,13 @@ export interface Archetype {
   startingHex: HexId;
   /** Pouvoir d'archétype : échappe au verrou d'illiquidité (sortie immédiate, spec immo). */
   ignoreLockup?: boolean;
+  /**
+   * Compétence active « Récolte » (Vautour) : coûte `paCost` PA, multiplie le carry encaissé
+   * (positions V + coupons) par `factor` pendant `duration` tours, puis indisponible `cooldown`
+   * tours (réutilisable au tour activation + duration + cooldown). Mesuré équilibré à
+   * factor 2 / duration 2 / cooldown 12 (top1 ~40 %). Donnée pure — pas codé en dur.
+   */
+  carrySkill?: { factor: number; duration: number; cooldown: number; paCost: number };
 }
 
 /**

@@ -195,6 +195,14 @@
       bcDelta: gs.credit.bc.rate - prevBcRate,
       bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
       cashCarryFloor: gs.params.cashCarryFloor, // franchise : la réserve au-dessus encaisse r_BC
+      // Compétence « Récolte » (Vautour) : carry ×factor pendant duration tours, cooldown.
+      // L'activation vise la PROCHAINE résolution (tour gs.turn+1) → décalage d'un tour.
+      hasCarrySkill: !!player.carrySkill,
+      skillFactor: player.carrySkill?.factor ?? 0,
+      skillDuration: player.carrySkill?.duration ?? 0,
+      skillPaCost: player.carrySkill?.paCost ?? 0,
+      skillReadyIn: player.carrySkill ? Math.max(0, (player.carrySkillReadyAt ?? 0) - (gs.turn + 1)) : 0,
+      skillActiveLeft: player.carrySkill ? Math.max(0, (player.carryBoostUntil ?? -1) - gs.turn) : 0,
       bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
       // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
       bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
@@ -363,6 +371,20 @@
     }
     player.positions = kept;
     spend(1);
+  }
+
+  // Compétence « Récolte » (Vautour) : arme le boost de carry pour les prochains tours.
+  // L'activation cible la PROCHAINE résolution (state.turn = gs.turn+1) → cohérent avec le moteur.
+  function useSkill() {
+    const player = gs.actors[0]!;
+    const sk = player.carrySkill;
+    if (!sk || view?.over || paLeft() < sk.paCost) return;
+    const nextTurn = gs.turn + 1;
+    if (nextTurn < (player.carrySkillReadyAt ?? 0)) return; // encore en cooldown
+    player.carryBoostUntil = nextTurn + sk.duration - 1; // boosté pendant `duration` résolutions
+    player.carrySkillReadyAt = nextTurn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    log = [`🦅 Récolte activée — carry ×${sk.factor} pendant ${sk.duration} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
+    spend(sk.paCost);
   }
 
   function readSignal(name: string) {
@@ -666,6 +688,15 @@
           {:else}
             <div class="sel muted">Clique un hexe révélé.</div>
           {/if}
+          {#if view.hasCarrySkill}
+            <div class="skill">
+              <div class="court" style="margin:0">🦅 <b>Récolte</b> <span class="muted small">carry ×{view.skillFactor} · {view.skillDuration}t · {view.skillPaCost} PA</span></div>
+              {#if view.skillActiveLeft > 0}<div class="court up" style="margin:.2rem 0">● Active — carry boosté sur {view.skillActiveLeft} tour(s) à venir</div>{/if}
+              <button onclick={useSkill} disabled={view.over || paLeft() < view.skillPaCost || view.skillReadyIn > 0}>
+                {view.skillReadyIn > 0 ? `🔒 prête dans ${view.skillReadyIn} tour(s)` : `Activer · carry ×${view.skillFactor} (${view.skillPaCost} PA)`}
+              </button>
+            </div>
+          {/if}
           <div class="cash">
             Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b><br />
             {#if view.cash > view.cashCarryFloor}
@@ -778,6 +809,8 @@
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
   .locked { font-size: .72rem; color: #c79a4a; }
   .small { font-size: .72rem; } .muted { color: #7a8294; }
+  .skill { background: #1d2230; border: 1px solid #3a4459; border-radius: 6px; padding: .45rem; margin: .4rem 0; }
+  .skill button { margin: .3rem 0 0; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }
   .log { font-size: .76rem; color: #9aa3b5; }
