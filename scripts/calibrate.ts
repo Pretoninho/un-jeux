@@ -21,6 +21,7 @@ import { presetMvp } from '../src/data/config-mvp';
 import { FONDS_LEVERAGE } from '../src/data/profiles/fonds-leverage';
 import { VALUE_PATIENT } from '../src/data/profiles/value-patient';
 import { maxDrawdown, totalReturn } from '../src/engine/score';
+import { PARAM_RANGES } from '../src/engine/params';
 
 const N = Number(process.argv[2] ?? 1000);
 const SEED = 1000;
@@ -173,5 +174,47 @@ for (const name of ['hoarder (tout-réserve)', 'levier 4x']) {
   const policy = playerProfiles.find((p) => p.name === name)!.policy;
   const traj = fTrajectory(policy);
   console.log(`  ${name.padEnd(22)} : ${traj.map((f) => f.toFixed(2)).join(' ')}`);
+}
+
+// ── Neutralité des Track Records (§28.8) + viabilité du levier / α (§27.4) ──
+// On joue la partie par DÉFAUT (joueur réserve + 2 IA réelles) et on compare les
+// scores Track Record des profils. Cible : AUCUN profil ne domine strictement (le
+// levier ne doit être ni mort, ni gagnant garanti). α = `drawdownPenalty` est le
+// bouton : il pénalise le drawdown → tempère le profil leveragé.
+console.log(`\n--- Neutralité §28.8 / α (défaut : joueur réserve + 2 IA) ---`);
+{
+  const results = simulate(presetMvp(SEED), N);
+  const ids = ['vautour', 'fonds_leverage', 'value_patient'] as const;
+  const label: Record<string, string> = {
+    vautour: 'Vautour (réserve)', fonds_leverage: 'Fonds leveragé', value_patient: 'Value patient',
+  };
+  const spct = (x: number) => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)}%`; // pourcentage signé
+  console.log(`  α (drawdownPenalty) = ${fx(PARAM_RANGES.drawdownPenalty.min)}-${fx(PARAM_RANGES.drawdownPenalty.max)}`);
+  console.log(['  profil', 'score moy', 'excédent', 'drawdown', '% top1'].join(' | '));
+  for (const id of ids) {
+    const scores = results.map((r) => r.trackRecords[id]!.score);
+    const exc = results.map((r) => r.trackRecords[id]!.excessReturn);
+    const dd = results.map((r) => r.trackRecords[id]!.maxDrawdown);
+    const top1 = results.filter((r) => {
+      const me = r.trackRecords[id]!.score;
+      return ids.every((o) => r.trackRecords[o]!.score <= me);
+    }).length / results.length;
+    console.log(
+      ['  ' + label[id]!.padEnd(18), spct(mean(scores)).padStart(9), spct(mean(exc)).padStart(8),
+       pct(mean(dd)).padStart(8), pct(top1).padStart(6)].join(' | '),
+    );
+  }
+  // Duel direct levier vs value : part des parties où le leveragé bat le value.
+  const levBeatsValue = results.filter(
+    (r) => r.trackRecords['fonds_leverage']!.score > r.trackRecords['value_patient']!.score,
+  ).length / results.length;
+  console.log(`  duel levier>value : ${pct(levBeatsValue)} (cible ~40-60 % = aucun ne domine)`);
+
+  // Distribution de crises de la partie PAR DÉFAUT = le vrai « joueur moyen + IA
+  // standard » de §28.2 (et non un profil qui met 0×/2× à chaque tour).
+  const z = results.filter((r) => r.crisisCount === 0).length / results.length;
+  const o = results.filter((r) => r.crisisCount === 1).length / results.length;
+  const d = results.filter((r) => r.crisisCount >= 2).length / results.length;
+  console.log(`  → distribution crises (config par défaut) : sans ${pct(z)} · 1 ${pct(o)} · 2+ ${pct(d)}  (cible 20-25 / 60 / 10-15)`);
 }
 console.log('');

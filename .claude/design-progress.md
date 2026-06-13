@@ -1,19 +1,23 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.16
+> Dernière mise à jour : 2026-06-13 — v1.17
 >
-> 🎯 **Calibrage J7 — TEMPO LIVRÉ (2026-06-13)** : tempo réglé via les paramètres générateurs
-> (`src/engine/params.ts`), aucun timing forcé. Cause racine corrigée : le terme de
-> valorisation (`×100`) écrasait l'accumulation et **noyait le levier** → F était pilotée
-> par les IA, pas par le joueur. Rééquilibré → le **levier redevient le moteur**. Cibles
-> §28.2 atteintes : sans-crise **24 %** ✓, crise<t5 **<1 %** ✓, **signaux > horloge** (§28.7)
-> ✓, drawdown qui mord (23-58 %) ✓, doubles pyromanes **~11 %** (lev4) ✓. Instrument :
-> `scripts/calibrate.ts` (`npx vite-node`). Garde anti-régression : `src/engine/calibration.test.ts`.
-> **Restent en J7** (non faits) : α (`drawdownPenalty`), coût/viabilité du levier (§29.3),
-> assertion de neutralité §28.8 → voir « Ce qui reste à développer », A.1.
-> ⚠️ **Décision design** : reset post-crise relevé (`resetFactor` 0.32-0.48) → **n'est plus
-> « quasi-total »** (§23.5 assoupli) pour permettre le rallumage pyromane.
+> 🎯 **Calibrage J7 — COMPLET (2026-06-13)** : tempo + neutralité réglés via les paramètres
+> générateurs (`src/engine/params.ts`), aucun timing/résultat forcé. **2 causes racines
+> trouvées** : (1) le terme de valorisation (`×100`) noyait le levier ; (2) **`fluxImpact`
+> ~100× trop fort** (flux absolu O(100), réglé pour O(1)) → l'achat normal des IA saturait
+> le prix au plafond +50 %/tour, marché auto-pompé, **levier god-tier** (+2930 % de score,
+> 99 % de victoires). Corrigés : `fluxImpact` 0.0002-0.0006, levier **carry-neutre**
+> (`leverageBorrowRate` ≈ carry), drifts quasi nuls (marché ≈ martingale + krachs), **α=0.35**.
+> **Résultats** : agrégat tempo **28/59/13** (sans/1/2+ crise) ✓ · **neutralité §28.8** : duel
+> levier/value **46 %** (égalité, aucun ne domine) ✓ · drawdowns qui mordent (lev4 94 %) ✓ ·
+> le **hoarder gagne 11 %** des parties (krachs) ✓ · signaux>horloge §28.7 ✓. La fragilité est
+> désormais pilotée par le **COMPORTEMENT** (levier+crowding), pas par un pump global → un monde
+> calme reste calme. Instrument `scripts/calibrate.ts`, 8 assertions `calibration.test.ts`.
+> ⚠️ **Décisions design J7** : (a) reset relevé (`resetFactor` 0.32-0.48) → §23.5 **assoupli**
+> (plus « quasi-total ») pour le rallumage pyromane ; (b) α **fixe** à 0.35 (score transparent
+> §27.3) ; (c) marché à dérive ~nulle (le levier amplifie un pari, pas un gain garanti, §29.3).
 >
 > 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
 >
@@ -72,10 +76,10 @@
 
 ### A. Chantiers code immédiats (MVP)
 
-1. **Fin de J7 — vérifs numériques restantes** (le tempo §28.2 et signaux>horloge §28.7 sont ✅) :
-   - **α (`drawdownPenalty`)** encore figé à 0.5-0.5 → calibrer le point d'équilibre du défaut #4 (§27.4).
-   - **Coût / viabilité du levier** (`leverageBorrowRate`, seuil de marge §29.3) → vérifier que le levier n'est ni mort ni dominant.
-   - **Assertion de neutralité §28.8** : test automatisé « aucun profil ne domine strictement les Track Records » (l'instrument `simulate` + Track Records par acteur est déjà prêt).
+1. ~~**Fin de J7 — vérifs numériques**~~ ✅ **FAIT (2026-06-13)** : α calibré à **0.35** (fixe,
+   §27.3) ; levier **viable et non dominant** (carry-neutre + `fluxImpact` corrigé → duel
+   levier/value 46 %, drawdowns qui mordent) ; **assertion de neutralité §28.8** en place
+   (`calibration.test.ts`). **J7 entièrement clos.**
 2. **Coutures UI (dette J5)** :
    - **Câbler le coût LIRE** — les signaux sont gratuits aujourd'hui (le budget épistémique §28.5 ne mord pas).
    - **Clôture partielle + levier joueur dans l'UI** (existent au moteur, pas exposés proprement).

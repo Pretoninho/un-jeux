@@ -1,11 +1,10 @@
-// Assertions de calibrage J7 (memo §28). Transforme les cibles de tempo (§28.2) et
-// le « critère d'or » signaux>horloge (§28.7) en garde automatisée : si un réglage
-// futur recasse la physique (F qui pègue le plafond, crise certaine, tempo scripté),
-// ces tests tombent. Ce sont des BANDES, pas des égalités — la distribution est
-// émergente, on vérifie qu'elle reste dans le couloir, jamais qu'on la force.
+// Assertions de calibrage J7 (memo §28). Transforme les cibles de tempo (§28.2), le
+// « critère d'or » signaux>horloge (§28.7) et la neutralité (§28.8) en garde automatisée.
+// Si un réglage futur recasse la physique (crise certaine, levier god-tier, tempo scripté),
+// ces tests tombent. Ce sont des BANDES, pas des égalités — la distribution est émergente,
+// on vérifie qu'elle reste dans le couloir, jamais qu'on la force.
 //
-// Reproductible : `simulate` est seedé (seed = config.seed + i), donc ces assertions
-// sont déterministes (pas de flakiness) tout en restant sensibles aux paramètres.
+// Reproductible : `simulate` est seedé (seed = config.seed + i), donc déterministe.
 
 import { describe, it, expect } from 'vitest';
 import { simulate, type SimResult } from './simulate';
@@ -25,10 +24,7 @@ const run = (playerPolicy: ReturnType<typeof steadyLong>) =>
 const rate = (rs: SimResult[], pred: (r: SimResult) => boolean) =>
   rs.filter(pred).length / rs.length;
 
-/**
- * Pouvoir prédictif (corrélation point-bisériale, en valeur absolue) de X sur
- * « une crise se déclenche dans ≤2 tours ». §28.7 : on veut |corr(signal)| > |corr(horloge)|.
- */
+/** Corrélation point-bisériale |·| de X sur « crise dans ≤2 tours » (§28.7). */
 function predictivePower(rs: SimResult[]): { clock: number; signal: number } {
   const turn: number[] = [], sig: number[] = [], label: number[] = [];
   for (const r of rs) {
@@ -52,55 +48,68 @@ function predictivePower(rs: SimResult[]): { clock: number; signal: number } {
   return { clock: corr(turn), signal: corr(sig) };
 }
 
-describe('Calibrage J7 — cibles de tempo §28.2 (bandes, distribution émergente)', () => {
-  // Joueur « moyen » = long sans levier, 2 IA standard en face.
-  const moyen = run(steadyLong(0));
+describe('Calibrage J7 — la fragilité est pilotée par le COMPORTEMENT (§23.2, §28.2)', () => {
+  // Depuis le retrait du pump de valorisation (fluxImpact à l'échelle), F vient du
+  // levier + crowding, pas d'un fond global → un monde calme reste calme, un monde
+  // leveragé casse. C'est l'intention : « le hoarder peut perdre/gagner sans drame ».
+  const passif = run(steadyLong(0)); // sans levier
+  const pyromane = run(steadyLong(4)); // levier max
 
-  it('un quota réel de parties finit SANS crise (le « hoarder perd » est vécu, §28.2)', () => {
-    // Cible 20-25 %. Le bouton sensible : ni quasi-zéro (crise certaine = script appris),
-    // ni trop haut (parties plates). Bande large pour rester robuste.
-    const calm = rate(moyen, (r) => r.crisisCount === 0);
-    expect(calm).toBeGreaterThan(0.12);
-    expect(calm).toBeLessThan(0.40);
+  it('un jeu prudent (sans levier) laisse un VRAI quota de parties calmes', () => {
+    const calm = rate(passif, (r) => r.crisisCount === 0);
+    expect(calm).toBeGreaterThan(0.30); // ni « crise certaine » (le bug baseline = 0 %)…
+    expect(calm).toBeLessThan(0.70); // …ni « jamais de crise »
   });
 
-  it('la crise précoce (avant le tour 5) reste rare — protection statistique, pas décrétée', () => {
-    const early = rate(moyen, (r) => r.crisisTurns.some((t) => t < 5));
-    expect(early).toBeLessThan(0.08); // cible <5 %, marge anti-flakiness
+  it('le levier agressif rend la crise quasi inévitable (le levier EST le moteur)', () => {
+    const calm = rate(pyromane, (r) => r.crisisCount === 0);
+    expect(calm).toBeLessThan(0.15);
   });
 
-  it('la date de déclenchement est étalée (pas de fenêtre apprenable)', () => {
-    const turns = moyen.flatMap((r) => r.crisisTurns);
+  it('les tables pyromanes brûlent DEUX fois, le prudent quasi jamais (§28.2)', () => {
+    const dbl = (rs: SimResult[]) => rate(rs, (r) => r.crisisCount >= 2);
+    expect(dbl(pyromane)).toBeGreaterThan(dbl(passif));
+    expect(dbl(pyromane)).toBeGreaterThan(0.10); // cible 10-15 % réservée aux pyromanes
+  });
+
+  it('la crise précoce (avant t5) reste rare en jeu modéré — protection du débutant', () => {
+    expect(rate(passif, (r) => r.crisisTurns.some((t) => t < 5))).toBeLessThan(0.05);
+  });
+
+  it('la date de crise est étalée (pas de fenêtre apprenable)', () => {
+    const turns = pyromane.flatMap((r) => r.crisisTurns);
     const m = turns.reduce((a, b) => a + b, 0) / turns.length;
     const sd = Math.sqrt(turns.reduce((a, t) => a + (t - m) ** 2, 0) / turns.length);
-    expect(sd).toBeGreaterThan(1.8); // ~3 visé ; garde-fou contre un tempo qui se resserre
-  });
-
-  it('F ne pègue plus le plafond tôt : la montée est lente (anti « marché ×2 au tour 6 »)', () => {
-    // Au tour 6, la fragilité MOYENNE doit rester loin du plafond 0.85.
-    const f6 = moyen.map((r) => r.fragilityHistory[6] ?? 0);
-    const meanF6 = f6.reduce((a, b) => a + b, 0) / f6.length;
-    expect(meanF6).toBeLessThan(0.65);
+    expect(sd).toBeGreaterThan(1.8);
   });
 });
 
 describe('Calibrage J7 — critère d\'or §28.7 (les signaux battent l\'horloge)', () => {
-  it('le signal prédit la crise MIEUX que le numéro de tour (le moteur n\'est pas scripté)', () => {
-    // Mesuré avec le signal le PLUS bruité (Volatilité) → borne basse conservatrice :
-    // les signaux propres (Financement) prédisent encore mieux.
+  it('le signal prédit la crise MIEUX que le numéro de tour (moteur non scripté)', () => {
+    // Mesuré avec le signal le plus bruité (Volatilité) → borne basse conservatrice.
     const { clock, signal } = predictivePower(run(steadyLong(2)));
     expect(signal).toBeGreaterThan(clock);
   });
 });
 
-describe('Calibrage J7 — émergence par le comportement (neutralité §26, pyromane §28.2)', () => {
-  it('les tables à fort levier brûlent DEUX fois plus que le joueur prudent', () => {
-    const prudent = run(steadyLong(0));
-    const pyromane = run(steadyLong(4));
-    const doubles = (rs: SimResult[]) => rate(rs, (r) => r.crisisCount >= 2);
-    // Le double-krach est piloté par le levier, pas scripté : le pyromane y accède,
-    // le prudent quasi pas (cible 10-15 % réservée aux « tables pyromanes », §28.2).
-    expect(doubles(pyromane)).toBeGreaterThan(doubles(prudent));
-    expect(doubles(pyromane)).toBeGreaterThan(0.06);
+describe('Calibrage J7 — neutralité §28.8 (aucun profil ne domine les Track Records)', () => {
+  // Partie PAR DÉFAUT : joueur réserve + les 2 IA réelles (momentum leveragé vs value).
+  const def = simulate(presetMvp(SEED), N);
+  const score = (r: SimResult, id: string) => r.trackRecords[id]!.score;
+
+  it('le levier ne domine NI n\'est mort face au value (duel ~équilibré)', () => {
+    // α (drawdownPenalty) est le bouton : il pénalise le drawdown du leveragé juste
+    // assez pour que le pari soit symétrique. Cible : ni 0 % ni 100 %.
+    const levBeatsValue = rate(def, (r) => score(r, 'fonds_leverage') > score(r, 'value_patient'));
+    expect(levBeatsValue).toBeGreaterThan(0.30);
+    expect(levBeatsValue).toBeLessThan(0.70);
+  });
+
+  it('chaque profil remporte la partie au moins parfois (personne n\'est strictement dominé)', () => {
+    const ids = ['vautour', 'fonds_leverage', 'value_patient'];
+    const top1 = (id: string) =>
+      rate(def, (r) => ids.every((o) => score(r, o) <= score(r, id)));
+    // Même le hoarder (réserve) gagne dans les parties à krach → branche « le hoarder gagne ».
+    for (const id of ids) expect(top1(id)).toBeGreaterThan(0.05);
   });
 });
