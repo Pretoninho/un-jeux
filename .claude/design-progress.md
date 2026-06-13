@@ -29,6 +29,7 @@
 >
 > 🧭 **Spawn (décision 2026-06-13)** : clusters gardés contigus (adjacence = corrélation) ; remplacer le spawn aléatoire (proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multi (memo §22, §21, conforme §11). À implémenter avec les archétypes / le setup §31.
 >
+> 🗣️ **Comment expliquer le jeu (pitch + table de traduction trader→gamer) : `docs/pitch.md`** — genre *press-your-luck*, métaphore chaises musicales, 2 niveaux de discours (memo §12). Tagline posée dans l'en-tête de l'UI.
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
 > 🧠 **Le « pourquoi » du système : `docs/systeme-pourquoi.md`** (modèle mental du créateur — pourquoi chaque pièce est ainsi + guide « comment lire une partie »).
 > 💳 **Spec crédit-coupons + BC : `docs/spec-credit-coupons.md`** (proposition design, phase 2 — crédit = émetteur de coupons, BC = fonction de réaction lisible **+** nœud FED influençable).

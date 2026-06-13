@@ -369,7 +369,10 @@
 
 <main>
   <header>
-    <div class="title">un-jeux <span class="sub">· {profileLabel} · exploration (proto)</span></div>
+    <div class="brand">
+      <div class="title">un-jeux <span class="sub">· {profileLabel} · exploration (proto)</span></div>
+      <div class="tagline">Enrichis-toi tant que la fête dure — sors avant que tout s'effondre.</div>
+    </div>
     {#if view}
       <div class="status">
         <span>Tour <b>{view.turn}/{view.horizon}</b></span>
@@ -643,6 +646,7 @@
   header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2f3a; padding-bottom: .5rem; }
   .title { font-size: 1.3rem; font-weight: 700; }
   .sub { color: #7a8294; font-weight: 400; font-size: .85rem; }
+  .tagline { color: #9aa3b5; font-size: .8rem; font-style: italic; margin-top: .1rem; }
   .status { display: flex; gap: 1rem; font-size: .85rem; color: #9aa3b5; flex-wrap: wrap; }
   .status b { color: #e6ebf5; }
   b.crise, .neg { color: #e0564f; }
