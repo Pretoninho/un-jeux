@@ -14,8 +14,8 @@ describe('Track Record (memo §27)', () => {
 
   it('pénalise le drawdown : à excédent égal, plus de drawdown = moins de score', () => {
     const bench = [1, 1.1];
-    const calme: ActorState = { id: 'a', cash: 0, positions: [], wealthHistory: [100, 110] };
-    const cahot: ActorState = { id: 'b', cash: 0, positions: [], wealthHistory: [100, 150, 70, 110] };
+    const calme: ActorState = { id: 'a', cash: 0, positions: [], couponPositions: [], wealthHistory: [100, 110] };
+    const cahot: ActorState = { id: 'b', cash: 0, positions: [], couponPositions: [], wealthHistory: [100, 150, 70, 110] };
     const ra = trackRecord(calme, bench, 0.5);
     const rb = trackRecord(cahot, bench, 0.5);
     // Même rendement total (+10%) et même excédent, mais b a souffert un gros drawdown.

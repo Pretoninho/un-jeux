@@ -3,10 +3,27 @@
 
 import type { ActorState, GameState, Position } from './state';
 import type { HexId } from './types';
+import { couponPositionValue } from './credit';
 
 /** Signe directionnel d'une position (+1 long, −1 short) — pour le flux/impact. */
 export function dirSign(pos: Position): number {
   return pos.direction === 'short' ? -1 : 1;
+}
+
+/**
+ * Verrou d'illiquidité (spec immobilier) : tours restants avant de pouvoir fermer une
+ * position sur cet hexe. 0 = libre. La tranche la PLUS RÉCENTE fait foi (renforcer
+ * re-verrouille). Un acteur `ignoreLockup` (pouvoir d'archétype) n'est jamais verrouillé.
+ */
+export function lockTurnsLeft(hexId: HexId, actor: ActorState, state: GameState): number {
+  if (actor.ignoreLockup) return 0;
+  const hex = state.map.hexes.find((h) => h.id === hexId);
+  if (!hex?.illiquid) return 0;
+  let unlock = 0;
+  for (const pos of actor.positions) {
+    if (pos.hexId === hexId) unlock = Math.max(unlock, (pos.entryTurn ?? 0) + state.params.lockupTurns);
+  }
+  return Math.max(0, unlock - state.turn);
 }
 
 /** Valeur mark-to-market de l'équity d'une position (peut devenir négative). */
@@ -24,6 +41,9 @@ export function actorWealth(actor: ActorState, market: GameState['market']): num
     const m = market[pos.hexId];
     if (m) w += Math.max(0, positionValue(pos, m.V));
   }
+  // Coupons : long = pair (+U), short = dette (−U). PAS de plancher par position : la
+  // dette du short est réelle (compensée par le cash reçu à l'entrée). Cf. credit.ts.
+  for (const cp of actor.couponPositions) w += couponPositionValue(cp);
   return w;
 }
 
@@ -55,6 +75,11 @@ export function crowdingIndex(state: GameState): number {
       const cl = clusterOf.get(pos.hexId) ?? 'actions';
       byCluster[cl] = (byCluster[cl] ?? 0) + notional;
       total += notional;
+    }
+    // Le crédit a quitté le monde V : sa concentration vient des coupons (reach-for-yield).
+    for (const cp of actor.couponPositions) {
+      byCluster.credit = (byCluster.credit ?? 0) + cp.notional;
+      total += cp.notional;
     }
   }
   if (total <= 0) return 0;

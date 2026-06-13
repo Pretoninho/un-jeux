@@ -8,6 +8,7 @@
 import type { ActorState, GameState } from './state';
 import type { HexId } from './types';
 import type { Rng } from './rng';
+import type { CouponMaturity } from './credit';
 
 export type Direction = 'long' | 'short';
 
@@ -16,7 +17,10 @@ export type PlannedAction =
   | { verb: 'POSITIONNER'; op: 'ouvrir'; hexId: HexId; equity: number; leverage: number; direction: Direction }
   | { verb: 'POSITIONNER'; op: 'renforcer'; hexId: HexId; equity: number; leverage: number; direction: Direction }
   | { verb: 'POSITIONNER'; op: 'cloture_partielle'; hexId: HexId }
-  | { verb: 'POSITIONNER'; op: 'fermer'; hexId: HexId };
+  | { verb: 'POSITIONNER'; op: 'fermer'; hexId: HexId }
+  // Ouvre une position sur un coupon offert (crédit hors-V) : long XOR short, taille
+  // `notional` choisie une fois et verrouillée (spec crédit-coupons §6).
+  | { verb: 'POSITIONNER'; op: 'ouvrir_coupon'; issuer: HexId; maturity: CouponMaturity; notional: number; direction: Direction };
 
 export interface Policy {
   id: string;
@@ -24,7 +28,7 @@ export interface Policy {
 }
 
 const investableHexes = (state: GameState): HexId[] =>
-  state.map.hexes.filter((h) => h.kind === 'marche').map((h) => h.id);
+  state.map.hexes.filter((h) => h.kind === 'marche' && h.cluster !== 'credit').map((h) => h.id);
 
 /** Reste toujours en réserve (le hoarder pur). */
 export const alwaysReserve: Policy = {

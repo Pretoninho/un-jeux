@@ -5,6 +5,7 @@
 
 import type { GameMap, HexId } from './types';
 import type { InstanceParams } from './params';
+import type { CouponPosition, CreditState } from './credit';
 
 /** Régime émergent (memo §15) — une LECTURE de F + tendance, jamais un script. */
 export type Regime = 'bull' | 'tension' | 'crise' | 'recovery';
@@ -44,6 +45,8 @@ export interface Position {
   leverage: number;
   /** Valorisation `V` de l'hexe à l'entrée (référence du P&L). */
   entryV: number;
+  /** Tour d'ouverture — sert au verrou d'illiquidité (spec immobilier). */
+  entryTurn?: number;
 }
 
 /** État d'un acteur (joueur ou IA). */
@@ -52,10 +55,14 @@ export interface ActorState {
   /** Liquidités non déployées (réserve sèche). */
   cash: number;
   positions: Position[];
+  /** Positions sur coupons de crédit (hors monde `V`, spec crédit-coupons). */
+  couponPositions: CouponPosition[];
   /** Historique de richesse mark-to-market, par tour (pour le drawdown, §27). */
   wealthHistory: number[];
   /** Multiplicateur du coût d'emprunt (1 = normal ; <1 = levier moins cher, ex. présence PB). */
   borrowMultiplier?: number;
+  /** Pouvoir d'archétype : échappe au verrou d'illiquidité (spec immobilier). */
+  ignoreLockup?: boolean;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */
@@ -79,6 +86,8 @@ export interface GameState {
   crisis: CrisisState;
 
   market: Record<HexId, HexMarket>;
+  /** Sous-système crédit : Banque centrale + carnet de coupons (hors monde `V`). */
+  credit: CreditState;
   actors: ActorState[];
 
   /** Trace pour le harness / J7 (memo §28.7) — la VRAIE courbe de F. */

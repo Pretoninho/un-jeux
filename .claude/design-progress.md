@@ -1,19 +1,27 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.16
+> Dernière mise à jour : 2026-06-13 — v1.17
 >
-> 🎯 **Calibrage J7 — TEMPO LIVRÉ (2026-06-13)** : tempo réglé via les paramètres générateurs
-> (`src/engine/params.ts`), aucun timing forcé. Cause racine corrigée : le terme de
-> valorisation (`×100`) écrasait l'accumulation et **noyait le levier** → F était pilotée
-> par les IA, pas par le joueur. Rééquilibré → le **levier redevient le moteur**. Cibles
-> §28.2 atteintes : sans-crise **24 %** ✓, crise<t5 **<1 %** ✓, **signaux > horloge** (§28.7)
-> ✓, drawdown qui mord (23-58 %) ✓, doubles pyromanes **~11 %** (lev4) ✓. Instrument :
-> `scripts/calibrate.ts` (`npx vite-node`). Garde anti-régression : `src/engine/calibration.test.ts`.
-> **Restent en J7** (non faits) : α (`drawdownPenalty`), coût/viabilité du levier (§29.3),
-> assertion de neutralité §28.8 → voir « Ce qui reste à développer », A.1.
-> ⚠️ **Décision design** : reset post-crise relevé (`resetFactor` 0.32-0.48) → **n'est plus
-> « quasi-total »** (§23.5 assoupli) pour permettre le rallumage pyromane.
+> 🎯 **Calibrage J7 — COMPLET (2026-06-13)** : tempo + neutralité réglés via les paramètres
+> générateurs (`src/engine/params.ts`), aucun timing/résultat forcé. **2 causes racines
+> trouvées** : (1) le terme de valorisation (`×100`) noyait le levier ; (2) **`fluxImpact`
+> ~100× trop fort** (flux absolu O(100), réglé pour O(1)) → l'achat normal des IA saturait
+> le prix au plafond +50 %/tour, marché auto-pompé, **levier god-tier** (+2930 % de score,
+> 99 % de victoires). Corrigés : `fluxImpact` 0.0002-0.0006, levier **carry-neutre**
+> (`leverageBorrowRate` ≈ carry), drifts quasi nuls (marché ≈ martingale + krachs), **α=0.35**.
+> **Résultats** : agrégat tempo **28/59/13** (sans/1/2+ crise) ✓ · **neutralité §28.8** : duel
+> levier/value **46 %** (égalité, aucun ne domine) ✓ · drawdowns qui mordent (lev4 94 %) ✓ ·
+> le **hoarder gagne 11 %** des parties (krachs) ✓ · signaux>horloge §28.7 ✓. La fragilité est
+> désormais pilotée par le **COMPORTEMENT** (levier+crowding), pas par un pump global → un monde
+> calme reste calme. Instrument `scripts/calibrate.ts`, 8 assertions `calibration.test.ts`.
+> ⚠️ **Décisions design J7** : (a) reset relevé (`resetFactor` 0.32-0.48) → §23.5 **assoupli**
+> (plus « quasi-total ») pour le rallumage pyromane ; (b) α **fixe** à 0.35 (score transparent
+> §27.3) ; (c) marché à dérive ~nulle (le levier amplifie un pari, pas un gain garanti, §29.3).
+> 🔄 **Re-calibré 2026-06-13 (intégration crédit-coupons, voir tâche B.8)** : le crédit a
+> quitté le monde `V` → retirer les hexes crédit défensifs a fait chuter le duel à 28 %,
+> rétabli à **~50 %** via `leverageBorrowRate`↓ (0.015-0.03) + `marginCallThreshold`↑
+> (0.35-0.55) ; tempo **26/62/12**. Chiffres ci-dessus (28/59/13, duel 46 %) = état pré-crédit.
 >
 > 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
 >
@@ -21,8 +29,10 @@
 >
 > 🧭 **Spawn (décision 2026-06-13)** : clusters gardés contigus (adjacence = corrélation) ; remplacer le spawn aléatoire (proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multi (memo §22, §21, conforme §11). À implémenter avec les archétypes / le setup §31.
 >
+> 🗣️ **Comment expliquer le jeu (pitch + table de traduction trader→gamer) : `docs/pitch.md`** — genre *press-your-luck*, métaphore chaises musicales, 2 niveaux de discours (memo §12). Tagline posée dans l'en-tête de l'UI.
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
 > 🧠 **Le « pourquoi » du système : `docs/systeme-pourquoi.md`** (modèle mental du créateur — pourquoi chaque pièce est ainsi + guide « comment lire une partie »).
+> 💳 **Spec crédit-coupons + BC : `docs/spec-credit-coupons.md`** (proposition design, phase 2 — crédit = émetteur de coupons, BC = fonction de réaction lisible **+** nœud FED influençable).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
 > 🌐 **Archi multijoueur « plan & TICKs »** documentée (memo §31), non implémentée ; IA déjà visibles (footprint).
 
@@ -72,10 +82,10 @@
 
 ### A. Chantiers code immédiats (MVP)
 
-1. **Fin de J7 — vérifs numériques restantes** (le tempo §28.2 et signaux>horloge §28.7 sont ✅) :
-   - **α (`drawdownPenalty`)** encore figé à 0.5-0.5 → calibrer le point d'équilibre du défaut #4 (§27.4).
-   - **Coût / viabilité du levier** (`leverageBorrowRate`, seuil de marge §29.3) → vérifier que le levier n'est ni mort ni dominant.
-   - **Assertion de neutralité §28.8** : test automatisé « aucun profil ne domine strictement les Track Records » (l'instrument `simulate` + Track Records par acteur est déjà prêt).
+1. ~~**Fin de J7 — vérifs numériques**~~ ✅ **FAIT (2026-06-13)** : α calibré à **0.35** (fixe,
+   §27.3) ; levier **viable et non dominant** (carry-neutre + `fluxImpact` corrigé → duel
+   levier/value 46 %, drawdowns qui mordent) ; **assertion de neutralité §28.8** en place
+   (`calibration.test.ts`). **J7 entièrement clos.**
 2. **Coutures UI (dette J5)** :
    - **Câbler le coût LIRE** — les signaux sont gratuits aujourd'hui (le budget épistémique §28.5 ne mord pas).
    - **Clôture partielle + levier joueur dans l'UI** (existent au moteur, pas exposés proprement).
@@ -88,6 +98,17 @@
 
 6. **Génération procédurale de la carte** (géométrie = adjacence ; le proto d'exploration la fait déjà côté UI).
 7. **Multijoueur « plan & TICKs »** (§31, WebSockets) : phase de choix simultanée + observation en TICKs (déplacements révélés, investissements cachés).
+8. **Crédit-coupons + Banque centrale** (spec `docs/spec-credit-coupons.md` **close**, b+c). Sous-système entier = phase 2, pas MVP-critique.
+   - ✅ **Phase 2a étape 1** : moteur autonome `src/engine/credit.ts` + 18 tests — taux (r_BC + spread_qualité + spread_F + prime de terme), réaction BC lisible, carnet court/long, portage long/short, défaut tout-ou-rien, échéance vrai-bond.
+   - 🔧 **Décision archi** : flux RNG du **monde** découplé de celui des **params** (`init.ts`) → ajouter des params ne décale plus le comportement seedé (indispensable, la phase 2a en ajoute beaucoup).
+   - ✅ **Phase 2a étape 2 — INTÉGRATION MOTEUR (2026-06-13)** : le crédit a quitté le monde `V` (init exclut le cluster crédit du `market`), coupons branchés dans `runTurn` (cycle BC→défaut→portage→échéance→rollover), richesse + crowding comptent les coupons, benchmark **alpha-pur**, IA tradent actions/alt. Action `ouvrir_coupon` (long XOR short, taille verrouillée). **93 tests verts** (+5 intégration). **Re-calibré** : retirer les hexes crédit (défensifs) a fait tomber le duel levier/value à 28 % → réglé par la **dynamique** (`leverageBorrowRate`↓ 0.015-0.03, `marginCallThreshold`↑ 0.35-0.55, α **fixe** 0.35) → duel **50 %**, tempo **26/62/12** ✓.
+   - ✅ **Phase 2a étape 3 — INCRÉMENT B (2026-06-13)** : (a) **IA reach-for-yield** — `AIBehavior.couponAppetite` (fonds leveragé = 0.2) : en période calme l'IA chasse le coupon le plus juteux (HY long) → crowd crédit → nourrit `F`, et le HY défaut le plus en crise (boucle de fragilité fermée). Re-calibré : duel **58 %** (cible 40-60 ✓), tempo 27/62/11. (b) **UI coupons** (`App.svelte`) — section « Crédit · Banque centrale » (taux BC + flèche de tendance = lit F en filigrane ; coupons détenus avec RCE + risque) ; panneau de trade sur hexe crédit (carnet court/long, taux, échéance, risque ; LONG/SHORT + taille 25/50/100 %). 93 tests + svelte-check 0 erreur.
+   - 🎯 **Sous-système crédit-coupons COMPLET** (moteur + IA + UI). Reste optionnel : early-close des coupons, recovery rate, BC influençable (info-edge/influence), maturités variées par émetteur.
+
+9. **Illiquidité immobilier** (spec immo, créateur 2026-06-13) — l'illiquidité attaque le skill central (sortir avant le krach) : l'immo devient l'asset qu'on **ne peut pas fuir**, son carry devient une vraie prime d'illiquidité.
+   - ✅ **Livré** : flags de données `Hex.longOnly` + `Hex.illiquid` ; **long-only + SANS levier** (option a, décision créateur → pas de contradiction avec l'appel de marge) ; **verrou de sortie** `lockupTurns` (param tiré 2-3, transparent/affiché) ; `Position.entryTurn` arme le verrou, renforcer **re-verrouille** (tranche la + récente fait foi) ; pouvoir d'archétype `ignoreLockup` (sur `Archetype` + `ActorState`) qui contourne. Posé sur IMMO (MVP) et les **alternatifs marché** (générateur, carry 0.03 le justifie ; PEVC carry 0 exclu en MVP). UI : panneau adapté (pas de SHORT/levier, notice illiquidité, compte à rebours du verrou, sortie désactivée). 5 tests `illiquid.test.ts`.
+   - 🔧 **Re-calibré** : l'immo sans-levier a refroidi le système (sans-crise 31 %) → `accLeverage` relevé (0.09-0.18) → tempo **26/65**, duel **54 %** (✓). 98 tests verts.
+   - ⏭️ **Optionnel plus tard** : spirale de marge sur immo leveragé (options b/c), sensibilité de l'immo au taux directeur BC, un archétype « spécialiste immo » porteur d'`ignoreLockup`.
 
 ### C. Backlog design (hors MVP)
 

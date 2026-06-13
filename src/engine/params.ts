@@ -24,10 +24,10 @@ export const PARAM_RANGES = {
   //                    élargie (J7) pour étaler QUAND F entre en zone de tir → étale
   //                    la date de crise (protège le critère §28.7) et nourrit les
   //                    parties sans crise (§28.2).
-  accLeverage: r(0.08, 0.16), // poids du levier (§23.2) — relevé (J7) : le levier doit
-  //                             être LE moteur de fragilité piloté par le joueur ; le
-  //                             haut de plage fait cramer TÔT les tables à fort levier
-  //                             → de la place pour une 2ᵉ crise (pyromane, §28.2).
+  accLeverage: r(0.09, 0.18), // poids du levier (§23.2) — LE moteur de fragilité. C'est un
+  //                             driver GLOBAL : il scale avec le levier AGRÉGÉ (les 2 IA +
+  //                             le joueur), pas seulement le joueur → c'est lui qui cale le
+  //                             taux de crise de la partie par défaut (joueur + IA standard).
   accCrowding: r(0.020, 0.035),
   // Calibrage J7 : l'étirement de valorisation (×100) dominait l'accumulation
   // (~0.10-0.19/tour) et noyait le levier → F pilotée par les IA, pas par le joueur,
@@ -71,15 +71,24 @@ export const PARAM_RANGES = {
   lambdaRecovery: r(0.08, 0.20), // réversion (stochastique) en recovery (§25.6, fix C)
   anchorNoiseFloor: r(0.04, 0.08), // plancher de bruit sur l'estimation de A (§25.2, fix B)
   anchorWalk: r(0.005, 0.015), // amplitude de la marche lente de l'ancre A (§25.2)
-  fluxImpact: r(0.02, 0.06), // sensibilité du prix au flux net d'ordres (§25.4)
+  // Échelle corrigée (J7) : le flux est en termes ABSOLUS (notionnel ~O(100) avec
+  // START_CAPITAL=100), pas O(1). À 0.02-0.06 l'achat normal d'une IA (~140) saturait le
+  // rendement au plafond +50 %/tour → marché auto-pompé, levier god-tier. Ramené pour
+  // qu'un ordre normal bouge le prix de ~1-2 % et qu'une fire-sale (flux ~1000) ~10 %
+  // (l'impact-prix §25.4 garde des dents pour la contagion sans pomper le marché).
+  fluxImpact: r(0.0002, 0.0006), // sensibilité du prix au flux net d'ordres (§25.4)
 
   // ── Drifts et vols par régime (memo §25.3) — μ/σ du facteur marché M ──
   // La plage de tension CHEVAUCHE le bull (anti-leak du melt-up, §25.3).
-  // Drifts abaissés (J7) : le marché passif gagnait +150-260 % sur un cycle (×2,5-3,6),
-  // jeu trivialement haussier. Ramenés pour une amplitude de cycle plus sobre (§28 tempo).
-  driftBull: r(0.006, 0.018),
+  // Drifts quasi nuls (J7, neutralité §28.8) : une dérive haussière garantie faisait du
+  // « long + levier » un distributeur de billets (le fonds leveragé battait le value dans
+  // 99,8 % des parties). Marché ≈ martingale ponctuée de krachs → le levier amplifie un
+  // processus à espérance ~nulle et skew négatif = pari à double tranchant (§29.3), pas un
+  // gain garanti. La fragilité F est indépendante du drift (dépend de V/A, A suit le drift)
+  // → le tempo §28.2 n'en est pas affecté.
+  driftBull: r(0.000, 0.010),
   volBull: r(0.02, 0.04),
-  driftTension: r(0.008, 0.030),
+  driftTension: r(0.003, 0.015),
   volTension: r(0.04, 0.07),
   driftCrisis: r(-0.18, -0.08),
   volCrisis: r(0.08, 0.14),
@@ -89,11 +98,24 @@ export const PARAM_RANGES = {
   // ── Levier (memo §29.3, v1.8) ──
   // Le coût et le seuil de marge sont des règles TRANSPARENTES (exception §27.3) ;
   // ces plages ne sont que leurs points de départ de calibrage.
-  leverageBorrowRate: r(0.01, 0.03), // taux d'emprunt/tour par unité de levier (croît avec la détresse en J2)
-  marginCallThreshold: r(0.25, 0.40), // drawdown mark-to-market d'une position leveragée → liquidation forcée
+  // Relevé (J7, neutralité §28.8) au niveau du carry (~0.025/tour) : sinon le levier
+  // encaisse le carry sur tout le notionnel mais ne paie l'emprunt que sur la part
+  // empruntée à taux plus bas → revenu net sans risque qui compose. À ~carry, le levier
+  // devient CARRY-NEUTRE et ne fait plus qu'amplifier le risque-prix (le but, §29.3).
+  // RE-CALIBRÉ (sortie du crédit du monde V) : retirer les 3 hexes crédit (β bas, carry
+  // régulier) a privé le levier de son terrain défensif → il n'amplifiait plus qu'un
+  // univers actions/alt volatil = pari perdant (duel levier/value tombé à 28 %). Baissé
+  // (coût d'emprunt) + seuil de marge relevé (le levier survit aux creux) → duel re-centré
+  // à ~50 %. α reste FIXE à 0.35 (un α négatif aurait fallu, donc on règle la dynamique).
+  leverageBorrowRate: r(0.015, 0.03), // taux d'emprunt/tour par unité de levier
+  marginCallThreshold: r(0.35, 0.55), // drawdown mark-to-market d'une position leveragée → liquidation forcée
 
   // ── Score (memo §27.4) ──
-  drawdownPenalty: r(0.5, 0.5), // α — point d'équilibre du défaut #4, calibré en J7
+  drawdownPenalty: r(0.35, 0.35), // α — point d'équilibre du défaut #4 (§27.4). FIXE
+  //                                 (score transparent §27.3, pas tiré par instance).
+  //                                 Calibré J7 : centre le duel levier/value (~50 %) une
+  //                                 fois l'amplitude assainie (fluxImpact). Trop haut → le
+  //                                 levier devient désavantagé (mort) ; trop bas → dominant.
   // NOTE J2 : les planchers de bruit des signaux (memo §29.2, σ réductible/irréductible
   // + délais par signal) sont une STRUCTURE par signal — ils seront modélisés en données
   // au J2 (avec leurs planchers tirés en plages), pas comme scalaires plats ici.
@@ -112,6 +134,29 @@ export const PARAM_RANGES = {
   signalNoiseSpread: r(0.06, 0.12), // Écart de crédit : retard 1
   signalNoiseFinance: r(0.04, 0.08), // Financement : retard 2, bruit faible
   bounceDetune: r(0.15, 0.30), // détente des signaux pendant le rebond — le mensonge (§24.2)
+
+  // ── Crédit-coupons & Banque centrale (spec docs/spec-credit-coupons.md, phase 2a) ──
+  // Taux directeur BC = fonction de réaction LISIBLE à l'état caché (b) : monte en
+  // surchauffe (F au-dessus de la zone morte), coupe en crise. Lissé (θ) → anticipable.
+  // Points de départ ; calibrage individuel = phase 2b.
+  bcRateBase: r(0.005, 0.015), // taux directeur de repos
+  bcReactF: r(0.04, 0.08), // φ — sensibilité du taux cible à (F − zone morte)
+  bcReactCrisis: r(0.02, 0.04), // ψ — coupe d'urgence en crise
+  bcSmoothing: r(0.30, 0.50), // θ — vitesse d'ajustement vers la cible (lissage → anticipable)
+  // Coupon = r_BC + spread_qualité (carry de l'émetteur) + spread_F + prime de terme.
+  couponSpreadF: r(0.05, 0.10), // κ — élargissement de crédit par unité de (F − zone morte)
+  couponTermPremium: r(0.004, 0.010), // prime de terme : la maturité longue paie plus que la courte
+  couponRceCourt: r(2, 2), // maturité courte (tours) — fixe assumé (lisibilité de la courbe)
+  couponRceLong: r(5, 5), // maturité longue (tours) — fixe assumé
+  // Défaut : SEULEMENT en crise touchant le crédit. Proba/tour croît avec la qualité
+  // (spread structurel de l'émetteur) et avec F. TOUT-OU-RIEN (perte totale du principal).
+  couponDefaultBase: r(0.05, 0.10), // proba de base/tour en crise crédit (émetteur IG de réf.)
+  couponDefaultFSlope: r(0.6, 1.0), // pente de la proba en (F − zone morte)
+
+  // ── Illiquidité (spec immobilier) ──
+  // Verrou de sortie des hexes `illiquid` (immobilier). TRANSPARENT (affiché au joueur),
+  // mais tiré par instance pour qu'on ne mémorise pas « toujours 3 ». Entier.
+  lockupTurns: r(2, 3), // tours pendant lesquels une position illiquide ne peut être fermée
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
@@ -131,6 +176,9 @@ export function drawInstanceParams(seedOrRng: number | Rng): InstanceParams {
     'cascadeLeg3Turns',
     'horizonTurns',
     'recoveryTurns',
+    'couponRceCourt',
+    'couponRceLong',
+    'lockupTurns',
   ]);
 
   const out = {} as InstanceParams;

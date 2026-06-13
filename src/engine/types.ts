@@ -29,6 +29,15 @@ export interface Hex {
   gamma?: number; // exposition au facteur cluster C
   /** Portage par tour (memo §25.5). */
   carry?: number;
+  /**
+   * Contraintes d'illiquidité (spec immobilier) — données, posées sur l'hexe :
+   *  - `longOnly` : interdit le short (on ne short pas un immeuble).
+   *  - `illiquid` : la sortie de position est bloquée pendant `lockupTurns` (param tiré
+   *    par instance). Couple naturellement avec un carry élevé = prime d'illiquidité.
+   * Un archétype avec `ignoreLockup` échappe au verrou. Pas de levier sur ces hexes.
+   */
+  longOnly?: boolean;
+  illiquid?: boolean;
   /** Adjacence = corrélation (memo §11). Doit être symétrique (testé). */
   neighbors: HexId[];
   /** Coordonnées axiales (q, r) — présentes pour les cartes générées (géométrie =
@@ -54,6 +63,8 @@ export interface Archetype {
   /** Part du capital placée en réserve sèche au départ (0..1). */
   startingReserveRatio: number;
   startingHex: HexId;
+  /** Pouvoir d'archétype : échappe au verrou d'illiquidité (sortie immédiate, spec immo). */
+  ignoreLockup?: boolean;
 }
 
 /**
@@ -73,6 +84,12 @@ export interface AIBehavior {
   sizing: number;
   /** Décote minimale (V sous l'ancre estimée) pour acheter — entrée 'value'. */
   decoteThreshold: number;
+  /**
+   * Reach-for-yield (spec crédit-coupons §8) : propension/tour, en période calme, à
+   * chasser le coupon le plus juteux (HY long). 0 ou absent = ignore le crédit. Sa
+   * contribution à la fragilité ÉMERGE du crowding crédit (portfolio.ts), pas codée en dur.
+   */
+  couponAppetite?: number;
 }
 
 /**

@@ -26,7 +26,7 @@ export const MVP_MAP: GameMap = {
     { id: 'LC_EM', label: 'LC EM', kind: 'marche', cluster: 'actions', beta: 1.3, gamma: 0.9, carry: 0.02, neighbors: ['LC_US', 'IG_EM'] },
 
     // ── Alternatifs ──
-    { id: 'IMMO', label: 'Immobilier', kind: 'marche', cluster: 'alternatifs', beta: 0.8, gamma: 0.6, carry: 0.04, neighbors: ['LC_EU', 'PEVC'] },
+    { id: 'IMMO', label: 'Immobilier', kind: 'marche', cluster: 'alternatifs', beta: 0.8, gamma: 0.6, carry: 0.04, longOnly: true, illiquid: true, neighbors: ['LC_EU', 'PEVC'] },
     { id: 'PEVC', label: 'PE / VC', kind: 'marche', cluster: 'alternatifs', beta: 1.2, gamma: 0.6, carry: 0.0, neighbors: ['LC_US', 'IMMO', 'EXOT'] },
 
     // ── Frontière (verrouillées au départ, memo §11) ──
