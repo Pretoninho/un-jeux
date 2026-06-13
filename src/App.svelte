@@ -104,12 +104,13 @@
   // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
   const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
   // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent — marché V
-  // OU émetteur de crédit (cluster crédit, marché). Le crédit a quitté le monde V (coupons),
-  // mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds derrière (ex. IG_US →
-  // Banque centrale). Sans ça, le crédit est un mur infranchissable.
+  // OU émetteur de crédit, FRONTIÈRE VERROUILLÉE comprise (HY_US). Le crédit a quitté le
+  // monde V (coupons), mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds
+  // derrière (ex. IG_US → Banque centrale). Marcher sur un crédit verrouillé reste permis
+  // (du gameplay : on s'y faufile) même si l'ouverture, elle, reste bloquée par la frontière.
   const canMoveTo = (id: string) => {
     const h = hexById(id);
-    const walkable = !!h && (isInvestable(h) || (h.cluster === 'credit' && h.kind === 'marche'));
+    const walkable = !!h && (isInvestable(h) || isCredit(h));
     return walkable && revealed.has(id) && neighborsOfPlayer().includes(id);
   };
 
