@@ -22,6 +22,7 @@
 > 🧭 **Spawn (décision 2026-06-13)** : clusters gardés contigus (adjacence = corrélation) ; remplacer le spawn aléatoire (proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multi (memo §22, §21, conforme §11). À implémenter avec les archétypes / le setup §31.
 >
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
+> 🧠 **Le « pourquoi » du système : `docs/systeme-pourquoi.md`** (modèle mental du créateur — pourquoi chaque pièce est ainsi + guide « comment lire une partie »).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).
 > 🌐 **Archi multijoueur « plan & TICKs »** documentée (memo §31), non implémentée ; IA déjà visibles (footprint).
 
