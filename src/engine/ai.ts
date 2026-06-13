@@ -39,6 +39,15 @@ function hottestHex(state: GameState): HexId | undefined {
   return best;
 }
 
+/** Coupon offert le plus juteux (taux le plus haut = HY long) — la cible du reach-for-yield. */
+function juiciestCoupon(state: GameState): { issuer: HexId; maturity: 'court' | 'long' } | undefined {
+  let best: { issuer: HexId; maturity: 'court' | 'long'; rate: number } | undefined;
+  for (const c of state.credit.book) {
+    if (!best || c.rate > best.rate) best = { issuer: c.issuer, maturity: c.maturity, rate: c.rate };
+  }
+  return best && { issuer: best.issuer, maturity: best.maturity };
+}
+
 /** Hexe le plus décoté selon l'ESTIMATION bruitée de l'ancre. */
 function mostUndervalued(state: GameState, rng: Rng): { hexId: HexId; decote: number } | undefined {
   let best: { hexId: HexId; decote: number } | undefined;
@@ -63,10 +72,18 @@ export function policyForProfile(profile: ProfilIA): Policy {
       if (b.entrySignal === 'momentum') {
         const risk = perceivedVolatility(state, rng);
         if (risk < b.riskTolerance && actor.cash > 1) {
+          const actions: PlannedAction[] = [];
           const target = hottestHex(state);
           if (target) {
-            return [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: target, equity: actor.cash * b.sizing, leverage: b.leverageAppetite, direction: 'long' }];
+            actions.push({ verb: 'POSITIONNER', op: 'ouvrir', hexId: target, equity: actor.cash * b.sizing, leverage: b.leverageAppetite, direction: 'long' });
           }
+          // Reach-for-yield : en période calme, on chasse le portage du crédit (HY long).
+          // Encaisse le carry, mais c'est exactement ce qui défaut le plus en crise.
+          if (b.couponAppetite && rng.chance(b.couponAppetite)) {
+            const coupon = juiciestCoupon(state);
+            if (coupon) actions.push({ verb: 'POSITIONNER', op: 'ouvrir_coupon', issuer: coupon.issuer, maturity: coupon.maturity, notional: actor.cash * b.sizing, direction: 'long' });
+          }
+          if (actions.length) return actions;
         }
         // Risque perçu trop haut : on réduit LENTEMENT (le « trop tard »).
         if (actor.positions.length > 0 && rng.chance(b.deRiskRate)) {

@@ -16,5 +16,6 @@ export const FONDS_LEVERAGE: ProfilIA = {
     deRiskRate: 0.2, // réduit lentement → se fait prendre en crise
     sizing: 0.35,
     decoteThreshold: 0, // n/a pour le momentum
+    couponAppetite: 0.2, // reach-for-yield : chasse le HY en période calme → crowd crédit → F
   },
 };

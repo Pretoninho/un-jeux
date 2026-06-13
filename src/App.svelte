@@ -10,6 +10,7 @@
   import { policyForProfile } from './engine/ai';
   import { computeSignals } from './engine/signals';
   import { actorWealth, positionValue } from './engine/portfolio';
+  import { openCouponPosition, type CouponMaturity } from './engine/credit';
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
   import type { GameState, SignalReading } from './engine/state';
@@ -23,6 +24,7 @@
   let rng: Rng;
   let ai: Policy[];
   let prevV: Record<string, number> = {};
+  let prevBcRate = 0; // taux directeur du tour précédent (pour la flèche de tendance BC)
 
   let seed = $state(1);
   let selected = $state<string | null>(null);
@@ -95,6 +97,12 @@
     const h = hexById(id);
     return !!h && h.kind === 'noeud' && revealed.has(id) && neighborsOfPlayer().includes(id);
   };
+  // Crédit : émetteur de coupons (hors monde V). Tradable dès qu'il est révélé (proto :
+  // « on appelle le desk obligataire », pas de contrainte d'adjacence ici).
+  const isCredit = (h?: Hex) => !!h && h.cluster === 'credit' && (h.kind === 'marche' || h.kind === 'frontiere');
+  const canTradeCoupon = (id: string) => isCredit(hexById(id)) && revealed.has(id);
+  // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
+  const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -163,6 +171,11 @@
       marketWealth: 100 * (gs.benchmarkHistory.at(-1) ?? 1), // benchmark en valeur (capital départ = 100)
       track: { you: wealth / 100 - 1, market: (gs.benchmarkHistory.at(-1) ?? 1) - 1, drawdown: tr.maxDrawdown },
       over: gs.turn >= gs.params.horizonTurns,
+      // Crédit-coupons : taux directeur (lit F en filigrane), carnet offert, coupons détenus.
+      bcRate: gs.credit.bc.rate,
+      bcDelta: gs.credit.bc.rate - prevBcRate,
+      couponBook: gs.credit.book.map((c) => ({ issuer: c.issuer, maturity: c.maturity, rate: c.rate, rce: c.rce, qualitySpread: c.qualitySpread })),
+      couponPositions: player.couponPositions.map((cp) => ({ issuer: cp.issuer, side: cp.side, rate: cp.rate, notional: cp.notional, rceLeft: cp.rceLeft, qualitySpread: cp.qualitySpread })),
     };
   }
 
@@ -183,6 +196,7 @@
     ai = cfg.adversaires.map(policyForProfile);
     hexes = gs.map.hexes;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
+    prevBcRate = gs.credit.bc.rate;
     // Centres pixel depuis les coordonnées axiales + viewBox englobante.
     const centers: Array<[number, number]> = [];
     positions = {};
@@ -235,6 +249,25 @@
     selected = hexId;
     log = [`${here ? 'Investit' : 'Ouvre'} ${direction === 'short' ? 'SHORT' : 'LONG'} ${h?.label} (${cost} PA)`, ...log].slice(0, 8);
     spend(cost);
+  }
+
+  // Ouvre une position sur un coupon offert (crédit hors-V) : long XOR short, taille
+  // verrouillée. Calqué sur `open` : mute le joueur immédiatement, le cycle de vie
+  // (portage/défaut/échéance) est résolu par runTurn à la fin du tour.
+  function openCoupon(issuer: string, maturity: CouponMaturity, side: 'long' | 'short', frac: number) {
+    if (view?.over || paLeft() < 1) return;
+    const player = gs.actors[0]!;
+    const offered = gs.credit.book.find((c) => c.issuer === issuer && c.maturity === maturity);
+    if (!offered) return;
+    const notional = player.cash * frac;
+    if (notional <= 0) return;
+    const res = openCouponPosition(gs.credit, offered.id, side, notional);
+    if (!res) return;
+    player.cash += res.entryCash; // long −U, short +U
+    player.couponPositions.push(res.position);
+    selected = issuer;
+    log = [`Coupon ${side === 'long' ? 'LONG' : 'SHORT'} ${hexById(issuer)?.label} ${maturity} · ${notional.toFixed(0)} @ ${(offered.rate * 100).toFixed(1)}%/t`, ...log].slice(0, 8);
+    spend(1);
   }
 
   function occupy(hexId: string) {
@@ -308,6 +341,7 @@
   function endTurn() {
     if (!view || view.over) return;
     prevV = Object.fromEntries(Object.entries(gs.market).map(([id, m]) => [id, m.V]));
+    prevBcRate = gs.credit.bc.rate; // capture avant résolution → flèche de tendance BC
     gs.actors[0]!.borrowMultiplier = hasNode('liquidite') ? PB_BORROW_DISCOUNT : 1; // présence PB → emprunt moins cher
     const human: Policy = { id: 'human', decide: () => [{ verb: 'RESERVER' }] };
     runTurn(gs, [human, ...ai], rng);
@@ -365,8 +399,9 @@
                 <polygon points={hexPointsPointy(pos[0], pos[1])} fill={hexFill(h.kind, h.cluster)} class:frontier={h.kind === 'frontiere'} />
                 {#if playerHex === h.id}<circle cx={pos[0]} cy={pos[1] - 17} r="4" class="token" />{/if}
                 {#if view.aiPresence[h.id]}
-                  {#each view.aiPresence[h.id] as col, i}
-                    <circle cx={pos[0] - (view.aiPresence[h.id].length - 1) * 4 + i * 8} cy={pos[1] - 24} r="3" fill={col} stroke="#0e1015" stroke-width="0.5" />
+                  {@const cols = view.aiPresence[h.id] ?? []}
+                  {#each cols as col, i}
+                    <circle cx={pos[0] - (cols.length - 1) * 4 + i * 8} cy={pos[1] - 24} r="3" fill={col} stroke="#0e1015" stroke-width="0.5" />
                   {/each}
                 {/if}
                 <text x={pos[0]} y={pos[1] - 5} class="label">{h.label}</text>
@@ -438,6 +473,31 @@
           </div>
         </section>
 
+        <section class="credit">
+          <h3>Crédit · Banque centrale <span class="hint">taux directeur</span></h3>
+          <div class="bar-row">
+            <span>Taux BC</span>
+            <span><b>{(view.bcRate * 100).toFixed(2)}%</b>
+              {#if view.bcDelta > 0.0005}<span class="down"> ▲ resserre (surchauffe)</span>
+              {:else if view.bcDelta < -0.0005}<span class="up"> ▼ soutien (crise)</span>
+              {:else}<span class="muted"> — stable</span>{/if}
+            </span>
+          </div>
+          <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée.</div>
+          {#if view.couponPositions.length}
+            <div class="court" style="margin-top:.4rem">Coupons détenus :</div>
+            {#each view.couponPositions as cp}
+              <div class="tx-row">
+                <span><span class:long-tag={cp.side === 'long'} class:short-tag={cp.side === 'short'}>{cp.side === 'long' ? 'L' : 'S'}</span>
+                  {hexById(cp.issuer)?.label} · {cp.notional.toFixed(0)} @ {(cp.rate * 100).toFixed(1)}%/t</span>
+                <b>RCE {cp.rceLeft}t · risque {riskLabel(cp.qualitySpread)}</b>
+              </div>
+            {/each}
+          {:else}
+            <div class="muted small">Aucun coupon détenu.</div>
+          {/if}
+        </section>
+
         <section class="actions">
           <h3>Actions <span class="pa">{paLeft()} / {PA_PAR_TOUR} PA</span></h3>
           <div class="chain">Prochaine ouverture : <b>{openCost()} PA</b>{opensThisTurn > 0 ? ' (CHAIN)' : ''}</div>
@@ -446,6 +506,7 @@
             {@const held = view.held.has(selected)}
             {@const here = playerHex === selected}
             {@const canInvest = canOpen(selected) || (here && !!h && isInvestable(h))}
+            {@const credit = isCredit(h)}
             {@const oCost = here ? 1 : openCost()}
             <div class="sel">
               <b>{descOf(h).court}</b>{#if playerHex === selected}<span class="muted small"> · vous êtes ici</span>{/if}
@@ -490,13 +551,41 @@
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
             {/if}
+
+            {#if credit}
+              <div class="court">Émetteur de crédit — <b>coupons</b> (hors marché V).</div>
+              {#if canTradeCoupon(selected)}
+                <div class="dir-row">
+                  <span>Sens</span>
+                  <button class:active={openDir === 'long'} onclick={() => (openDir = 'long')}>LONG · no-défaut</button>
+                  <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT · défaut</button>
+                </div>
+                {#each ['court', 'long'] as const as mat}
+                  {@const c = view.couponBook.find((x) => x.issuer === selected && x.maturity === mat)}
+                  {#if c}
+                    <div class="coupon">
+                      <div class="small"><b>{mat === 'court' ? 'Court' : 'Long'}</b> · <b>{(c.rate * 100).toFixed(1)}%</b>/tour · échéance <b>{c.rce}t</b> · risque de défaut <b>{riskLabel(c.qualitySpread)}</b></div>
+                      <div class="open-row">
+                        <span>Taille</span>
+                        <button onclick={() => openCoupon(selected!, mat, openDir, 0.25)} disabled={paLeft() < 1}>25%</button>
+                        <button onclick={() => openCoupon(selected!, mat, openDir, 0.5)} disabled={paLeft() < 1}>50%</button>
+                        <button onclick={() => openCoupon(selected!, mat, openDir, 1)} disabled={paLeft() < 1}>100%</button>
+                      </div>
+                    </div>
+                  {/if}
+                {/each}
+                <div class="muted small">Long : encaisse le portage, perd le principal si défaut. Short : paie le portage, gagne si défaut. Une fois par coupon, taille verrouillée · 1 PA.</div>
+              {:else}
+                <div class="muted small">Émetteur non révélé — explore pour y accéder.</div>
+              {/if}
+            {/if}
             {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2}>Clôture partielle (−50%) · 2 PA</button>
               <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1}>Fermer (totale) · 1 PA</button>
             {/if}
-            {#if !canInvest && !canOccupy(selected) && !held}
+            {#if !canInvest && !canOccupy(selected) && !held && !credit}
               <div class="muted small">{here ? 'Rien à faire sur cet hexe.' : 'Pas adjacent / non accessible.'}</div>
             {/if}
           {:else}
@@ -600,6 +689,8 @@
   .long { font-size: .76rem; color: #cdd3df; background: #0e1015; border-radius: 5px; padding: .45rem; margin-bottom: .4rem; line-height: 1.35; }
   .open-row { display: grid; grid-template-columns: auto 1fr 1fr 1fr; align-items: center; gap: .3rem; font-size: .78rem; }
   .open-row button { margin: .25rem 0; }
+  .coupon { background: #0e1015; border-radius: 5px; padding: .4rem; margin: .3rem 0; }
+  .coupon .small { margin-bottom: .2rem; }
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
   .locked { font-size: .72rem; color: #c79a4a; }
   .small { font-size: .72rem; } .muted { color: #7a8294; }
