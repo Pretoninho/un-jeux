@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.14 — 13 juin 2026.
+> Document de référence vivant. Version 1.15 — 13 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -312,6 +312,11 @@ Avantages directs :
 - Pas de barrière d'installation — accessible directement au public cible
 
 **Solo-first. Multijoueur (WebSockets) en phase 2.**
+
+> **Portabilité / rendu (note 2026-06-13)** : grâce à la **séparation moteur (TS pur, sans DOM) / UI (couche mince)**, le **rendu** est interchangeable et toutes les options restent ouvertes :
+> - **Rendu web enrichi** (PixiJS / Phaser / Canvas-WebGL) → de plus beaux graphismes 2D **en réutilisant le moteur tel quel** (aucun portage), déploiement web conservé. *Chemin le moins cher pour un meilleur rendu.*
+> - **Moteur graphique type Unity** → possible, mais nécessite de **porter le moteur en C#** (module bien délimité + 60+ tests = portage cadré). Pertinent surtout pour des **builds natifs** (desktop/mobile/console) ou une présentation très riche/3D — ce dont ce jeu (carte + jauges + data-viz) n'a *pas* spécialement besoin.
+> - **Discipline à tenir** : ne **jamais mélanger logique et affichage** ; c'est ce qui garde toutes les portes ouvertes. Choix du rendu **différé** (quand le jeu sera amusant et calibré).
 
 | Impact sur | Implication |
 |---|---|
@@ -699,6 +704,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **Diagnostic calibrage → J7 = prochain chantier (autre session)** : partie testée (seed 3) + rejeu moteur — la mécanique tourne (bulle → krach tour 6 → rebond/bull trap → reset → recovery, 1 crise émergente) MAIS **tempo trop rapide** (F franchit le plafond 0.85 dès le tour ~6) et **amplitudes trop fortes** (marché ×2 en 12 tours, joueur +434 %, drawdown ~0 % → trop facile). J7 : régler poids d'accumulation + purge + drifts/vols vers les cibles §28.2 et un drawdown qui mord. Outils prêts : harness, critère §28.7, mode debug |
 | 2026-06-13 | **Spawn & clusters (DÉCISION / piste)** : **garder les clusters CONTIGUS** — adjacence = corrélation (§11) ; un éparpillement aléatoire viderait la carte de son sens (le voisin serait décorrélé, plus de logique de contagion ni d'arbitrage concentration/dispersion). **Remplacer le spawn ALÉATOIRE** (raccourci de prototype) par un spawn **choisi / par affinité d'archétype** — conforme à §11 (« position de départ déterminée par archétype + badges »). Motif : l'aléatoire pénalise par la chance, surtout en **multijoueur** (l'un naît près d'un PB, l'autre dans un coin). **Multi** : phase de setup avec **draft de zones** ou **spawns symétriques équilibrés**. Chaque archétype = une **affinité de zone** (Sismographe ~ macro/BC · Architecte ~ Notation/exotiques · Vautour souple). Garde-fou : aucun cluster objectivement meilleur (neutralité §26) → le choix est un arbitrage. À implémenter avec la couche archétypes / le setup §31 |
 | 2026-06-13 | **Nouveaux nœuds = hexes à effets spéciaux (PISTE, §11)** : pour provisionner des « hexes à effets », on **étend le système de nœuds** plutôt que d'inventer un type d'hexe « vide » générique — les nœuds ont déjà toute la machinerie (présence / S'installer / durée ~3 tours / bénéfice câblé). Un nouveau `nodeType` = un hexe à effet, ajouté en **donnée** ; bénéfice câblé **un à la fois**. **Approche décidée : d'abord placer des nœuds VIDES (sans bénéfice), réfléchir à la mécanique ensuite.** Menu de candidats (infra réelle → levier mécanique) : **Chambre de compensation** → seuil de marge (§29.3) · **Réseau d'initiés** → débloque le **4ᵉ signal « Initiés »** (coupé au MVP, §17/§23.6) · **Place de marché/Bourse** → impact-prix `flux` (§25.4) · **Desk de recherche/data** → délai des signaux (complète Notation qui réduit le bruit) · **Banque d'investissement** → déblocage des **frontières** (§21) · **Média** → Réputation (§10). Trivial à ajouter (données) ; le travail réel = câbler chaque bénéfice |
+| 2026-06-13 | **Portabilité / rendu (note, §13)** : la séparation moteur (TS pur) / UI (mince) rend le **rendu interchangeable**. Pour de plus beaux graphismes → **rendu web enrichi** (PixiJS/Phaser/WebGL) en réutilisant le moteur tel quel (le moins cher). **Unity** = possible mais nécessite un **portage du moteur en C#** (cadré par les 60+ tests), pertinent surtout pour des **builds natifs**/3D — pas indispensable pour ce jeu (carte + jauges + data-viz). Règle : ne jamais mélanger logique et affichage ; choix du rendu **différé** |
 
 ---
 

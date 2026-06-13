@@ -1,7 +1,9 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.14
+> Dernière mise à jour : 2026-06-13 — v1.15
+>
+> 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
 >
 > 🧩 **Nouveaux nœuds (piste 2026-06-13)** : provisionner des **hexes à effets via le système de nœuds** (réutilise présence/S'installer/durée). **D'abord des nœuds VIDES, mécanique ensuite** (un à la fois). Menu : Chambre de compensation (marge), Réseau d'initiés (4ᵉ signal), Bourse (impact-prix), Desk recherche (délai signaux), Banque d'investissement (frontières), Média (réputation). Détail memo §22/§21.
 >
