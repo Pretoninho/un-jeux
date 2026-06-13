@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.13 — 13 juin 2026.
+> Document de référence vivant. Version 1.14 — 13 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -646,6 +646,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 - [ ] **Spécificités des archétypes à définir** — un à la fois, par-dessus le profil neutre (§30) : ressource, contraintes, mécaniques exclusives, modulation des primitives (dont le short).
 - [~] **Bénéfices des nœuds** : **PB → Financement** ✅, **PB → levier −50 %** ✅, **Notation → signaux plus nets** ✅ (prototype, v1.12) ; reste ⛔ **BC → taux anticipés** (dépend de la banque centrale active).
 - [ ] **Spawn de départ** : remplacer l'**aléatoire** (raccourci proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multijoueur (décision journal 2026-06-13, conforme §11). Clusters gardés contigus.
+- [ ] **Nouveaux nœuds (hexes à effets)** : provisionner d'abord des **nœuds vides** (sans bénéfice), câbler la mécanique ensuite, un à la fois. Menu en journal (2026-06-13) : Chambre de compensation, Réseau d'initiés (4ᵉ signal), Bourse, Desk recherche, Banque d'investissement, Média.
 - [ ] **Déblocage des hexes frontière** (marchés verrouillés) : mécanisme à définir (arbre de compétences §8 ou événement de marché).
 
 ---
@@ -697,6 +698,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **Bénéfices des nœuds câblés + levier joueur + DÉPLACER + debug (prototype)** : **PB → Financement** (flux continu gratuit sur présence) ; **PB → levier −50 %** (`ActorState.borrowMultiplier`, moteur) ; **Notation → signaux plus nets** (`computeSignals(noiseScale)` + plancher irréductible §29.2) ; **BC → taux anticipés** reste ⛔ (chantier « réveiller la BC »). **Présence à durée ~3 tours** (`presenceUntil`) = futur bouton d'archétype. **Levier joueur** 0/2/3× exposé en UI. Primitive **DÉPLACER** (bouger sans investir, 1 PA) + **« Ouvrir ici »** (corrige : on pouvait pas investir sur l'hexe courant). **Mode debug 🐞** (révèle F / régime / phase / ancres A). Réf `docs/mecaniques.md` |
 | 2026-06-12 | **Diagnostic calibrage → J7 = prochain chantier (autre session)** : partie testée (seed 3) + rejeu moteur — la mécanique tourne (bulle → krach tour 6 → rebond/bull trap → reset → recovery, 1 crise émergente) MAIS **tempo trop rapide** (F franchit le plafond 0.85 dès le tour ~6) et **amplitudes trop fortes** (marché ×2 en 12 tours, joueur +434 %, drawdown ~0 % → trop facile). J7 : régler poids d'accumulation + purge + drifts/vols vers les cibles §28.2 et un drawdown qui mord. Outils prêts : harness, critère §28.7, mode debug |
 | 2026-06-13 | **Spawn & clusters (DÉCISION / piste)** : **garder les clusters CONTIGUS** — adjacence = corrélation (§11) ; un éparpillement aléatoire viderait la carte de son sens (le voisin serait décorrélé, plus de logique de contagion ni d'arbitrage concentration/dispersion). **Remplacer le spawn ALÉATOIRE** (raccourci de prototype) par un spawn **choisi / par affinité d'archétype** — conforme à §11 (« position de départ déterminée par archétype + badges »). Motif : l'aléatoire pénalise par la chance, surtout en **multijoueur** (l'un naît près d'un PB, l'autre dans un coin). **Multi** : phase de setup avec **draft de zones** ou **spawns symétriques équilibrés**. Chaque archétype = une **affinité de zone** (Sismographe ~ macro/BC · Architecte ~ Notation/exotiques · Vautour souple). Garde-fou : aucun cluster objectivement meilleur (neutralité §26) → le choix est un arbitrage. À implémenter avec la couche archétypes / le setup §31 |
+| 2026-06-13 | **Nouveaux nœuds = hexes à effets spéciaux (PISTE, §11)** : pour provisionner des « hexes à effets », on **étend le système de nœuds** plutôt que d'inventer un type d'hexe « vide » générique — les nœuds ont déjà toute la machinerie (présence / S'installer / durée ~3 tours / bénéfice câblé). Un nouveau `nodeType` = un hexe à effet, ajouté en **donnée** ; bénéfice câblé **un à la fois**. **Approche décidée : d'abord placer des nœuds VIDES (sans bénéfice), réfléchir à la mécanique ensuite.** Menu de candidats (infra réelle → levier mécanique) : **Chambre de compensation** → seuil de marge (§29.3) · **Réseau d'initiés** → débloque le **4ᵉ signal « Initiés »** (coupé au MVP, §17/§23.6) · **Place de marché/Bourse** → impact-prix `flux` (§25.4) · **Desk de recherche/data** → délai des signaux (complète Notation qui réduit le bruit) · **Banque d'investissement** → déblocage des **frontières** (§21) · **Média** → Réputation (§10). Trivial à ajouter (données) ; le travail réel = câbler chaque bénéfice |
 
 ---
 
