@@ -20,21 +20,45 @@ const r = (min: number, max: number): Range => ({ min, max });
 /** Plages de conception. Référencées à leur section du memo. */
 export const PARAM_RANGES = {
   // ── Jauge de fragilité (memo §23) ──
-  f0: r(0.10, 0.35), // fragilité initiale cachée (§23.1) — < zone morte 0.40
-  accLeverage: r(0.05, 0.07), // poids du levier dans l'accumulation (§23.2)
-  accCrowding: r(0.03, 0.05),
-  accValuation: r(0.008, 0.012),
+  f0: r(0.08, 0.36), // fragilité initiale cachée (§23.1) — < zone morte 0.40 ; plage
+  //                    élargie (J7) pour étaler QUAND F entre en zone de tir → étale
+  //                    la date de crise (protège le critère §28.7) et nourrit les
+  //                    parties sans crise (§28.2).
+  accLeverage: r(0.08, 0.16), // poids du levier (§23.2) — relevé (J7) : le levier doit
+  //                             être LE moteur de fragilité piloté par le joueur ; le
+  //                             haut de plage fait cramer TÔT les tables à fort levier
+  //                             → de la place pour une 2ᵉ crise (pyromane, §28.2).
+  accCrowding: r(0.020, 0.035),
+  // Calibrage J7 : l'étirement de valorisation (×100) dominait l'accumulation
+  // (~0.10-0.19/tour) et noyait le levier → F pilotée par les IA, pas par le joueur,
+  // crise quasi certaine dès le tour 4. Ramené au niveau du levier/crowding pour que
+  // les TROIS termes pèsent comparablement et que le climb net soit lent (§23.2, §28.2).
+  accValuation: r(0.0010, 0.0020),
   purgeDeleverage: r(0.04, 0.06), // (§23.3)
-  purgeMeanReversion: r(0.015, 0.025),
+  // Plage ÉLARGIE (J7) : F est une rampe sans auto-limitation (l'accumulation ne dépend
+  // pas de F), donc la seule source de parties SANS crise est une pente nette faible.
+  // Une purge tirée haut (~0.05) peut égaler l'accumulation → F reste plat en zone basse
+  // → pas de crise. Crée la variance de pente qui nourrit à la fois les ~20-25 % de
+  // parties calmes (§28.2) et l'étalement de la date de crise (§28.7).
+  purgeMeanReversion: r(0.020, 0.058),
   crisisDeadZone: r(0.40, 0.40), // seuil structurel (§23.4) — fixe assumé
   crisisCeiling: r(0.85, 0.85), // plafond déterministe (§23.4) — fixe assumé
-  crisisK: r(1.3, 1.7), // raideur de la proba de crise (§23.4)
-  resetFactor: r(0.12, 0.18), // reset post-crise ∝ amplitude (§23.5)
+  crisisK: r(0.7, 1.1), // raideur de la proba de crise (§23.4) — adouci (J7) : la zone
+  //                       roulette tire plus graduellement → F y séjourne plus long,
+  //                       la date de déclenchement s'étale et plus de parties finissent
+  //                       sans crise (cibles §28.2, critère §28.7).
+  resetFactor: r(0.32, 0.48), // reset post-crise ∝ amplitude (§23.5) — RELEVÉ (J7,
+  //                             décision design) : le reset n'est plus « quasi-total » ;
+  //                             la crise laisse un résidu de combustible notable (F revient
+  //                             vers ~0.25-0.38, juste sous la zone morte 0.40) → rallumage
+  //                             rapide. Assume un affaiblissement de « la crise purge le
+  //                             système » au profit des tables pyromanes (2 crises 10-15 %).
 
   // ── Cascade de crise (memo §24.7) ──
   cascadeLeg1Turns: r(1, 2),
-  cascadeBounceTurns: r(1, 3),
-  cascadeLeg3Turns: r(1, 3),
+  cascadeBounceTurns: r(1, 2), // raccourci (J7) : la cascade entière (3-8 → 3-6 tours)
+  cascadeLeg3Turns: r(1, 2),   // mangeait l'horizon → une 2ᵉ crise était impossible
+  //                              (cible 2 crises ~10-15 %, §28.2). Morphologie §24 intacte.
   bounceRecovery: r(0.25, 0.55), // part de la jambe 1 récupérée au rebond
   realFloorProbability: r(0.25, 0.35), // proba que le rebond soit un vrai plancher
 
@@ -51,9 +75,11 @@ export const PARAM_RANGES = {
 
   // ── Drifts et vols par régime (memo §25.3) — μ/σ du facteur marché M ──
   // La plage de tension CHEVAUCHE le bull (anti-leak du melt-up, §25.3).
-  driftBull: r(0.010, 0.030),
+  // Drifts abaissés (J7) : le marché passif gagnait +150-260 % sur un cycle (×2,5-3,6),
+  // jeu trivialement haussier. Ramenés pour une amplitude de cycle plus sobre (§28 tempo).
+  driftBull: r(0.006, 0.018),
   volBull: r(0.02, 0.04),
-  driftTension: r(0.010, 0.050),
+  driftTension: r(0.008, 0.030),
   volTension: r(0.04, 0.07),
   driftCrisis: r(-0.18, -0.08),
   volCrisis: r(0.08, 0.14),
@@ -73,8 +99,11 @@ export const PARAM_RANGES = {
   // au J2 (avec leurs planchers tirés en plages), pas comme scalaires plats ici.
 
   // ── Tempo (memo §28) ──
-  horizonTurns: r(12, 15), // durée d'un cycle MVP (§28.2, §28.5)
-  recoveryTurns: r(2, 4), // fenêtre de recovery après une cascade (§24)
+  horizonTurns: r(13, 16), // durée d'un cycle MVP (§28.2, §28.5 « ~12-15 ») — haut de
+  //                          plage (J7) : laisse à une table pyromane le temps de
+  //                          rallumer une 2ᵉ crise après la cascade + recovery.
+  recoveryTurns: r(1, 3), // fenêtre de recovery après une cascade (§24) — raccourcie
+  //                         (J7) pour que le ré-armement de F démarre plus tôt.
 
   // ── Signaux observables (memo §23.6, §29.2) ──
   // Bruit total par signal (le plancher irréductible est inclus). Tirés en plages

@@ -9,7 +9,7 @@ import { alwaysReserve } from './policy';
 import { policyForProfile } from './ai';
 import { buildInitialState } from './init';
 import { runTurn } from './turn';
-import { trackRecord, type TrackRecord } from './score';
+import { trackRecord, totalReturn, type TrackRecord } from './score';
 
 export interface SimResult {
   seed: number;
@@ -23,6 +23,8 @@ export interface SimResult {
   /** Track Record par acteur (clé = id d'acteur). actors[0] = le joueur. */
   trackRecords: Record<string, TrackRecord>;
   playerTrackRecord: TrackRecord;
+  /** Rendement total du benchmark = amplitude du marché sur la partie (§28, §28.6). */
+  benchmarkReturn: number;
 }
 
 export interface SimOptions {
@@ -59,6 +61,7 @@ function resultFromState(state: GameState, seed: number): SimResult {
     signalsHistory: [...state.signalsHistory],
     trackRecords,
     playerTrackRecord: trackRecords[state.actors[0]!.id]!,
+    benchmarkReturn: totalReturn(state.benchmarkHistory),
   };
 }
 
