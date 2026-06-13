@@ -103,6 +103,15 @@
   const canTradeCoupon = (id: string) => isCredit(hexById(id)) && revealed.has(id);
   // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
   const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
+  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent — marché V
+  // OU émetteur de crédit (cluster crédit, marché). Le crédit a quitté le monde V (coupons),
+  // mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds derrière (ex. IG_US →
+  // Banque centrale). Sans ça, le crédit est un mur infranchissable.
+  const canMoveTo = (id: string) => {
+    const h = hexById(id);
+    const walkable = !!h && (isInvestable(h) || (h.cluster === 'credit' && h.kind === 'marche'));
+    return walkable && revealed.has(id) && neighborsOfPlayer().includes(id);
+  };
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -169,6 +178,7 @@
       lockupTurns: gs.params.lockupTurns,
       aiPresence,
       pbActive: hasNode('liquidite'), // débloque le Financement + levier moins cher (memo §11)
+      bcActive: hasNode('reglementaire'), // présence Banque centrale → cible de taux anticipée (memo §11)
       infoActive,
       // État caché révélé en mode debug uniquement.
       fReal: gs.fragility,
@@ -182,6 +192,7 @@
       // Crédit-coupons : taux directeur (lit F en filigrane), carnet offert, coupons détenus.
       bcRate: gs.credit.bc.rate,
       bcDelta: gs.credit.bc.rate - prevBcRate,
+      bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
       couponBook: gs.credit.book.map((c) => ({ issuer: c.issuer, maturity: c.maturity, rate: c.rate, rce: c.rce, qualitySpread: c.qualitySpread })),
       couponPositions: player.couponPositions.map((cp) => ({ issuer: cp.issuer, side: cp.side, rate: cp.rate, notional: cp.notional, rceLeft: cp.rceLeft, qualitySpread: cp.qualitySpread })),
     };
@@ -293,9 +304,10 @@
     spend(cost);
   }
 
-  // DÉPLACER : se déplacer sur un hexe marché adjacent SANS investir (1 PA, primitive).
+  // DÉPLACER : se déplacer sur un hexe traversable adjacent (marché V ou crédit) SANS
+  // investir (1 PA, primitive). Traverser le crédit = atteindre les nœuds derrière.
   function deplacer(hexId: string) {
-    if (view?.over || !canOpen(hexId) || paLeft() < 1) return;
+    if (view?.over || !canMoveTo(hexId) || paLeft() < 1) return;
     playerHex = hexId;
     reveal(hexId);
     selected = hexId;
@@ -416,7 +428,7 @@
               class:selected={selected === h.id}
               class:owned={view.held.has(h.id)}
               class:here={playerHex === h.id}
-              class:openable={canOpen(h.id) || canOccupy(h.id)}
+              class:openable={canMoveTo(h.id) || canOccupy(h.id)}
               class:presence={isPresent(h.id)}
               role="button"
               tabindex="0"
@@ -514,7 +526,19 @@
               {:else}<span class="muted"> — stable</span>{/if}
             </span>
           </div>
-          <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée.</div>
+          {#if view.bcActive}
+            <div class="bar-row">
+              <span>Cible BC ✨</span>
+              <span><b>{(view.bcTarget * 100).toFixed(2)}%</b>
+                {#if view.bcTarget - view.bcRate > 0.0005}<span class="down"> ▲ va resserrer</span>
+                {:else if view.bcTarget - view.bcRate < -0.0005}<span class="up"> ▼ va soutenir</span>
+                {:else}<span class="muted"> — au repos</span>{/if}
+              </span>
+            </div>
+            <div class="muted small">✨ Présence Banque centrale : cible de taux <b>anticipée</b> — où la BC pilote le taux avant qu'il n'y arrive.</div>
+          {:else}
+            <div class="muted small">Monte en surchauffe, coupe en crise — son ton trahit la fragilité cachée.</div>
+          {/if}
           {#if view.couponPositions.length}
             <div class="court" style="margin-top:.4rem">Coupons détenus :</div>
             {#each view.couponPositions as cp}
@@ -588,7 +612,6 @@
                 <button onclick={() => open(selected!, 0.5, openDir)} disabled={paLeft() < oCost}>50%</button>
                 <button onclick={() => open(selected!, 1, openDir)} disabled={paLeft() < oCost}>100%</button>
               </div>
-              {#if canOpen(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA</button>{/if}
             {/if}
             {#if canOccupy(selected)}
               <button onclick={() => occupy(selected!)} disabled={paLeft() < openCost()}>S'installer (présence) · {openCost()} PA</button>
@@ -621,7 +644,8 @@
                 <div class="muted small">Émetteur non révélé — explore pour y accéder.</div>
               {/if}
             {/if}
-            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}</div>{/if}
+            {#if canMoveTo(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA{#if credit} · traverser le crédit{/if}</button>{/if}
+            {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}{#if hexById(selected)?.nodeType === 'reglementaire'} · <b>cible de taux BC anticipée</b>{/if}</div>{/if}
             {#if held}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA{#if illiquid} · re-verrouille{/if}</button>
               <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2 || locked > 0}>Clôture partielle (−50%) · 2 PA</button>
