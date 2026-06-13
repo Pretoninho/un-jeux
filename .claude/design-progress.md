@@ -1,7 +1,9 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-12 — v1.12
+> Dernière mise à jour : 2026-06-13 — v1.13
+>
+> 🧭 **Spawn (décision 2026-06-13)** : clusters gardés contigus (adjacence = corrélation) ; remplacer le spawn aléatoire (proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multi (memo §22, §21, conforme §11). À implémenter avec les archétypes / le setup §31.
 >
 > 📄 **Référence des mécaniques jouables : `docs/mecaniques.md`** (état réel du prototype).
 > 🎓 **Tuto réservé pour plus tard** — approche hybride pressentie (memo §22, agenda en 6 points).

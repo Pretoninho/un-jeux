@@ -1,6 +1,6 @@
 # Mémoire de Game Design — Jeu 4X Investissement
 
-> Document de référence vivant. Version 1.12 — 12 juin 2026.
+> Document de référence vivant. Version 1.13 — 13 juin 2026.
 > Synthèse des sessions de brainstorming. À amender au fil des décisions.
 
 ---
@@ -644,7 +644,8 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 - [x] ~~**Short au MVP ?**~~ — **TRANCHÉ (§30)** : le short devient une **primitive du profil neutre** ; les archétypes la modulent (Sismographe excelle, Vautour dissuadé par sa ressource). Implémenté (`Position.direction`).
 - [~] **Carte — écart 13/16** : sans objet pour le prototype d'exploration, qui utilise une **carte hexagonale générée** (géométrie = adjacence, §30). La carte fixe `MVP_MAP` (13 hexes) reste pour les tests. À retrancher si on revient à une carte fixe pour le MVP.
 - [ ] **Spécificités des archétypes à définir** — un à la fois, par-dessus le profil neutre (§30) : ressource, contraintes, mécaniques exclusives, modulation des primitives (dont le short).
-- [ ] **Bénéfices des nœuds à câbler** dans le moteur : taux anticipés (BC) / signaux plus nets (Notation) / levier moins cher + signal Financement (Prime broker). La présence est posée en UI (action « S'installer »), l'effet reste à brancher.
+- [~] **Bénéfices des nœuds** : **PB → Financement** ✅, **PB → levier −50 %** ✅, **Notation → signaux plus nets** ✅ (prototype, v1.12) ; reste ⛔ **BC → taux anticipés** (dépend de la banque centrale active).
+- [ ] **Spawn de départ** : remplacer l'**aléatoire** (raccourci proto) par un spawn **choisi / par affinité d'archétype** + **draft de zones** en multijoueur (décision journal 2026-06-13, conforme §11). Clusters gardés contigus.
 - [ ] **Déblocage des hexes frontière** (marchés verrouillés) : mécanisme à définir (arbre de compétences §8 ou événement de marché).
 
 ---
@@ -695,6 +696,7 @@ Après une crise, l'historique réel de la jauge est révélé, superposé aux s
 | 2026-06-12 | **Doc mécaniques + tuto réservé** : création de `docs/mecaniques.md` (inventaire de ce qui tourne réellement dans le prototype A→H + section « pas encore branché ») comme référence vivante. **Tutoriel réservé pour plus tard** : approche pressentie = hybride (court premier-contact guidé + jeu libre sur seed curé + post-mortem comme professeur), s'appuyant sur §12 (onboarding contextuel) et §17 (apprentissage par observation). À reprendre via l'agenda en 6 points (approche / curriculum / seed / ton / contenu / implémentation) |
 | 2026-06-12 | **Bénéfices des nœuds câblés + levier joueur + DÉPLACER + debug (prototype)** : **PB → Financement** (flux continu gratuit sur présence) ; **PB → levier −50 %** (`ActorState.borrowMultiplier`, moteur) ; **Notation → signaux plus nets** (`computeSignals(noiseScale)` + plancher irréductible §29.2) ; **BC → taux anticipés** reste ⛔ (chantier « réveiller la BC »). **Présence à durée ~3 tours** (`presenceUntil`) = futur bouton d'archétype. **Levier joueur** 0/2/3× exposé en UI. Primitive **DÉPLACER** (bouger sans investir, 1 PA) + **« Ouvrir ici »** (corrige : on pouvait pas investir sur l'hexe courant). **Mode debug 🐞** (révèle F / régime / phase / ancres A). Réf `docs/mecaniques.md` |
 | 2026-06-12 | **Diagnostic calibrage → J7 = prochain chantier (autre session)** : partie testée (seed 3) + rejeu moteur — la mécanique tourne (bulle → krach tour 6 → rebond/bull trap → reset → recovery, 1 crise émergente) MAIS **tempo trop rapide** (F franchit le plafond 0.85 dès le tour ~6) et **amplitudes trop fortes** (marché ×2 en 12 tours, joueur +434 %, drawdown ~0 % → trop facile). J7 : régler poids d'accumulation + purge + drifts/vols vers les cibles §28.2 et un drawdown qui mord. Outils prêts : harness, critère §28.7, mode debug |
+| 2026-06-13 | **Spawn & clusters (DÉCISION / piste)** : **garder les clusters CONTIGUS** — adjacence = corrélation (§11) ; un éparpillement aléatoire viderait la carte de son sens (le voisin serait décorrélé, plus de logique de contagion ni d'arbitrage concentration/dispersion). **Remplacer le spawn ALÉATOIRE** (raccourci de prototype) par un spawn **choisi / par affinité d'archétype** — conforme à §11 (« position de départ déterminée par archétype + badges »). Motif : l'aléatoire pénalise par la chance, surtout en **multijoueur** (l'un naît près d'un PB, l'autre dans un coin). **Multi** : phase de setup avec **draft de zones** ou **spawns symétriques équilibrés**. Chaque archétype = une **affinité de zone** (Sismographe ~ macro/BC · Architecte ~ Notation/exotiques · Vautour souple). Garde-fou : aucun cluster objectivement meilleur (neutralité §26) → le choix est un arbitrage. À implémenter avec la couche archétypes / le setup §31 |
 
 ---
 
