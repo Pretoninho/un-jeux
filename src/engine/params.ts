@@ -121,11 +121,14 @@ export const PARAM_RANGES = {
   // au J2 (avec leurs planchers tirés en plages), pas comme scalaires plats ici.
 
   // ── Tempo (memo §28) ──
-  horizonTurns: r(13, 16), // durée d'un cycle MVP (§28.2, §28.5 « ~12-15 ») — haut de
-  //                          plage (J7) : laisse à une table pyromane le temps de
-  //                          rallumer une 2ᵉ crise après la cascade + recovery.
-  recoveryTurns: r(1, 3), // fenêtre de recovery après une cascade (§24) — raccourcie
-  //                         (J7) pour que le ré-armement de F démarre plus tôt.
+  // PATH B (décision : campagne multi-cycles). Horizon allongé : la partie n'est plus UN
+  // cycle (~13-16t, §28.5) mais une SUITE de booms-busts. Conséquence ASSUMÉE et mesurée
+  // (scripts/horizon.ts) : ~1.2-1.7 crise/partie, la branche « sans crise » se raréfie
+  // (~8-11 %), le skill devient la navigation de cycles répétés. Bandes §28.2 re-ciblées
+  // en conséquence (calibration.test.ts). La neutralité §28.8 tient à tout horizon (mesuré).
+  horizonTurns: r(28, 40), // durée d'une CAMPAGNE multi-cycles (PATH B) — large = peu apprenable
+  recoveryTurns: r(1, 3), // fenêtre de recovery après une cascade (§24) — courte → F se ré-arme
+  //                         vite, ce qui nourrit les cycles suivants de la campagne.
 
   // ── Signaux observables (memo §23.6, §29.2) ──
   // Bruit total par signal (le plancher irréductible est inclus). Tirés en plages
