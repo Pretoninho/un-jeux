@@ -19,6 +19,10 @@
   import { PA_PAR_TOUR } from './data/actions';
   import { presetExplore } from './data/config-explore';
   import { hexFill, axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
+  import {
+    isInvestable, isCredit, openCost as chainCost, canOpenAt, canOccupyAt, canMoveToAt,
+    canTradeCouponAt, couponBuyMoves, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
+  } from './lib/interaction';
 
   let gs: GameState;
   let rng: Rng;
@@ -62,10 +66,9 @@
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
   let viewBox = $state('0 0 100 100');
 
-  // Le crédit a quitté le monde V (coupons, spec crédit-coupons) → non V-investissable.
-  // L'UI coupons dédiée arrive en incrément B ; ici on évite surtout d'ouvrir une
-  // position-V fantôme sur un hexe sans prix (sinon `gs.market[id]` est undefined).
-  const isInvestable = (h: Hex) => h.kind === 'marche' && h.cluster !== 'credit';
+  // isInvestable / isCredit / canOpenAt / canMoveToAt / openCost… : règles d'interaction PURES
+  // importées de ./lib/interaction (testées hors DOM). Les closures ci-dessous ne font que leur
+  // passer l'état réactif (revealed, position du joueur).
 
   // Descriptions génériques (carte générée → pas d'entrée dans le lexique fixe).
   const CLUSTER_DESC: Record<string, [string, string]> = {
@@ -85,34 +88,19 @@
     return { court: c[0] + (h.kind === 'frontiere' ? ' — frontière (verrouillé)' : ''), long: c[1] };
   }
   const paLeft = () => PA_PAR_TOUR - paUsed - read.size;
-  const openCost = () => (opensThisTurn === 0 ? 1 : 2); // 1ʳᵉ ouverture = 1 PA, CHAIN = 2 PA
+  const openCost = () => chainCost(opensThisTurn);
   const hexById = (id: string) => hexes.find((h) => h.id === id);
   const neighborsOfPlayer = () => hexById(playerHex)?.neighbors ?? [];
-  const canOpen = (id: string) => {
-    const h = hexById(id);
-    return !!h && isInvestable(h) && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
+  const canOpen = (id: string) => canOpenAt(hexById(id), revealed, neighborsOfPlayer());
   // S'installer : se déplacer sur un nœud adjacent (présence, sans investir).
-  const canOccupy = (id: string) => {
-    const h = hexById(id);
-    return !!h && h.kind === 'noeud' && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
-  // Crédit : émetteur de coupons (hors monde V). Tradable dès qu'il est révélé (proto :
-  // « on appelle le desk obligataire », pas de contrainte d'adjacence ici).
-  const isCredit = (h?: Hex) => !!h && h.cluster === 'credit' && (h.kind === 'marche' || h.kind === 'frontiere');
-  const canTradeCoupon = (id: string) => isCredit(hexById(id)) && revealed.has(id);
+  const canOccupy = (id: string) => canOccupyAt(hexById(id), revealed, neighborsOfPlayer());
+  // Crédit tradable dès qu'il est révélé (proto : « on appelle le desk obligataire »).
+  const canTradeCoupon = (id: string) => canTradeCouponAt(hexById(id), revealed);
   // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
   const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
-  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent — marché V
-  // OU émetteur de crédit, FRONTIÈRE VERROUILLÉE comprise (HY_US). Le crédit a quitté le
-  // monde V (coupons), mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds
-  // derrière (ex. IG_US → Banque centrale). Marcher sur un crédit verrouillé reste permis
-  // (du gameplay : on s'y faufile) même si l'ouverture, elle, reste bloquée par la frontière.
-  const canMoveTo = (id: string) => {
-    const h = hexById(id);
-    const walkable = !!h && (isInvestable(h) || isCredit(h));
-    return walkable && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
+  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent (marché V ou crédit,
+  // frontière verrouillée comprise) — on traverse le crédit pour atteindre les nœuds derrière.
+  const canMoveTo = (id: string) => canMoveToAt(hexById(id), revealed, neighborsOfPlayer());
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -201,14 +189,14 @@
       skillFactor: player.carrySkill?.factor ?? 0,
       skillDuration: player.carrySkill?.duration ?? 0,
       skillPaCost: player.carrySkill?.paCost ?? 0,
-      skillReadyIn: player.carrySkill ? Math.max(0, (player.carrySkillReadyAt ?? 0) - (gs.turn + 1)) : 0,
-      skillActiveLeft: player.carrySkill ? Math.max(0, (player.carryBoostUntil ?? -1) - gs.turn) : 0,
+      skillReadyIn: player.carrySkill ? readyInFromDisplay(gs.turn, player.carrySkillReadyAt ?? 0) : 0,
+      skillActiveLeft: player.carrySkill ? activeLeftFromDisplay(gs.turn, player.carryBoostUntil ?? -1) : 0,
       // Compétence « Couverture » (Vautour) : armer (auto-tir) → anti-défaut des coupons N tours.
       hasCoverSkill: !!player.coverSkill,
       coverWindow: player.coverSkill?.window ?? 0,
       coverPaCost: player.coverSkill?.paCost ?? 0,
-      coverReadyIn: player.coverSkill ? Math.max(0, (player.coverReadyAt ?? 0) - (gs.turn + 1)) : 0,
-      coverArmedLeft: player.coverSkill ? Math.max(0, (player.coverArmedUntil ?? -1) - gs.turn) : 0,
+      coverReadyIn: player.coverSkill ? readyInFromDisplay(gs.turn, player.coverReadyAt ?? 0) : 0,
+      coverArmedLeft: player.coverSkill ? activeLeftFromDisplay(gs.turn, player.coverArmedUntil ?? -1) : 0,
       bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
       // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
       bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
@@ -308,7 +296,7 @@
     player.couponPositions.push(res.position);
     // Investir sur un crédit = aller sur la case : on s'y déplace si on y est adjacent (le crédit
     // est traversable). Émetteur lointain (desk à distance) = trade en place, sans téléportation.
-    if (issuer !== playerHex && neighborsOfPlayer().includes(issuer)) {
+    if (couponBuyMoves(issuer, playerHex, neighborsOfPlayer())) {
       playerHex = issuer;
       reveal(issuer); // révèle les nouveaux voisins
     }
@@ -395,8 +383,9 @@
     if (!sk || view?.over || paLeft() < sk.paCost) return;
     const nextTurn = gs.turn + 1;
     if (nextTurn < (player.carrySkillReadyAt ?? 0)) return; // encore en cooldown
-    player.carryBoostUntil = nextTurn + sk.duration - 1; // boosté pendant `duration` résolutions
-    player.carrySkillReadyAt = nextTurn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    const w = activateWindow(nextTurn, sk.duration, sk.cooldown);
+    player.carryBoostUntil = w.activeUntil; // boosté pendant `duration` résolutions
+    player.carrySkillReadyAt = w.readyAt; // réutilisable après le cooldown
     log = [`🦅 Récolte activée — carry ×${sk.factor} pendant ${sk.duration} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
     spend(sk.paCost);
   }
@@ -408,8 +397,9 @@
     if (!sk || view?.over || paLeft() < sk.paCost) return;
     const nextTurn = gs.turn + 1;
     if (nextTurn < (player.coverReadyAt ?? 0)) return; // encore en cooldown
-    player.coverArmedUntil = nextTurn + sk.window - 1; // protégé pendant `window` résolutions
-    player.coverReadyAt = nextTurn + sk.window + sk.cooldown; // ré-armable après le cooldown
+    const w = activateWindow(nextTurn, sk.window, sk.cooldown);
+    player.coverArmedUntil = w.activeUntil; // protégé pendant `window` résolutions
+    player.coverReadyAt = w.readyAt; // ré-armable après le cooldown
     log = [`🛡️ Couverture armée — coupons protégés du défaut ${sk.window} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
     spend(sk.paCost);
   }
