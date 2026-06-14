@@ -1,7 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.22
+> Dernière mise à jour : 2026-06-14 — v1.23
+>
+> ✅ **VAUTOUR COMPLET — fiche §6 bouclée (2026-06-14)** : victoire (Score) + 2 compétences (Récolte/
+> Couverture) + **ressource** + **contrainte**. **Contrainte** `noLeverage` (capital patient, levier→0,
+> moteur+UI). **Ressource** « Réserve sèche » (`dryPowder`) : +1/tour patient (plafond 8) ; déployer en
+> haute fragilité (F>0.55) DÉCOTE l'entrée (≤10 %) puis consomme — « déploiement décoté dans le krach ».
+> Mesuré (`scripts/vautour-resource.ts`) : ligne contrarian FAIBLE (top1 ~16 % à 10 % décote) → ressource
+> sans risque ; noLeverage protège même le déployeur (leviérer un krach = suicide), mord sur le bull ;
+> inerte pour Vautour-coupons (42 %) et réserve (9 %). Sondes de physique (calibration/calibrate) passent
+> par l'archétype **NEUTRE** (sinon le pyromane steadyLong(4) ne peut pas leviérer). 120 tests, §28.8 OK.
 >
 > 🧪 **UI : 2 fixes crédit + logique extraite/testée (2026-06-14)** : (1) acheter un crédit DÉPLACE le
 > joueur sur la case si adjacent (cohérence ; le crédit est traversable) ; (2) l'achat de crédit COMPTE
