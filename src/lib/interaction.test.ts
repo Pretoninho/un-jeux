@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { Hex, HexKind, Cluster } from '../engine/types';
 import {
   isInvestable, isCredit, isWalkable, openCost, canOpenAt, canOccupyAt, canMoveToAt,
-  canTradeCouponAt, couponBuyMoves, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
+  canTradeCouponAt, couponBuyMoves, canActOnPositionAt, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
 } from './interaction';
 
 const hex = (id: string, kind: HexKind, cluster?: Cluster): Hex => ({ id, label: id, kind, cluster, neighbors: [] });
@@ -72,6 +72,33 @@ describe('accessibilité (adjacent + révélé)', () => {
     expect(canTradeCouponAt(HY, revealed)).toBe(true);
     expect(canTradeCouponAt(ACT, revealed)).toBe(false); // pas un émetteur crédit
     expect(canTradeCouponAt(IG, new Set())).toBe(false); // non révélé
+  });
+});
+
+describe('périmètre de clôture (verrou §9bis)', () => {
+  // Carte : le joueur est en LC (cluster actions). EQ2 = même cluster (lointain), CR1 = cluster crédit (lointain).
+  const clusterOf = (id: string) =>
+    ({ LC: 'actions', EQ2: 'actions', CR1: 'credit', NODE: undefined } as Record<string, string | undefined>)[id];
+  const neighbors = ['IG', 'FED']; // adjacents au joueur (LC)
+
+  it('peut clôturer SUR l’hexe courant', () => {
+    expect(canActOnPositionAt('LC', 'LC', neighbors, clusterOf)).toBe(true);
+  });
+  it('peut clôturer une position ADJACENTE', () => {
+    expect(canActOnPositionAt('IG', 'LC', neighbors, clusterOf)).toBe(true);
+  });
+  it('peut clôturer dans le MÊME CLUSTER même non adjacent', () => {
+    expect(canActOnPositionAt('EQ2', 'LC', neighbors, clusterOf)).toBe(true); // actions = actions
+  });
+  it('NE peut PAS clôturer un autre cluster, non adjacent (hors périmètre)', () => {
+    expect(canActOnPositionAt('CR1', 'LC', neighbors, clusterOf)).toBe(false); // credit ≠ actions, lointain
+  });
+  it('cluster indéfini des deux côtés ne crée pas de portée (nœud sans cluster)', () => {
+    expect(canActOnPositionAt('NODE', 'NODE', neighbors, clusterOf)).toBe(true); // même hexe l’emporte
+    expect(canActOnPositionAt('NODE', 'CR1', neighbors, clusterOf)).toBe(false); // undefined ≠ match
+  });
+  it('la compétence ignorePerimeter fait SAUTER le verrou (clôture n’importe où)', () => {
+    expect(canActOnPositionAt('CR1', 'LC', neighbors, clusterOf, true)).toBe(true);
   });
 });
 

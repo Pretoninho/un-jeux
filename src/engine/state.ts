@@ -63,6 +63,8 @@ export interface ActorState {
   borrowMultiplier?: number;
   /** Pouvoir d'archétype : échappe au verrou d'illiquidité (spec immobilier). */
   ignoreLockup?: boolean;
+  /** Pouvoir d'archétype : fait sauter le verrou de PÉRIMÈTRE de clôture (copié à l'init, §9bis). */
+  ignoreClosePerimeter?: boolean;
   /** Compétence « Récolte » (Vautour) : copiée de l'archétype à l'init. */
   carrySkill?: { factor: number; duration: number; cooldown: number; paCost: number };
   /** Boost de carry actif tant que `state.turn <= carryBoostUntil`. */

@@ -1,7 +1,41 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.25
+> Dernière mise à jour : 2026-06-14 — v1.26
+>
+> 🔒 **CLÔTURE — verrou de périmètre (2026-06-14, §9bis)** : FERMER (1 PA) + clôture partielle exigent d'être
+> SUR l'hexe / ADJACENT / MÊME CLUSTER pour agir (sinon 🔒 hors de portée). Asymétrie voulue vs ouverture
+> (adjacence stricte). Hook de compétence : trait `ignoreClosePerimeter` (Archetype→Actor, mirroir `ignoreLockup`)
+> **fait sauter le verrou** — latent (aucun archétype ne l'a encore). Couche UI (`interaction.ts canActOnPositionAt`
+> pur+testé, `App.svelte`). 127 tests (+6), moteur INCHANGÉ. À muer ENSUITE en compétence active (PA+fenêtre+cd).
+>
+> 🎮 **FOCUS COURANT = JEU DE BASE (2026-06-14, soir)** : on **reprend le développement du jeu de base** (cadre
+> finance, ce memo). L'esthétique reste **parquée** (DA = chantier séparé) ; le moteur de rendu est tranché (SVG).
+> Toute l'énergie va sur les **mécaniques du jeu de base**.
+>
+> ⭐ **ÉTOILE POLAIRE — SIMPLICITÉ / PEAU LUDIQUE (2026-06-14, détail `docs/refonte-chaises-demineur.md` en tête)** :
+> diagnostic franc du concepteur — **le moteur est 100 % validé**, mais **« la peau » est trop complexe** et **le fun
+> ne se sent pas**. Cause : le jeu de base est bâti sur la **prise de décision en info cachée/latente** (façon quant),
+> ce qui **mure** les deux ingrédients du fun (conséquence lisible + lire les autres). **Décision de direction** :
+> *se découpler de la réalité (c'est un jeu)*. **Règle d'or** : *tout ce qui est caché devient VISIBLE ou SUPPRIMÉ ;
+> une règle valide est un SI→ALORS énonçable à voix haute*. Le moteur (machine à états déterministe) est gardé ; on
+> remplace la peau **réaliste/incertaine** par une peau **visible/déterministe/logique** (`F`→charge visible ; signaux
+> bruités/ancre `A`/régimes/mensonge du rebond → supprimés ; crowding→danger = règle énonçable ; contagion = chaîne
+> visible). **Convergence** : « jeu de base » et piste « chaises × démineur » visent désormais la **même** réponse.
+> Skill central candidat = **B « ne pas être le dernier debout »** (crowding = seule grandeur honnêtement observable) ;
+> A (anticiper `F`) et C (poudre sèche) deviennent des **lentilles d'archétype**. À reprendre après la nuit du concepteur.
+>
+> ⏸️ **PISTE PARKÉE — « Chaises musicales × Démineur » (`docs/refonte-chaises-demineur.md`)** : exploration d'un
+> **virage de thème** (abandon du registre finance) → chaise musicale + démineur + économie d'information (pièces =
+> enquête, PV = survie). Le concepteur **réfléchit une nuit**. Acquis notés dans le doc (mine = faille×charge, enquête
+> réflexive, détonation forçable = fire-sale→marge). **Décision en suspens** : effacer le `bounce` + détonation chaque
+> tour avec `F` = sévérité croissante (a) vs déclencheur occasionnel (b). À reprendre si/quand le concepteur revient dessus.
+>
+> 👥 **MULTIJOUEUR = BOARD PARTAGÉ (confirmé explicitement 2026-06-14, §10/§31)** : un **seul plateau commun**,
+> une **seule fragilité `F` commune** + sentiment partagé (états systémiques que tous influencent ET subissent,
+> §10) ; **paris privés** révélés par bribes (plan & TICKs §31 : déplacements visibles, investissements cachés).
+> PAS de boards individuels — c'est *parce que* le plateau est commun que le jeu de fragilité fonctionne à
+> plusieurs. Statut : tranché solo-first / multi phase 2 ; §31 reste une proposition non implémentée.
 >
 > 🎯 **SISMOGRAPHE rendu ACTIF — « Le Grand Pari » (2026-06-14)** : il était trop passif (jauge + thêta
 > = info/coût subis, aucun geste). Mesuré : **levier + jauge = GAME-BREAKING** (top1 88-99 %, robuste au
@@ -113,7 +147,16 @@
 > rétabli à **~50 %** via `leverageBorrowRate`↓ (0.015-0.03) + `marginCallThreshold`↑
 > (0.35-0.55) ; tempo **26/62/12**. Chiffres ci-dessus (28/59/13, duel 46 %) = état pré-crédit.
 >
-> 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
+> 🖼️ **MOTEUR DE RENDU — TRANCHÉ : SVG (2026-06-14, memo §13)** : décision prise (plus différée). Le jeu
+> rend ~13-16 hexes statiques + jauges + barres + data-viz + texte : profil **tour par tour, UI-lourd**, PAS
+> d'action temps réel ni de milliers d'entités → un moteur « jeu » serait un contre-emploi. **Choix : garder
+> SVG** (actuel, `App.svelte` : `<polygon>`/`<circle>` liés à la réactivité Svelte, 0 boucle de rendu). Le
+> « juice » passe par **CSS + transitions/motion Svelte** (remplissage de jauge, pulsation rouge de F, glow
+> d'hexe, fondus de révélation) — suffisant et gratuit en archi. **Escape hatch** : le SEUL gain réel de
+> PixiJS/Phaser ici = les **particules de krach** → si un jour ce moment les mérite, **overlay PixiJS sur ce
+> seul effet**, jamais un framework qui avale l'UI (une couche, pas une migration). **Unity** = réservé à un
+> éventuel virage build natif (portage C# cadré par les 60+ tests). Discipline maintenue : logique/affichage
+> jamais mélangés. **Direction artistique (palette/icônes/mood)** reste indépendante du moteur → chantier à part.
 >
 > 🧩 **Nouveaux nœuds (piste 2026-06-13)** : provisionner des **hexes à effets via le système de nœuds** (réutilise présence/S'installer/durée). **D'abord des nœuds VIDES, mécanique ensuite** (un à la fois). Menu : Chambre de compensation (marge), Réseau d'initiés (4ᵉ signal), Bourse (impact-prix), Desk recherche (délai signaux), Banque d'investissement (frontières), Média (réputation). Détail memo §22/§21.
 >
@@ -162,6 +205,7 @@
 | **Restructuration profils : primitives d'abord (profil NEUTRE = bac à sable), archétypes = spécificités par-dessus (un à la fois). Short = primitive, modulée par archétype** | §30 | v1.10 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
+| **Moteur de rendu = SVG (juice par CSS/transitions Svelte ; Pixi en overlay ciblé pour les particules de krach seulement ; Unity = build natif futur)** | §13 | v1.26 |
 
 ---
 
