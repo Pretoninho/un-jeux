@@ -17,7 +17,7 @@
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
   import { PA_PAR_TOUR } from './data/actions';
-  import { presetExplore } from './data/config-explore';
+  import { presetExplore, PLAYABLE_ARCHETYPES } from './data/config-explore';
   import { hexFill, axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
   import {
     isInvestable, isCredit, openCost as chainCost, canOpenAt, canOccupyAt, canMoveToAt,
@@ -31,6 +31,7 @@
   let prevBcRate = 0; // taux directeur du tour précédent (pour la flèche de tendance BC)
 
   let seed = $state(1);
+  let archetypeId = $state('vautour'); // archétype joué (sélecteur de nouvelle partie)
   let selected = $state<string | null>(null);
   let hexes = $state<Hex[]>([]);
   let log = $state<string[]>([]);
@@ -217,7 +218,8 @@
   }
 
   function newGame(s: number) {
-    const cfg = presetExplore(s);
+    const arch = PLAYABLE_ARCHETYPES.find((a) => a.id === archetypeId) ?? PLAYABLE_ARCHETYPES[0]!;
+    const cfg = presetExplore(s, 4, arch);
     profileLabel = cfg.archetype.label;
     aiList = cfg.adversaires.map((a, i) => ({ id: a.id, label: a.label, color: AI_PALETTE[i % AI_PALETTE.length]! }));
     const init = buildInitialState(cfg);
@@ -783,6 +785,9 @@
         </section>
 
         <section class="newgame">
+          <select bind:value={archetypeId} title="Archétype joué">
+            {#each PLAYABLE_ARCHETYPES as a}<option value={a.id}>{a.label}</option>{/each}
+          </select>
           <input type="number" bind:value={seed} min="1" />
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
           <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
@@ -870,7 +875,8 @@
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }
   .log { font-size: .76rem; color: #9aa3b5; }
   .log div { padding: .1rem 0; border-bottom: 1px solid #22262f; }
-  .newgame { display: flex; gap: .4rem; }
+  .newgame { display: flex; gap: .4rem; flex-wrap: wrap; }
   .newgame input { width: 70px; background: #0e1015; color: #cdd3df; border: 1px solid #39414f; border-radius: 5px; padding: .3rem; }
+  .newgame select { background: #0e1015; color: #cdd3df; border: 1px solid #39414f; border-radius: 5px; padding: .3rem; flex: 1; min-width: 120px; }
   .newgame button { margin: 0; }
 </style>
