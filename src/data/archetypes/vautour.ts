@@ -19,4 +19,12 @@ export const VAUTOUR: Archetype = {
   // crise frappe. Conditionnelle (nulle au calme, vitale en krach) → auto-équilibrée. Mesuré :
   // la PAIRE (Récolte ×2/cd18 + Couverture W2) reste neutre (top1 ~42 %, duel ~50 %).
   coverSkill: { window: 2, cooldown: 10, paCost: 2 },
+  // CONTRAINTE permanente (§6) : capital patient → jamais de levier. Friction : ne peut pas
+  // amplifier le boom comme le fonds leveragé → sous-performe les marchés haussiers. Elle PAIE
+  // le pouvoir de la ressource ci-dessous (net neutre, à mesurer).
+  noLeverage: true,
+  // RESSOURCE « Réserve sèche » (§10) : +1/tour patient (plafond 8), dépensée pour décoter
+  // l'entrée quand on déploie en haute fragilité (F > 0.55) — « déploiement massif dans le krach ».
+  // Jusqu'à 10 % de décote (8 × 0.0125). Valeurs de départ, à caler au sweep.
+  dryPowder: { max: 8, discountPerPowder: 0.0125, maxDiscount: 0.1, fThreshold: 0.55 },
 };

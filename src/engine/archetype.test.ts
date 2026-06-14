@@ -84,3 +84,59 @@ describe('Vautour — compétence défensive « Couverture »', () => {
     expect(player.coverReadyAt).toBe(1 + 2 + 10); // activation + window + cooldown = 13
   });
 });
+
+describe('Vautour — contrainte (noLeverage) & ressource (Réserve sèche)', () => {
+  const openLC = (leverage: number): Policy => ({
+    id: 'open',
+    decide: (a) => (a.positions.length === 0 ? [{ verb: 'POSITIONNER', op: 'ouvrir', hexId: 'LC_US', equity: 50, leverage, direction: 'long' }] : [{ verb: 'RESERVER' }]),
+  });
+
+  it('contrainte : le levier demandé est rogné à 0 (capital patient)', () => {
+    const { state, rng } = buildInitialState(presetMvp(1));
+    runTurn(state, [openLC(3), alwaysReserve, alwaysReserve], rng);
+    const pos = state.actors[0]!.positions.find((p) => p.hexId === 'LC_US');
+    expect(pos?.leverage).toBe(0); // ×3 demandé → 0 (noLeverage)
+  });
+
+  it('ressource : +1 par tour patient, plafonnée à `max`', () => {
+    const { state, rng } = buildInitialState(presetMvp(1));
+    for (let t = 0; t < 12; t++) runTurn(state, reserveAll, rng); // 12 tours de réserve
+    expect(state.actors[0]!.dryPowder).toBe(8); // plafond (max = 8)
+  });
+
+  it('ressource : déployer en haute fragilité DÉCOTE l’entrée et consomme la poudre', () => {
+    const { state, rng } = buildInitialState(presetMvp(1));
+    const p = state.actors[0]!;
+    p.dryPowder = 8; // poudre pleine
+    state.fragility = 0.95; // haute (> fThreshold 0.55)
+    const V = state.market['LC_US']!.V;
+    runTurn(state, [openLC(0), alwaysReserve, alwaysReserve], rng);
+    const pos = p.positions.find((x) => x.hexId === 'LC_US')!;
+    expect(pos.entryV).toBeCloseTo(V * (1 - 0.1), 6); // décote 8 × 0.0125 = 10 %
+    expect(p.dryPowder).toBe(0); // poudre dépensée
+  });
+
+  it('ressource : PAS de décote au calme (fragilité basse)', () => {
+    const { state, rng } = buildInitialState(presetMvp(1));
+    const p = state.actors[0]!;
+    p.dryPowder = 8;
+    state.fragility = 0.2; // basse (< fThreshold)
+    const V = state.market['LC_US']!.V;
+    runTurn(state, [openLC(0), alwaysReserve, alwaysReserve], rng);
+    expect(p.positions.find((x) => x.hexId === 'LC_US')!.entryV).toBe(V); // entrée au prix plein
+  });
+});
+
+describe('Sismographe — contrainte « fragile au calme » (thêta de couverture)', () => {
+  it('au calme (hors crise), il fond — sans thêta, il ne fond pas', () => {
+    // Deux runs identiques (même seed), seul le thêta diffère ; on reste au calme (réserve,
+    // f0 < zone morte → pas de crise tour 1). Le run avec thêta doit avoir MOINS de cash.
+    const sans = buildInitialState(presetMvp(1));
+    runTurn(sans.state, reserveAll, sans.rng);
+    const avec = buildInitialState(presetMvp(1));
+    avec.state.actors[0]!.calmTheta = 0.02; // 2 %/tour
+    runTurn(avec.state, reserveAll, avec.rng);
+    // L'écart ≈ 2 % de la richesse (~2 sur 100), le reste (carry cash) étant identique.
+    expect(avec.state.actors[0]!.cash).toBeLessThan(sans.state.actors[0]!.cash - 1.5);
+  });
+});

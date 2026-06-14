@@ -17,8 +17,12 @@
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
   import { PA_PAR_TOUR } from './data/actions';
-  import { presetExplore } from './data/config-explore';
+  import { presetExplore, PLAYABLE_ARCHETYPES } from './data/config-explore';
   import { hexFill, axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
+  import {
+    isInvestable, isCredit, openCost as chainCost, canOpenAt, canOccupyAt, canMoveToAt,
+    canTradeCouponAt, couponBuyMoves, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
+  } from './lib/interaction';
 
   let gs: GameState;
   let rng: Rng;
@@ -27,6 +31,7 @@
   let prevBcRate = 0; // taux directeur du tour précédent (pour la flèche de tendance BC)
 
   let seed = $state(1);
+  let archetypeId = $state('vautour'); // archétype joué (sélecteur de nouvelle partie)
   let selected = $state<string | null>(null);
   let hexes = $state<Hex[]>([]);
   let log = $state<string[]>([]);
@@ -62,10 +67,9 @@
   let positions = $state<Record<string, [number, number]>>({}); // centres pixel par hexe
   let viewBox = $state('0 0 100 100');
 
-  // Le crédit a quitté le monde V (coupons, spec crédit-coupons) → non V-investissable.
-  // L'UI coupons dédiée arrive en incrément B ; ici on évite surtout d'ouvrir une
-  // position-V fantôme sur un hexe sans prix (sinon `gs.market[id]` est undefined).
-  const isInvestable = (h: Hex) => h.kind === 'marche' && h.cluster !== 'credit';
+  // isInvestable / isCredit / canOpenAt / canMoveToAt / openCost… : règles d'interaction PURES
+  // importées de ./lib/interaction (testées hors DOM). Les closures ci-dessous ne font que leur
+  // passer l'état réactif (revealed, position du joueur).
 
   // Descriptions génériques (carte générée → pas d'entrée dans le lexique fixe).
   const CLUSTER_DESC: Record<string, [string, string]> = {
@@ -85,34 +89,19 @@
     return { court: c[0] + (h.kind === 'frontiere' ? ' — frontière (verrouillé)' : ''), long: c[1] };
   }
   const paLeft = () => PA_PAR_TOUR - paUsed - read.size;
-  const openCost = () => (opensThisTurn === 0 ? 1 : 2); // 1ʳᵉ ouverture = 1 PA, CHAIN = 2 PA
+  const openCost = () => chainCost(opensThisTurn);
   const hexById = (id: string) => hexes.find((h) => h.id === id);
   const neighborsOfPlayer = () => hexById(playerHex)?.neighbors ?? [];
-  const canOpen = (id: string) => {
-    const h = hexById(id);
-    return !!h && isInvestable(h) && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
+  const canOpen = (id: string) => canOpenAt(hexById(id), revealed, neighborsOfPlayer());
   // S'installer : se déplacer sur un nœud adjacent (présence, sans investir).
-  const canOccupy = (id: string) => {
-    const h = hexById(id);
-    return !!h && h.kind === 'noeud' && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
-  // Crédit : émetteur de coupons (hors monde V). Tradable dès qu'il est révélé (proto :
-  // « on appelle le desk obligataire », pas de contrainte d'adjacence ici).
-  const isCredit = (h?: Hex) => !!h && h.cluster === 'credit' && (h.kind === 'marche' || h.kind === 'frontiere');
-  const canTradeCoupon = (id: string) => isCredit(hexById(id)) && revealed.has(id);
+  const canOccupy = (id: string) => canOccupyAt(hexById(id), revealed, neighborsOfPlayer());
+  // Crédit tradable dès qu'il est révélé (proto : « on appelle le desk obligataire »).
+  const canTradeCoupon = (id: string) => canTradeCouponAt(hexById(id), revealed);
   // Étiquette de risque de défaut, lue sur le spread STRUCTUREL de l'émetteur (IG ≈ 0.03).
   const riskLabel = (qs: number) => (qs <= 0.035 ? 'faible' : qs <= 0.055 ? 'moyen' : 'élevé');
-  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent — marché V
-  // OU émetteur de crédit, FRONTIÈRE VERROUILLÉE comprise (HY_US). Le crédit a quitté le
-  // monde V (coupons), mais le token doit pouvoir le TRAVERSER pour atteindre les nœuds
-  // derrière (ex. IG_US → Banque centrale). Marcher sur un crédit verrouillé reste permis
-  // (du gameplay : on s'y faufile) même si l'ouverture, elle, reste bloquée par la frontière.
-  const canMoveTo = (id: string) => {
-    const h = hexById(id);
-    const walkable = !!h && (isInvestable(h) || isCredit(h));
-    return walkable && revealed.has(id) && neighborsOfPlayer().includes(id);
-  };
+  // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent (marché V ou crédit,
+  // frontière verrouillée comprise) — on traverse le crédit pour atteindre les nœuds derrière.
+  const canMoveTo = (id: string) => canMoveToAt(hexById(id), revealed, neighborsOfPlayer());
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -195,20 +184,28 @@
       bcDelta: gs.credit.bc.rate - prevBcRate,
       bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
       cashCarryFloor: gs.params.cashCarryFloor, // franchise : la réserve au-dessus encaisse r_BC
+      // Vautour : contrainte (pas de levier) + ressource « Réserve sèche » (poudre → décote de krach).
+      noLeverage: !!player.noLeverage,
+      dryPowder: player.dryPowder ?? 0,
+      dryPowderMax: player.dryPowderCfg?.max ?? 0,
+      // Sismographe : jauge de fragilité F innée + thêta de couverture (fragile au calme).
+      fragilityGauge: !!player.fragilityGauge,
+      calmTheta: player.calmTheta ?? 0,
+      inCrisis: gs.crisis.active,
       // Compétence « Récolte » (Vautour) : carry ×factor pendant duration tours, cooldown.
       // L'activation vise la PROCHAINE résolution (tour gs.turn+1) → décalage d'un tour.
       hasCarrySkill: !!player.carrySkill,
       skillFactor: player.carrySkill?.factor ?? 0,
       skillDuration: player.carrySkill?.duration ?? 0,
       skillPaCost: player.carrySkill?.paCost ?? 0,
-      skillReadyIn: player.carrySkill ? Math.max(0, (player.carrySkillReadyAt ?? 0) - (gs.turn + 1)) : 0,
-      skillActiveLeft: player.carrySkill ? Math.max(0, (player.carryBoostUntil ?? -1) - gs.turn) : 0,
+      skillReadyIn: player.carrySkill ? readyInFromDisplay(gs.turn, player.carrySkillReadyAt ?? 0) : 0,
+      skillActiveLeft: player.carrySkill ? activeLeftFromDisplay(gs.turn, player.carryBoostUntil ?? -1) : 0,
       // Compétence « Couverture » (Vautour) : armer (auto-tir) → anti-défaut des coupons N tours.
       hasCoverSkill: !!player.coverSkill,
       coverWindow: player.coverSkill?.window ?? 0,
       coverPaCost: player.coverSkill?.paCost ?? 0,
-      coverReadyIn: player.coverSkill ? Math.max(0, (player.coverReadyAt ?? 0) - (gs.turn + 1)) : 0,
-      coverArmedLeft: player.coverSkill ? Math.max(0, (player.coverArmedUntil ?? -1) - gs.turn) : 0,
+      coverReadyIn: player.coverSkill ? readyInFromDisplay(gs.turn, player.coverReadyAt ?? 0) : 0,
+      coverArmedLeft: player.coverSkill ? activeLeftFromDisplay(gs.turn, player.coverArmedUntil ?? -1) : 0,
       bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
       // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
       bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
@@ -225,7 +222,8 @@
   }
 
   function newGame(s: number) {
-    const cfg = presetExplore(s);
+    const arch = PLAYABLE_ARCHETYPES.find((a) => a.id === archetypeId) ?? PLAYABLE_ARCHETYPES[0]!;
+    const cfg = presetExplore(s, 4, arch);
     profileLabel = cfg.archetype.label;
     aiList = cfg.adversaires.map((a, i) => ({ id: a.id, label: a.label, color: AI_PALETTE[i % AI_PALETTE.length]! }));
     const init = buildInitialState(cfg);
@@ -268,6 +266,20 @@
     view = buildView();
   }
 
+  // Réserve sèche (Vautour) : déployer en HAUTE FRAGILITÉ décote l'entrée (achat au creux du
+  // krach), à hauteur de la poudre accumulée — puis on la consomme. F reste cachée (effet silencieux).
+  function vautourEntry(hexId: string): number {
+    const player = gs.actors[0]!;
+    const V = gs.market[hexId]!.V;
+    const cfg = player.dryPowderCfg;
+    const powder = player.dryPowder ?? 0;
+    if (cfg && gs.fragility > cfg.fThreshold && powder > 0) {
+      player.dryPowder = 0; // poudre dépensée
+      return V * (1 - Math.min(cfg.maxDiscount, powder * cfg.discountPerPowder));
+    }
+    return V;
+  }
+
   function open(hexId: string, frac: number, direction: 'long' | 'short') {
     const here = hexId === playerHex; // investir « ici » (hexe courant) = sans se déplacer
     const h = hexById(hexId);
@@ -278,10 +290,11 @@
     const equity = player.cash * frac;
     if (equity <= 0) return;
     // Illiquidité (spec immo) : long-only + sans levier ; entryTurn arme le verrou.
+    // Levier 0 si illiquide OU contrainte noLeverage (Vautour). Entrée décotée si Réserve sèche.
     const dir = h?.longOnly ? 'long' : direction;
-    const lev = h?.illiquid ? 0 : openLev;
+    const lev = (h?.illiquid || player.noLeverage) ? 0 : openLev;
     player.cash -= equity;
-    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: vautourEntry(hexId), entryTurn: gs.turn });
     if (!here) {
       playerHex = hexId; // déplacement
       reveal(hexId); // révèle les nouveaux voisins
@@ -306,9 +319,17 @@
     if (!res) return;
     player.cash += res.entryCash; // long −U, short +U
     player.couponPositions.push(res.position);
+    // Investir sur un crédit = aller sur la case : on s'y déplace si on y est adjacent (le crédit
+    // est traversable). Émetteur lointain (desk à distance) = trade en place, sans téléportation.
+    if (couponBuyMoves(issuer, playerHex, neighborsOfPlayer())) {
+      playerHex = issuer;
+      reveal(issuer); // révèle les nouveaux voisins
+    }
     selected = issuer;
     log = [`Coupon ${side === 'long' ? 'LONG' : 'SHORT'} ${hexById(issuer)?.label} ${maturity} · ${notional.toFixed(0)} @ ${(offered.rate * 100).toFixed(1)}%/t`, ...log].slice(0, 8);
-    spend(1);
+    opensThisTurn += 1; // le crédit est une ouverture de position → compte dans le CHAIN (la
+    //                     prochaine position sur un AUTRE actif sera un enchaînement, 2 PA).
+    spend(1); // coût du crédit lui-même : 1 PA fixe (appel du desk, pas de surcoût CHAIN)
   }
 
   function occupy(hexId: string) {
@@ -342,10 +363,10 @@
     const h = hexById(hexId);
     // Renforce dans le sens dominant déjà détenu sur l'hexe (forcé long si longOnly).
     const dir = h?.longOnly ? 'long' : ((view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long');
-    const lev = h?.illiquid ? 0 : openLev;
+    const lev = (h?.illiquid || player.noLeverage) ? 0 : openLev;
     player.cash -= equity;
     // entryTurn : renforcer un illiquide RE-VERROUILLE (la tranche la plus récente fait foi).
-    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: vautourEntry(hexId), entryTurn: gs.turn });
     spend(1);
   }
 
@@ -387,8 +408,9 @@
     if (!sk || view?.over || paLeft() < sk.paCost) return;
     const nextTurn = gs.turn + 1;
     if (nextTurn < (player.carrySkillReadyAt ?? 0)) return; // encore en cooldown
-    player.carryBoostUntil = nextTurn + sk.duration - 1; // boosté pendant `duration` résolutions
-    player.carrySkillReadyAt = nextTurn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    const w = activateWindow(nextTurn, sk.duration, sk.cooldown);
+    player.carryBoostUntil = w.activeUntil; // boosté pendant `duration` résolutions
+    player.carrySkillReadyAt = w.readyAt; // réutilisable après le cooldown
     log = [`🦅 Récolte activée — carry ×${sk.factor} pendant ${sk.duration} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
     spend(sk.paCost);
   }
@@ -400,8 +422,9 @@
     if (!sk || view?.over || paLeft() < sk.paCost) return;
     const nextTurn = gs.turn + 1;
     if (nextTurn < (player.coverReadyAt ?? 0)) return; // encore en cooldown
-    player.coverArmedUntil = nextTurn + sk.window - 1; // protégé pendant `window` résolutions
-    player.coverReadyAt = nextTurn + sk.window + sk.cooldown; // ré-armable après le cooldown
+    const w = activateWindow(nextTurn, sk.window, sk.cooldown);
+    player.coverArmedUntil = w.activeUntil; // protégé pendant `window` résolutions
+    player.coverReadyAt = w.readyAt; // ré-armable après le cooldown
     log = [`🛡️ Couverture armée — coupons protégés du défaut ${sk.window} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
     spend(sk.paCost);
   }
@@ -562,6 +585,19 @@
           </div>
         </section>
 
+        {#if view.fragilityGauge}
+          <section class="sismo">
+            <h3>🌋 Jauge sismique <span class="hint">fragilité cachée</span></h3>
+            <div class="bar-row">
+              <span>Fragilité F</span>
+              <div class="bar"><div class="fill" style="width:{Math.min(100, view.fReal * 100)}%"></div></div>
+            </div>
+            <div class="small">F = <b>{view.fReal.toFixed(2)}</b> · {view.fReal < 0.4 ? 'zone morte — aucun krach possible' : view.fReal >= 0.85 ? '⚠️ PLAFOND — krach imminent' : 'zone roulette — ça peut sauter (proba ↑ avec F)'}</div>
+            <div class="muted small">🎯 <b>Le Grand Pari</b> : zone rouge → <b>SHORT</b> le krach (pari directionnel) ou cash · creux → frappe <b>LONG</b> all-in. Tu vois la magnitude, pas la date (roulette).</div>
+            <div class="muted small">{view.inCrisis ? '🔥 Crise : tes couvertures paient (pas de thêta).' : `🩸 Thêta de couverture : −${(view.calmTheta * 100).toFixed(1)}%/tour au calme (tu fonds tant que rien ne tremble).`}</div>
+          </section>
+        {/if}
+
         <section class="credit">
           <h3>Crédit · Banque centrale <span class="hint">taux directeur</span></h3>
           <div class="bar-row">
@@ -647,7 +683,11 @@
                   <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
                 {/if}
               </div>
-              {#if !illiquid}
+              {#if illiquid}
+                <!-- levier déjà interdit (illiquide) -->
+              {:else if view.noLeverage}
+                <div class="muted small">🚫 <b>Sans levier</b> — capital patient (contrainte du Vautour) : pas d'amplification.</div>
+              {:else}
                 <div class="lev-row">
                   <span>Levier</span>
                   <button class:active={openLev === 0} onclick={() => (openLev = 0)}>0×</button>
@@ -725,6 +765,12 @@
               {/if}
             </div>
           {/if}
+          {#if view.dryPowderMax > 0}
+            <div class="skill">
+              <div class="court" style="margin:0">🦅 <b>Réserve sèche</b> <b class="up">{view.dryPowder}/{view.dryPowderMax}</b> <span class="muted small">+1/tour patient</span></div>
+              <div class="muted small">Déployer dans un krach (forte fragilité) achète <b>décoté</b> — la poudre fixe la ristourne, puis se vide.</div>
+            </div>
+          {/if}
           <div class="cash">
             Réserve : <b>{view.cash.toFixed(0)}</b> · Richesse : <b>{view.wealth.toFixed(0)}</b><br />
             {#if view.cash > view.cashCarryFloor}
@@ -756,6 +802,9 @@
         </section>
 
         <section class="newgame">
+          <select bind:value={archetypeId} title="Archétype joué">
+            {#each PLAYABLE_ARCHETYPES as a}<option value={a.id}>{a.label}</option>{/each}
+          </select>
           <input type="number" bind:value={seed} min="1" />
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
           <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
@@ -837,13 +886,15 @@
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
   .locked { font-size: .72rem; color: #c79a4a; }
   .small { font-size: .72rem; } .muted { color: #7a8294; }
+  .sismo { border-color: #6b4a3f; }
   .skill { background: #1d2230; border: 1px solid #3a4459; border-radius: 6px; padding: .45rem; margin: .4rem 0; }
   .skill button { margin: .3rem 0 0; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
   .over { font-size: .8rem; color: #e8b54a; margin-top: .5rem; }
   .log { font-size: .76rem; color: #9aa3b5; }
   .log div { padding: .1rem 0; border-bottom: 1px solid #22262f; }
-  .newgame { display: flex; gap: .4rem; }
+  .newgame { display: flex; gap: .4rem; flex-wrap: wrap; }
   .newgame input { width: 70px; background: #0e1015; color: #cdd3df; border: 1px solid #39414f; border-radius: 5px; padding: .3rem; }
+  .newgame select { background: #0e1015; color: #cdd3df; border: 1px solid #39414f; border-radius: 5px; padding: .3rem; flex: 1; min-width: 120px; }
   .newgame button { margin: 0; }
 </style>

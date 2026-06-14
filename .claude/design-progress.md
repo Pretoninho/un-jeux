@@ -1,7 +1,45 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.21
+> Dernière mise à jour : 2026-06-14 — v1.25
+>
+> 🎯 **SISMOGRAPHE rendu ACTIF — « Le Grand Pari » (2026-06-14)** : il était trop passif (jauge + thêta
+> = info/coût subis, aucun geste). Mesuré : **levier + jauge = GAME-BREAKING** (top1 88-99 %, robuste au
+> bruit — leviérer la reprise fiable est sans risque quand on time). Le levier est le coupable, pas la
+> jauge. → Geste actif = **SHORTER le krach** (pari DIRECTIONNEL, déjà dispo dans l'UI ; la jauge dit
+> *quand*). Build : `noLeverage: true` (le levier+jauge serait OP + empièterait sur le fonds leveragé) +
+> `calmTheta` 0.005→**0.007** → short balançable, top1 **38.8 %**, excédent +2 % (§28.8 ✓). Pas de
+> mécanique séparée. UI : panneau jauge enrichi (Grand Pari : zone rouge→SHORT/cash, creux→frappe LONG).
+> 121 tests, svelte-check 0. Leçon : info parfaite + amplification = dégénéré → l'edge du Sismo est
+> INFO+DIRECTION, jamais l'amplification.
+>
+> 🌋 **SISMOGRAPHE — 2ᵉ archétype (2026-06-14)** : trader macro (réf. Soros). **POUVOIR** : jauge de
+> fragilité `F` INNÉE (voit le séisme caché — exclusif ; les autres n'ont que les signaux bruités) →
+> débloque le timing + la frappe all-in au creux. **CONTRAINTE** : `calmTheta` 0.5 %/tour, « fragile au
+> calme » (ponction de richesse hors crise — couvertures qui décaient dans le boom ; clouée sur la crise
+> OBSERVABLE → pas de fuite de F). Mesuré : jauge seule = survie (top1 26 %, drawdown 14.7→2.8 %), FRAPPE
+> = win-con (50 % à θ=0), thêta = dial → **θ=0.5 % → top1 38 %, duel 50 % (neutre §28.8)**. La frappe
+> ÉMERGE du jeu agressif que la jauge autorise (pas de mécanique séparée). Au sélecteur d'archétype UI.
+> 121 tests, svelte-check 0. ⚠️ Découverte annexe : le forward guidance BC était MORT (target==rate en
+> mode réunions) → réparé (la cible suit F en continu, mène le taux) ; mais la BC reste un mauvais signal
+> macro (elle coupe en crise) → le Sismographe lit F directement, pas la BC.
+>
+> ✅ **VAUTOUR COMPLET — fiche §6 bouclée (2026-06-14)** : victoire (Score) + 2 compétences (Récolte/
+> Couverture) + **ressource** + **contrainte**. **Contrainte** `noLeverage` (capital patient, levier→0,
+> moteur+UI). **Ressource** « Réserve sèche » (`dryPowder`) : +1/tour patient (plafond 8) ; déployer en
+> haute fragilité (F>0.55) DÉCOTE l'entrée (≤10 %) puis consomme — « déploiement décoté dans le krach ».
+> Mesuré (`scripts/vautour-resource.ts`) : ligne contrarian FAIBLE (top1 ~16 % à 10 % décote) → ressource
+> sans risque ; noLeverage protège même le déployeur (leviérer un krach = suicide), mord sur le bull ;
+> inerte pour Vautour-coupons (42 %) et réserve (9 %). Sondes de physique (calibration/calibrate) passent
+> par l'archétype **NEUTRE** (sinon le pyromane steadyLong(4) ne peut pas leviérer). 120 tests, §28.8 OK.
+>
+> 🧪 **UI : 2 fixes crédit + logique extraite/testée (2026-06-14)** : (1) acheter un crédit DÉPLACE le
+> joueur sur la case si adjacent (cohérence ; le crédit est traversable) ; (2) l'achat de crédit COMPTE
+> dans le CHAIN (une position sur un autre actif ensuite = enchaînement 2 PA). Puis **option 2** : logique
+> UI tricky extraite en fonctions PURES (`src/lib/interaction.ts` : traversée, CHAIN, déplacement crédit,
+> timing compétences avec décalage écran→résolution) — App.svelte délègue (source unique). 12 tests
+> (`interaction.test.ts`) verrouillent ces comportements hors DOM. 116 tests, svelte-check 0, build OK.
+> Note : « 1 crédit/tour » observé = émergent (géographie), PAS une règle dure — à formaliser si voulu.
 >
 > 🛡️ **VAUTOUR — PAIRE de compétences off/def (2026-06-14)** : 2ᵉ compétence **Couverture** (défensive,
 > armer + auto-tir) : ARMER (2 PA) → anti-défaut des coupons **W=2 tours** → cooldown 10 ; auto-tir en crise

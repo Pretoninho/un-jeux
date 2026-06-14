@@ -45,6 +45,11 @@ export function buildInitialState(config: ConfigPartie): InitResult {
   player.ignoreLockup = config.archetype.ignoreLockup; // pouvoir d'archétype (spec immo)
   player.carrySkill = config.archetype.carrySkill; // compétence « Récolte » (Vautour)
   player.coverSkill = config.archetype.coverSkill; // compétence « Couverture » (Vautour)
+  player.noLeverage = config.archetype.noLeverage; // contrainte permanente (Vautour)
+  player.dryPowderCfg = config.archetype.dryPowder; // ressource « Réserve sèche » (Vautour)
+  if (player.dryPowderCfg) player.dryPowder = 0;
+  player.fragilityGauge = config.archetype.fragilityGauge; // jauge sismique (Sismographe)
+  player.calmTheta = config.archetype.calmTheta; // thêta de couverture (Sismographe)
   const actors: ActorState[] = [
     player,
     ...config.adversaires.map((a) => mkActor(a.id)),
