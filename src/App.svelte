@@ -203,6 +203,12 @@
       skillPaCost: player.carrySkill?.paCost ?? 0,
       skillReadyIn: player.carrySkill ? Math.max(0, (player.carrySkillReadyAt ?? 0) - (gs.turn + 1)) : 0,
       skillActiveLeft: player.carrySkill ? Math.max(0, (player.carryBoostUntil ?? -1) - gs.turn) : 0,
+      // Compétence « Couverture » (Vautour) : armer (auto-tir) → anti-défaut des coupons N tours.
+      hasCoverSkill: !!player.coverSkill,
+      coverWindow: player.coverSkill?.window ?? 0,
+      coverPaCost: player.coverSkill?.paCost ?? 0,
+      coverReadyIn: player.coverSkill ? Math.max(0, (player.coverReadyAt ?? 0) - (gs.turn + 1)) : 0,
+      coverArmedLeft: player.coverSkill ? Math.max(0, (player.coverArmedUntil ?? -1) - gs.turn) : 0,
       bcMeetingEvery: gs.params.bcMeetingEvery, // cadence des réunions (taux figé entre deux)
       // Tours avant la prochaine réunion (0 = mode continu). Réunion = tour multiple de la cadence.
       bcNextMeetingIn: gs.params.bcMeetingEvery <= 1 ? 0 : (Math.floor(gs.turn / gs.params.bcMeetingEvery) + 1) * gs.params.bcMeetingEvery - gs.turn,
@@ -384,6 +390,19 @@
     player.carryBoostUntil = nextTurn + sk.duration - 1; // boosté pendant `duration` résolutions
     player.carrySkillReadyAt = nextTurn + sk.duration + sk.cooldown; // réutilisable après le cooldown
     log = [`🦅 Récolte activée — carry ×${sk.factor} pendant ${sk.duration} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
+    spend(sk.paCost);
+  }
+
+  // « Couverture » (Vautour) : arme l'anti-défaut pour les prochains tours (auto-tir en crise).
+  function armCover() {
+    const player = gs.actors[0]!;
+    const sk = player.coverSkill;
+    if (!sk || view?.over || paLeft() < sk.paCost) return;
+    const nextTurn = gs.turn + 1;
+    if (nextTurn < (player.coverReadyAt ?? 0)) return; // encore en cooldown
+    player.coverArmedUntil = nextTurn + sk.window - 1; // protégé pendant `window` résolutions
+    player.coverReadyAt = nextTurn + sk.window + sk.cooldown; // ré-armable après le cooldown
+    log = [`🛡️ Couverture armée — coupons protégés du défaut ${sk.window} tour(s) (${sk.paCost} PA)`, ...log].slice(0, 8);
     spend(sk.paCost);
   }
 
@@ -688,13 +707,22 @@
           {:else}
             <div class="sel muted">Clique un hexe révélé.</div>
           {/if}
-          {#if view.hasCarrySkill}
+          {#if view.hasCarrySkill || view.hasCoverSkill}
             <div class="skill">
-              <div class="court" style="margin:0">🦅 <b>Récolte</b> <span class="muted small">carry ×{view.skillFactor} · {view.skillDuration}t · {view.skillPaCost} PA</span></div>
-              {#if view.skillActiveLeft > 0}<div class="court up" style="margin:.2rem 0">● Active — carry boosté sur {view.skillActiveLeft} tour(s) à venir</div>{/if}
-              <button onclick={useSkill} disabled={view.over || paLeft() < view.skillPaCost || view.skillReadyIn > 0}>
-                {view.skillReadyIn > 0 ? `🔒 prête dans ${view.skillReadyIn} tour(s)` : `Activer · carry ×${view.skillFactor} (${view.skillPaCost} PA)`}
-              </button>
+              {#if view.hasCarrySkill}
+                <div class="court" style="margin:0">🦅 <b>Récolte</b> <span class="muted small">offensive · carry ×{view.skillFactor} · {view.skillDuration}t · {view.skillPaCost} PA</span></div>
+                {#if view.skillActiveLeft > 0}<div class="court up" style="margin:.2rem 0">● Active — carry boosté sur {view.skillActiveLeft} tour(s) à venir</div>{/if}
+                <button onclick={useSkill} disabled={view.over || paLeft() < view.skillPaCost || view.skillReadyIn > 0}>
+                  {view.skillReadyIn > 0 ? `🔒 prête dans ${view.skillReadyIn} tour(s)` : `Activer · carry ×${view.skillFactor} (${view.skillPaCost} PA)`}
+                </button>
+              {/if}
+              {#if view.hasCoverSkill}
+                <div class="court" style="margin:.45rem 0 0">🛡️ <b>Couverture</b> <span class="muted small">défensive · anti-défaut {view.coverWindow}t · {view.coverPaCost} PA</span></div>
+                {#if view.coverArmedLeft > 0}<div class="court up" style="margin:.2rem 0">● Armée — coupons protégés du défaut {view.coverArmedLeft} tour(s) (auto-tir en crise)</div>{/if}
+                <button onclick={armCover} disabled={view.over || paLeft() < view.coverPaCost || view.coverReadyIn > 0}>
+                  {view.coverReadyIn > 0 ? `🔒 prête dans ${view.coverReadyIn} tour(s)` : `Armer · anti-défaut ${view.coverWindow}t (${view.coverPaCost} PA)`}
+                </button>
+              {/if}
             </div>
           {/if}
           <div class="cash">
