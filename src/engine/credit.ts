@@ -95,6 +95,16 @@ export function bcMeets(turn: number, every: number): boolean {
 }
 
 /**
+ * Cible de la fonction de réaction de la BC (spec §4b) : où la BC veut poser le taux vu l'état
+ * caché courant. Monte avec la surchauffe (F au-dessus de la zone morte), plonge en crise.
+ * Plancher à 0 (pas de taux négatif). PURE — sert au forward guidance (cible recalculée chaque
+ * tour) ET à la réaction (le taux y converge / y saute).
+ */
+export function bcReactionTarget(fragility: number, inCrisis: boolean, p: InstanceParams): number {
+  return Math.max(0, p.bcRateBase + p.bcReactF * excessF(fragility, p) - (inCrisis ? p.bcReactCrisis : 0));
+}
+
+/**
  * Fonction de réaction de la BC (spec §4b). La cible monte avec la surchauffe (F
  * au-dessus de la zone morte) et plonge en crise ; le taux s'y ajuste GRADUELLEMENT
  * (lissage θ) → partiellement anticipable. Mute `bc`. Plancher à 0 (pas de taux négatif).
@@ -106,8 +116,7 @@ export function bcReact(
   p: InstanceParams,
   smoothing: number = p.bcSmoothing,
 ): void {
-  const target = p.bcRateBase + p.bcReactF * excessF(fragility, p) - (inCrisis ? p.bcReactCrisis : 0);
-  bc.target = Math.max(0, target);
+  bc.target = bcReactionTarget(fragility, inCrisis, p);
   bc.rate = Math.max(0, bc.rate + smoothing * (bc.target - bc.rate));
 }
 

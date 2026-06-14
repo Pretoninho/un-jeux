@@ -11,7 +11,7 @@ import { resolveMarket } from './market';
 import { actorWealth, applyMarginCalls, positionValue, dirSign, lockTurnsLeft } from './portfolio';
 import { updateFragility, maybeTriggerCrisis, advanceCrisis } from './fragility';
 import { computeSignals } from './signals';
-import { bcReact, bcMeets, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
+import { bcReact, bcReactionTarget, bcMeets, refreshBook, accrueCoupons, settleMatured, resolveCouponDefaults, openCouponPosition } from './credit';
 
 const PA_COST: Record<string, number> = {
   RESERVER: 0, ouvrir: 1, renforcer: 1, cloture_partielle: 2, fermer: 1, ouvrir_coupon: 1,
@@ -130,8 +130,14 @@ function runCreditLifecycle(state: GameState, rng: Rng): void {
   //    (saut à la cible, smoothing=1 : à la réunion la BC pose le taux où F l'exige) ;
   //    figé entre deux. En continu (=1) on garde le lissage θ historique.
   const every = state.params.bcMeetingEvery;
-  if (bcMeets(state.turn, every)) {
-    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params, every > 1 ? 1 : state.params.bcSmoothing);
+  if (every > 1) {
+    // Réunions : la CIBLE (forward guidance) suit F EN CONTINU (la BC actualise son anticipation
+    // chaque tour) ; le TAUX ne saute à la cible qu'aux réunions (décisif). Le rate (qui tarifie
+    // les coupons) garde le même comportement → calibration intacte ; seul target mène désormais.
+    state.credit.bc.target = bcReactionTarget(state.fragility, state.crisis.active, state.params);
+    if (bcMeets(state.turn, every)) state.credit.bc.rate = state.credit.bc.target;
+  } else {
+    bcReact(state.credit.bc, state.fragility, state.crisis.active, state.params); // continu (legacy/tests)
   }
 
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).

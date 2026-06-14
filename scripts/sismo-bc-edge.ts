@@ -23,16 +23,18 @@ const sp = (x: number) => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(0)}%`;
 const med = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)] ?? 0; };
 const AIS = [policyForProfile(FONDS_LEVERAGE), policyForProfile(VALUE_PATIENT)];
 
-type Mode = 'long' | 'level' | 'ahead' | 'oracle';
+type Mode = 'long' | 'level' | 'ahead' | 'lead' | 'oracle';
 // Seuils : taux BC élevé ≈ surchauffe ; F élevée pour l'oracle.
 function macro(mode: Mode, rateThr: number, fThr: number): Policy {
   return {
     id: 'macro',
     decide(actor, state) {
+      const bc = state.credit.bc;
       const danger =
         mode === 'long' ? false
-        : mode === 'level' ? state.credit.bc.rate > rateThr
-        : mode === 'ahead' ? state.credit.bc.target > rateThr // décision de la prochaine réunion
+        : mode === 'level' ? bc.rate > rateThr
+        : mode === 'ahead' ? bc.target > rateThr // niveau de la cible (live)
+        : mode === 'lead' ? bc.target > bc.rate + 0.002 // la BC va RESSERRER (forward guidance vrai)
         : state.fragility > fThr; // oracle
       if (danger) {
         // risk-off : fermer toutes les positions (retour au cash).
@@ -61,10 +63,10 @@ console.log('Macro : risk-off si signal > seuil, risk-on sinon. On lit l\'écart
 console.log(['signal', 'top1', 'excédent médian', 'drawdown médian'].map((s) => s.padEnd(17)).join('| '));
 
 const RATE_THR = 0.025, F_THR = 0.6;
-for (const mode of ['long', 'level', 'ahead', 'oracle'] as Mode[]) {
+for (const mode of ['long', 'level', 'ahead', 'lead', 'oracle'] as Mode[]) {
   const rs = run(mode, RATE_THR, F_THR);
-  const label = { long: 'aucun (exposé)', level: 'taux courant (public)', ahead: 'taux +1 (forward guid.)', oracle: 'F cachée (parfait)' }[mode];
-  console.log([label.padEnd(17), pct(top1(rs)).padEnd(17), sp(excMed(rs)).padEnd(17), pct(ddMed(rs)).padEnd(17)].join('| '));
+  const label = { long: 'aucun (exposé)', level: 'taux courant (public)', ahead: 'cible niveau (live)', lead: 'cible>taux (va resserrer)', oracle: 'F cachée (parfait)' }[mode];
+  console.log([label.padEnd(25), pct(top1(rs)).padEnd(12), sp(excMed(rs)).padEnd(12), pct(ddMed(rs)).padEnd(12)].join('| '));
 }
 
 // Sensibilité au seuil (level vs ahead) — l'edge « en avance » tient-il sur la plage ?
