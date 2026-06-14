@@ -49,11 +49,17 @@ export function actorWealth(actor: ActorState, market: GameState['market']): num
 
 /** Ratio de levier agrégé (memo §23.2) : capital emprunté / richesse totale. */
 export function aggregateLeverageRatio(state: GameState): number {
+  // Fix A (exploration crédit) : exclure la richesse-COUPON du dénominateur. Sinon un
+  // récolteur de coupons qui compose gonfle la richesse totale → dilue le ratio de levier
+  // → étouffe les crises (artefact : un acteur passif riche ne devrait pas baisser F).
+  const excludeCoupons = (state.params.fixLeverageDenom ?? 0) > 0;
   let borrowed = 0;
   let total = 0;
   for (const actor of state.actors) {
     for (const pos of actor.positions) borrowed += pos.equity * pos.leverage;
-    total += actorWealth(actor, state.market);
+    let w = actorWealth(actor, state.market);
+    if (excludeCoupons) for (const cp of actor.couponPositions) w -= couponPositionValue(cp);
+    total += w;
   }
   return total > 0 ? borrowed / total : 0;
 }

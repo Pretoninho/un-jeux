@@ -1,7 +1,39 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.18
+> Dernière mise à jour : 2026-06-14 — v1.21
+>
+> 🛡️ **VAUTOUR — PAIRE de compétences off/def (2026-06-14)** : 2ᵉ compétence **Couverture** (défensive,
+> armer + auto-tir) : ARMER (2 PA) → anti-défaut des coupons **W=2 tours** → cooldown 10 ; auto-tir en crise
+> (pas d'auto-seuil → la décision « sentir le danger » reste au joueur). Data-driven (`coverSkill`, gate dans
+> `runCreditLifecycle`). **Finding** : 2 pouvoirs partagent le budget de neutralité → **co-doser** (Récolte
+> seule déjà 43 %). Choix : Récolte ×2 mais **cd 12→18** (rareté, punch gardé) + Couverture W=2 → top1 **~42 %**,
+> duel ~50 % (§28.8 ✓). UI 2 boutons. 104 tests (+cover), svelte-check 0. Leçon : garder la magnitude, payer
+> la 2ᵉ compétence par la fréquence. Reste fiche Vautour §6 : ressource « Réserve sèche » + contrainte de cadre.
+>
+> 🦅 **VAUTOUR — 1ᵉʳ pouvoir d'archétype « Récolte » (2026-06-14)** : compétence active (3 PA) →
+> carry ×2 pendant 2 tours, cooldown 12. Data-driven (`Archetype.carrySkill`) → ajouter un pouvoir =
+> une ligne. Moteur : `COMPETENCE` (action, coût PA) arme `carryBoostUntil` + pose `carrySkillReadyAt` ;
+> `carryBoostMult` booste le carry V + coupons. **Inerte si non activé** → calibration intacte.
+> Contre-poids : 3 PA + cooldown 12 + défaut crédit en krach (exagéré ×2, neutre en espérance).
+> Validé moteur (`scripts/vautour-skill.ts`) : top1 **31 %→40 %**, duel 51 % (§28.8 ✓). UI « 🦅 Récolte ».
+> **102 tests** (+3 `archetype.test`), svelte-check 0, build OK. **Pipeline archétype prouvé bout-en-bout.**
+> Reste fiche Vautour §6 : câbler la ressource « Réserve sèche » + une contrainte permanente de cadre.
+>
+> 🎭 **Archétypes — réflexion ouverte + RÈGLE DES POUVOIRS (2026-06-13)** : on est prêt à concevoir
+> (physique calibrée + archi data-driven + pouvoir prouvé `ignoreLockup`). **Règle clé** : un pouvoir
+> peut être EXAGÉRÉ en magnitude mais doit être NEUTRE EN ESPÉRANCE (asymétrie ≠ dominance). Formes
+> sûres : conditionnelle / contrainte appariée / coût d'opportunité. Anti-pattern fatal : **buff plat
+> sur une grandeur qui COMPOSE**. Méthode **un à la fois** (§30) ; commencer par victoire « Score »
+> (Vautour) car victoires différenciées (AUM/domination/science) non implémentées.
+>
+> 🔧 **Fix crédit A — baseline coupon assaini (2026-06-13)** : le coupon-long pur gagnait ~48 % (4 causes :
+> compounding sans risque, esquive de F, **suppression de crises via le dénominateur du levier**, non-concurrence
+> IA). **Fix A** = exclure la richesse-coupon du dénominateur (`fixLeverageDenom` défaut 1) → baseline **48 %→31 %**
+> (neutre), suppression de crises tuée, **calibration intouchée**. Suffisant seul ; B/C en flags off. Méthode :
+> faits mesurés (`scripts/credit-baseline.ts`) → fixes 1 à 1 (`scripts/credit-fixes.ts`) jusqu'à neutralité.
+> 🧪 **Pile de mesure (hors moteur sauf fixes)** : `bc-cadence`, `horizon`, `cash-carry`, `asset-ideas`,
+> `leverage-caps`, `archetype-carry-skill` (cooldown), `credit-baseline`, `credit-fixes`. Tous reproductibles.
 >
 > 🏦 **Session 2026-06-13 (suite) — BC vivante, campagne, hoarder réhabilité** :
 > 1. **Crédit traversable + nœud BC utile** : « se déplacer (sans investir) » étendu au crédit

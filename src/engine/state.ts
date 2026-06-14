@@ -63,6 +63,18 @@ export interface ActorState {
   borrowMultiplier?: number;
   /** Pouvoir d'archétype : échappe au verrou d'illiquidité (spec immobilier). */
   ignoreLockup?: boolean;
+  /** Compétence « Récolte » (Vautour) : copiée de l'archétype à l'init. */
+  carrySkill?: { factor: number; duration: number; cooldown: number; paCost: number };
+  /** Boost de carry actif tant que `state.turn <= carryBoostUntil`. */
+  carryBoostUntil?: number;
+  /** Compétence réutilisable quand `state.turn >= carrySkillReadyAt`. */
+  carrySkillReadyAt?: number;
+  /** Compétence « Couverture » (Vautour) : copiée de l'archétype à l'init. */
+  coverSkill?: { window: number; cooldown: number; paCost: number };
+  /** Couverture armée (coupons protégés du défaut) tant que `state.turn <= coverArmedUntil`. */
+  coverArmedUntil?: number;
+  /** « Couverture » ré-armable quand `state.turn >= coverReadyAt`. */
+  coverReadyAt?: number;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */

@@ -17,8 +17,30 @@ const PA_COST: Record<string, number> = {
   RESERVER: 0, ouvrir: 1, renforcer: 1, cloture_partielle: 2, fermer: 1, ouvrir_coupon: 1,
 };
 
+/** Le boost « Récolte » (Vautour) est-il actif pour cet acteur ce tour-ci ? */
+function carryBoostMult(actor: ActorState, state: GameState): number {
+  return state.turn <= (actor.carryBoostUntil ?? -1) ? actor.carrySkill?.factor ?? 1 : 1;
+}
+
 function executeAction(actor: ActorState, action: PlannedAction, state: GameState, flux: Record<string, number>): void {
   if (action.verb === 'RESERVER') return;
+
+  if (action.verb === 'COMPETENCE') {
+    if (action.skill === 'carry_boost') {
+      // « Récolte » : si prête, arme le boost de carry et pose le cooldown.
+      const sk = actor.carrySkill;
+      if (!sk || state.turn < (actor.carrySkillReadyAt ?? 0)) return;
+      actor.carryBoostUntil = state.turn + sk.duration - 1; // actif `duration` tours, dès ce tour
+      actor.carrySkillReadyAt = state.turn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    } else if (action.skill === 'cover_arm') {
+      // « Couverture » : si prête, ARME l'anti-défaut pour `window` tours (auto-tir en crise).
+      const sk = actor.coverSkill;
+      if (!sk || state.turn < (actor.coverReadyAt ?? 0)) return;
+      actor.coverArmedUntil = state.turn + sk.window - 1; // armée `window` tours
+      actor.coverReadyAt = state.turn + sk.window + sk.cooldown; // ré-armable après le cooldown
+    }
+    return;
+  }
 
   if (action.op === 'ouvrir_coupon') {
     // Crédit hors-V : on prend un coupon OFFERT (issuer + maturité) du carnet.
@@ -78,9 +100,10 @@ function accrueCarryAndCost(state: GameState): void {
   const carryOf = new Map(state.map.hexes.map((h) => [h.id, h.carry ?? 0]));
   for (const actor of state.actors) {
     const borrowMult = actor.borrowMultiplier ?? 1; // <1 = levier moins cher (présence PB)
+    const mult = carryBoostMult(actor, state); // « Récolte » (Vautour) : ×factor si actif
     for (const pos of actor.positions) {
       const notional = pos.equity * (1 + pos.leverage);
-      actor.cash += notional * (carryOf.get(pos.hexId) ?? 0); // carry
+      actor.cash += notional * (carryOf.get(pos.hexId) ?? 0) * mult; // carry (boosté si Récolte active)
       actor.cash -= pos.equity * pos.leverage * state.params.leverageBorrowRate * borrowMult; // coût d'emprunt
     }
   }
@@ -105,9 +128,11 @@ function runCreditLifecycle(state: GameState, rng: Rng): void {
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).
   const inCreditCrisis = state.crisis.active; // toute crise systémique touche le crédit (M domine)
   for (const actor of state.actors) {
-    const def = resolveCouponDefaults(actor.couponPositions, state.fragility, inCreditCrisis, rng, state.params);
+    // « Couverture » (Vautour) : armée → les coupons de cet acteur ne défaillent pas ce tour.
+    const covered = state.turn <= (actor.coverArmedUntil ?? -1);
+    const def = resolveCouponDefaults(actor.couponPositions, state.fragility, inCreditCrisis && !covered, rng, state.params);
     actor.couponPositions = def.survivors; // les défauts disparaissent (long perd U, short gagne U)
-    actor.cash += accrueCoupons(actor.couponPositions); // long encaisse, short paie ; décrémente le RCE
+    actor.cash += accrueCoupons(actor.couponPositions) * carryBoostMult(actor, state); // long encaisse, short paie ; décrémente le RCE (boosté si Récolte active)
     const mat = settleMatured(actor.couponPositions);
     actor.cash += mat.cash; // long récupère U, short rend U
     actor.couponPositions = mat.survivors;
@@ -143,7 +168,9 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
     if (!policy) return;
     let pa = PA_PAR_TOUR;
     for (const action of policy.decide(actor, state, rng)) {
-      const cost = PA_COST[action.verb === 'RESERVER' ? 'RESERVER' : action.op] ?? 1;
+      const cost = action.verb === 'COMPETENCE'
+        ? (action.skill === 'cover_arm' ? (actor.coverSkill?.paCost ?? 2) : (actor.carrySkill?.paCost ?? 3))
+        : PA_COST[action.verb === 'RESERVER' ? 'RESERVER' : action.op] ?? 1;
       if (cost > pa) break;
       pa -= cost;
       executeAction(actor, action, state, flux);

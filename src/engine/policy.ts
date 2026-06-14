@@ -20,7 +20,10 @@ export type PlannedAction =
   | { verb: 'POSITIONNER'; op: 'fermer'; hexId: HexId }
   // Ouvre une position sur un coupon offert (crédit hors-V) : long XOR short, taille
   // `notional` choisie une fois et verrouillée (spec crédit-coupons §6).
-  | { verb: 'POSITIONNER'; op: 'ouvrir_coupon'; issuer: HexId; maturity: CouponMaturity; notional: number; direction: Direction };
+  | { verb: 'POSITIONNER'; op: 'ouvrir_coupon'; issuer: HexId; maturity: CouponMaturity; notional: number; direction: Direction }
+  // Active une compétence d'archétype (Vautour) : « Récolte » (boost carry) ou « Couverture »
+  // (armer l'anti-défaut). Coûte les PA propres à la compétence.
+  | { verb: 'COMPETENCE'; skill: 'carry_boost' | 'cover_arm' };
 
 export interface Policy {
   id: string;

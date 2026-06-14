@@ -43,6 +43,8 @@ export function buildInitialState(config: ConfigPartie): InitResult {
 
   const player = mkActor(config.archetype.id);
   player.ignoreLockup = config.archetype.ignoreLockup; // pouvoir d'archétype (spec immo)
+  player.carrySkill = config.archetype.carrySkill; // compétence « Récolte » (Vautour)
+  player.coverSkill = config.archetype.coverSkill; // compétence « Couverture » (Vautour)
   const actors: ActorState[] = [
     player,
     ...config.adversaires.map((a) => mkActor(a.id)),

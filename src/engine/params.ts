@@ -178,6 +178,19 @@ export const PARAM_RANGES = {
   // sans effet sur la distribution de crises (couche richesse pure). TRANSPARENT (affiché).
   // Franchise relative au capital de départ (= 100) → ~0.5× ; tirée pour ne pas mémoriser. Entier.
   cashCarryFloor: r(40, 60),
+
+  // ── Fixes crédit (exploration : rééquilibrage du baseline coupon-long) ──
+  // Flags 0/1 (défaut 0 = comportement actuel, mesurés via paramsOverride avant adoption).
+  // A : exclure la richesse-coupon du dénominateur du levier agrégé (anti suppression de crises).
+  //     ADOPTÉ (mesuré) : à lui seul, ramène le baseline coupon-long de 48 % à 31 % (bande neutre)
+  //     et tue la boucle « je compose → j'étouffe les crises ». B/C non nécessaires (laissés off).
+  fixLeverageDenom: r(1, 1),
+  // B : un book de coupons agrégé (surpondéré HY) nourrit F (reach-for-yield = bulle de crédit).
+  //     Poids du terme ; 0 = off. NON nécessaire (Fix A a suffi) — gardé pour exploration future.
+  couponFragility: r(0, 0),
+  // C : compression du rendement par la demande (le taux offert baisse quand le notionnel
+  //     afflue sur un émetteur) — pente ; 0 = off. NON nécessaire (Fix A a suffi).
+  couponYieldCompression: r(0, 0),
 } as const;
 
 export type ParamKey = keyof typeof PARAM_RANGES;
