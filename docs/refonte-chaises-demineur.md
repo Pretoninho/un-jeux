@@ -1,10 +1,16 @@
 # Refonte — Chaises musicales × Démineur
 
-> Document vivant. Capture le **virage de thème et de gameplay** décidé en session
+> ⏸️ **STATUT (2026-06-14) : EXPLORATION PARKÉE — en réflexion.** Le concepteur prend
+> une nuit avant de trancher. Cette piste est désormais envisagée comme un **JEU SÉPARÉ
+> réutilisant le moteur actuel**, *pas* comme une refonte qui remplace le jeu de base.
+> **Le jeu de base reprend son développement normal** (cf. `docs/game-design-memo.md` /
+> `.claude/design-progress.md`). Document conservé intact comme point de reprise.
+>
+> Document vivant. Capture le **virage de thème et de gameplay** exploré en session
 > 2026-06-14. Le **moteur** (grille d'hexes, ticks, fragilité `F`, cascade, crowding,
-> impact-prix, périmètre, compétences d'archétype) est **conservé** : on rhabille et
+> impact-prix, périmètre, compétences d'archétype) serait **réutilisé** : on rhabille et
 > on simplifie, on ne reconstruit pas. Le détail de l'ancien cadre finance reste dans
-> `docs/game-design-memo.md` (référence historique).
+> `docs/game-design-memo.md` (référence du jeu de base).
 
 ---
 
@@ -214,19 +220,55 @@ deviennent piégées) mais **n'est plus l'énigme du tronc commun**.
 
 ---
 
-## 10. Forks encore ouverts (à trancher en continuant)
+## 10. Fork #1 — « qu'est-ce qu'une mine » (développé, en attente de validation)
 
-1. **Que représente précisément une « mine » ?** Un hexe qui blesse à l'arrêt ; lien
-   exact avec la **cascade** (morphologie chute→rebond→jambe) à définir.
-2. **Combien de PV de base ? de PA de base ? de pièces de départ ?** Valeurs à régler.
-3. **Granularité du refuge** : une **case** précise, ou une **zone/cluster** ? (la
+Modèle proposé en séance (ancré dans `cascade.ts`), **non encore validé** :
+
+- **Une mine = faille (cachée) × charge (empilée).**
+  1. **Faille** (cachée, structurelle) : prédisposition de fragilité d'un hexe — *« cette
+     chaise a un pied fragile »*. **C'est ce que le démineur révèle** (les chiffres
+     comptent les failles adjacentes). Posée par carte/round → déductible.
+  2. **Charge** (émergente, semi-visible) : crowding + levier empilés (`crowdingIndex`),
+     lisibles en filigrane par le prix. **C'est la charge qui arme la faille.**
+  3. **Déclencheur** (global) : `F` / l'arrêt de la musique → décide *quand* et avec
+     quelle violence (`amplitude`) les failles armées détonnent.
+- **Granularité : danger PAR HEXE, déclencheur GLOBAL.** Un séisme commun qui ne casse
+  que ce qui était **fragile + surchargé** ; le **refuge** = la chaise que personne n'a
+  chargée et qui n'a pas de faille (souvent une chaise pas chère).
+- **Skill = combiner le caché déduit (faille) et le visible lu (charge/prix).**
+
+**Sous-choix (leans, non figés) :** (1) faille **figée par round**, dérive lente réservée
+à la campagne ; (2) dégâts **∝ exposition/levier** (pas forfaitaires) ; (3) on **peut
+agir pendant** la fenêtre de détonation (réaction entre ticks).
+
+## 11. ⏸️ En réflexion — décision majeure à trancher après la nuit
+
+**Effacer le système de `bounce` (rebond) et passer à une boucle atomique.** Le
+concepteur veut la boucle : **dépenser → se positionner → détonation → outcome →
+recommencer**, *sans* le faux-redémarrage.
+
+- ✅ Faisable : `cascade.ts` est modifiable ; supprimer le bounce retire la machine à
+  phases (leg1/bounce/leg3), `isRealFloor`, `bounceDetune`, le « mensonge du rebond ».
+  **Vraie simplification.** Coût : on **perd le piège press-your-luck** du faux-redémarrage
+  → la tension se **déplace en amont** (déduction sous double contrainte + plan secret) ;
+  la détonation devient **le clic du démineur** (ai-je bien déduit ?).
+- ❓ **Question ouverte qui en découle — rôle de `F`** (à trancher) :
+  - **(a)** détonation **à chaque tour**, `F` = **sévérité croissante** (« la musique
+    accélère » devient la courbe de difficulté ; simplifie aussi `fragility.ts` : plus de
+    zone morte / plafond / `crisisProbability`, juste un cadran qui monte). *Lean proposé.*
+  - **(b)** détonation **occasionnelle**, `F` reste un **déclencheur** (statu quo moteur).
+
+## 12. Forks encore ouverts (à trancher en reprenant)
+
+1. **Combien de PV de base ? de PA de base ? de pièces de départ ?** Valeurs à régler.
+2. **Granularité du refuge** : une **case** précise, ou une **zone/cluster** ? (la
    chaise musicale pure = rareté : moins de refuges que de joueurs/menaces).
-4. **Source des pièges en solo** : système vs IA — qui « ment » quand il n'y a pas
+3. **Source des pièges en solo** : système vs IA — qui « ment » quand il n'y a pas
    d'adversaire humain ?
 
 ---
 
-## 11. Table de traduction (ancien → nouveau)
+## 13. Table de traduction (ancien → nouveau)
 
 | Ancien (finance) | Nouveau (chaises × démineur) |
 | --- | --- |

@@ -9,10 +9,16 @@
 > **fait sauter le verrou** — latent (aucun archétype ne l'a encore). Couche UI (`interaction.ts canActOnPositionAt`
 > pur+testé, `App.svelte`). 127 tests (+6), moteur INCHANGÉ. À muer ENSUITE en compétence active (PA+fenêtre+cd).
 >
-> 🎮 **FOCUS COURANT = GAMEPLAY (2026-06-14)** : l'esthétique est **mise de côté** (parquée, pas annulée). Le
-> moteur de rendu est tranché (SVG, ci-dessous) et la **direction artistique** (palette/icônes/mood/juice CSS)
-> devient un **chantier séparé à reprendre plus tard** — on ne le travaille PAS maintenant. Toute l'énergie va
-> sur les **mécaniques de jeu**. (Le concepteur s'apprête à exposer une nouvelle idée gameplay.)
+> 🎮 **FOCUS COURANT = JEU DE BASE (2026-06-14, soir)** : on **reprend le développement du jeu de base** (cadre
+> finance, ce memo). L'esthétique reste **parquée** (DA = chantier séparé) ; le moteur de rendu est tranché (SVG).
+> Toute l'énergie va sur les **mécaniques du jeu de base**.
+>
+> ⏸️ **PISTE PARKÉE — « Chaises musicales × Démineur » (`docs/refonte-chaises-demineur.md`)** : exploration d'un
+> **virage de thème** (abandon du registre finance) → chaise musicale + démineur + économie d'information (pièces =
+> enquête, PV = survie). Le concepteur **réfléchit une nuit** ; envisagé désormais comme un **JEU SÉPARÉ réutilisant
+> le moteur**, PAS une refonte du jeu de base. Acquis notés dans le doc (mine = faille×charge, enquête réflexive,
+> détonation forçable = fire-sale→marge). **Décision en suspens** : effacer le `bounce` + détonation chaque tour avec
+> `F` = sévérité croissante (a) vs déclencheur occasionnel (b). À reprendre si/quand le concepteur revient dessus.
 >
 > 👥 **MULTIJOUEUR = BOARD PARTAGÉ (confirmé explicitement 2026-06-14, §10/§31)** : un **seul plateau commun**,
 > une **seule fragilité `F` commune** + sentiment partagé (états systémiques que tous influencent ET subissent,
