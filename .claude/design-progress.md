@@ -1,7 +1,17 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.24
+> Dernière mise à jour : 2026-06-14 — v1.25
+>
+> 🎯 **SISMOGRAPHE rendu ACTIF — « Le Grand Pari » (2026-06-14)** : il était trop passif (jauge + thêta
+> = info/coût subis, aucun geste). Mesuré : **levier + jauge = GAME-BREAKING** (top1 88-99 %, robuste au
+> bruit — leviérer la reprise fiable est sans risque quand on time). Le levier est le coupable, pas la
+> jauge. → Geste actif = **SHORTER le krach** (pari DIRECTIONNEL, déjà dispo dans l'UI ; la jauge dit
+> *quand*). Build : `noLeverage: true` (le levier+jauge serait OP + empièterait sur le fonds leveragé) +
+> `calmTheta` 0.005→**0.007** → short balançable, top1 **38.8 %**, excédent +2 % (§28.8 ✓). Pas de
+> mécanique séparée. UI : panneau jauge enrichi (Grand Pari : zone rouge→SHORT/cash, creux→frappe LONG).
+> 121 tests, svelte-check 0. Leçon : info parfaite + amplification = dégénéré → l'edge du Sismo est
+> INFO+DIRECTION, jamais l'amplification.
 >
 > 🌋 **SISMOGRAPHE — 2ᵉ archétype (2026-06-14)** : trader macro (réf. Soros). **POUVOIR** : jauge de
 > fragilité `F` INNÉE (voit le séisme caché — exclusif ; les autres n'ont que les signaux bruités) →
