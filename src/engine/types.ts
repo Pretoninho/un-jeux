@@ -91,6 +91,17 @@ export interface Archetype {
    * (achat décoté au creux). La contrainte `noLeverage` paie le pouvoir de cette ressource (net neutre).
    */
   dryPowder?: { max: number; discountPerPowder: number; maxDiscount: number; fThreshold: number };
+  /**
+   * Pouvoir du Sismographe (§6, macro) : voit la FRAGILITÉ `F` cachée (jauge sismique innée) —
+   * exclusif (les autres n'ont que les signaux bruités). Lentille sur la physique neutre (§26).
+   */
+  fragilityGauge?: boolean;
+  /**
+   * Contrainte du Sismographe : « fragile au calme » = thêta de couverture. Ponction de richesse
+   * par tour TANT QU'AUCUNE crise n'est active (les couvertures permanentes décaient dans le boom,
+   * paient au krach). Fraction de la richesse/tour. Paie l'edge de la jauge (mesuré neutre à ~0.005).
+   */
+  calmTheta?: number;
 }
 
 /**

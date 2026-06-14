@@ -81,6 +81,10 @@ export interface ActorState {
   dryPowderCfg?: { max: number; discountPerPowder: number; maxDiscount: number; fThreshold: number };
   /** Réserve sèche accumulée (+1/tour patient, plafonnée) ; consommée à l'ouverture en haute F. */
   dryPowder?: number;
+  /** Pouvoir Sismographe : voit la fragilité `F` cachée (copié à l'init). */
+  fragilityGauge?: boolean;
+  /** Contrainte Sismographe : thêta de couverture (ponction de richesse/tour hors crise). */
+  calmTheta?: number;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */

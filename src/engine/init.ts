@@ -48,6 +48,8 @@ export function buildInitialState(config: ConfigPartie): InitResult {
   player.noLeverage = config.archetype.noLeverage; // contrainte permanente (Vautour)
   player.dryPowderCfg = config.archetype.dryPowder; // ressource « Réserve sèche » (Vautour)
   if (player.dryPowderCfg) player.dryPowder = 0;
+  player.fragilityGauge = config.archetype.fragilityGauge; // jauge sismique (Sismographe)
+  player.calmTheta = config.archetype.calmTheta; // thêta de couverture (Sismographe)
   const actors: ActorState[] = [
     player,
     ...config.adversaires.map((a) => mkActor(a.id)),

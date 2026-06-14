@@ -126,3 +126,17 @@ describe('Vautour — contrainte (noLeverage) & ressource (Réserve sèche)', ()
     expect(p.positions.find((x) => x.hexId === 'LC_US')!.entryV).toBe(V); // entrée au prix plein
   });
 });
+
+describe('Sismographe — contrainte « fragile au calme » (thêta de couverture)', () => {
+  it('au calme (hors crise), il fond — sans thêta, il ne fond pas', () => {
+    // Deux runs identiques (même seed), seul le thêta diffère ; on reste au calme (réserve,
+    // f0 < zone morte → pas de crise tour 1). Le run avec thêta doit avoir MOINS de cash.
+    const sans = buildInitialState(presetMvp(1));
+    runTurn(sans.state, reserveAll, sans.rng);
+    const avec = buildInitialState(presetMvp(1));
+    avec.state.actors[0]!.calmTheta = 0.02; // 2 %/tour
+    runTurn(avec.state, reserveAll, avec.rng);
+    // L'écart ≈ 2 % de la richesse (~2 sur 100), le reste (carry cash) étant identique.
+    expect(avec.state.actors[0]!.cash).toBeLessThan(sans.state.actors[0]!.cash - 1.5);
+  });
+});

@@ -220,6 +220,15 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
   //   jour), AVANT la comptabilité de richesse (entre dans wealthHistory ce tour-ci).
   accrueCashCarry(state);
 
+  // 4quater. Thêta de couverture (Sismographe) : « fragile au calme » → ponction de richesse
+  //   chaque tour SANS crise active (les couvertures décaient dans le boom). Observable (clouée
+  //   sur la crise, pas sur F caché → pas de fuite). Paie l'edge de la jauge.
+  if (!state.crisis.active) {
+    for (const actor of state.actors) {
+      if (actor.calmTheta) actor.cash -= actor.calmTheta * actorWealth(actor, state.market);
+    }
+  }
+
   // Signaux observés du tour (memo §23.6). RNG dédié, dérivé du seed+tour, pour ne
   // pas perturber la dynamique : les signaux sont purement observationnels.
   const sigRng = makeRng(state.rngSeed * 1000003 + state.turn);

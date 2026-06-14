@@ -188,6 +188,10 @@
       noLeverage: !!player.noLeverage,
       dryPowder: player.dryPowder ?? 0,
       dryPowderMax: player.dryPowderCfg?.max ?? 0,
+      // Sismographe : jauge de fragilité F innée + thêta de couverture (fragile au calme).
+      fragilityGauge: !!player.fragilityGauge,
+      calmTheta: player.calmTheta ?? 0,
+      inCrisis: gs.crisis.active,
       // Compétence « Récolte » (Vautour) : carry ×factor pendant duration tours, cooldown.
       // L'activation vise la PROCHAINE résolution (tour gs.turn+1) → décalage d'un tour.
       hasCarrySkill: !!player.carrySkill,
@@ -581,6 +585,18 @@
           </div>
         </section>
 
+        {#if view.fragilityGauge}
+          <section class="sismo">
+            <h3>🌋 Jauge sismique <span class="hint">fragilité cachée</span></h3>
+            <div class="bar-row">
+              <span>Fragilité F</span>
+              <div class="bar"><div class="fill" style="width:{Math.min(100, view.fReal * 100)}%"></div></div>
+            </div>
+            <div class="small">F = <b>{view.fReal.toFixed(2)}</b> · {view.fReal < 0.4 ? 'zone morte — aucun krach possible' : view.fReal >= 0.85 ? '⚠️ PLAFOND — krach imminent' : 'zone roulette — ça peut sauter (proba ↑ avec F)'}</div>
+            <div class="muted small">Tu vois la magnitude du séisme — pas sa date (roulette). {view.inCrisis ? '🔥 Crise : tes couvertures paient (pas de thêta).' : `🩸 Thêta de couverture : −${(view.calmTheta * 100).toFixed(1)}%/tour au calme (tu fonds tant que rien ne tremble).`}</div>
+          </section>
+        {/if}
+
         <section class="credit">
           <h3>Crédit · Banque centrale <span class="hint">taux directeur</span></h3>
           <div class="bar-row">
@@ -869,6 +885,7 @@
   .lire { width: auto; margin: 0; padding: .15rem .4rem; font-size: .72rem; }
   .locked { font-size: .72rem; color: #c79a4a; }
   .small { font-size: .72rem; } .muted { color: #7a8294; }
+  .sismo { border-color: #6b4a3f; }
   .skill { background: #1d2230; border: 1px solid #3a4459; border-radius: 6px; padding: .45rem; margin: .4rem 0; }
   .skill button { margin: .3rem 0 0; }
   .cash { font-size: .78rem; color: #9aa3b5; margin: .4rem 0; }
