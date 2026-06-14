@@ -26,11 +26,19 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
   if (action.verb === 'RESERVER') return;
 
   if (action.verb === 'COMPETENCE') {
-    // « Récolte » (Vautour) : si la compétence est prête, arme le boost et pose le cooldown.
-    const sk = actor.carrySkill;
-    if (!sk || state.turn < (actor.carrySkillReadyAt ?? 0)) return;
-    actor.carryBoostUntil = state.turn + sk.duration - 1; // actif `duration` tours, dès ce tour
-    actor.carrySkillReadyAt = state.turn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    if (action.skill === 'carry_boost') {
+      // « Récolte » : si prête, arme le boost de carry et pose le cooldown.
+      const sk = actor.carrySkill;
+      if (!sk || state.turn < (actor.carrySkillReadyAt ?? 0)) return;
+      actor.carryBoostUntil = state.turn + sk.duration - 1; // actif `duration` tours, dès ce tour
+      actor.carrySkillReadyAt = state.turn + sk.duration + sk.cooldown; // réutilisable après le cooldown
+    } else if (action.skill === 'cover_arm') {
+      // « Couverture » : si prête, ARME l'anti-défaut pour `window` tours (auto-tir en crise).
+      const sk = actor.coverSkill;
+      if (!sk || state.turn < (actor.coverReadyAt ?? 0)) return;
+      actor.coverArmedUntil = state.turn + sk.window - 1; // armée `window` tours
+      actor.coverReadyAt = state.turn + sk.window + sk.cooldown; // ré-armable après le cooldown
+    }
     return;
   }
 
@@ -120,7 +128,9 @@ function runCreditLifecycle(state: GameState, rng: Rng): void {
   // 2. Par acteur : défauts (en crise crédit) → portage → échéances (vrai bond).
   const inCreditCrisis = state.crisis.active; // toute crise systémique touche le crédit (M domine)
   for (const actor of state.actors) {
-    const def = resolveCouponDefaults(actor.couponPositions, state.fragility, inCreditCrisis, rng, state.params);
+    // « Couverture » (Vautour) : armée → les coupons de cet acteur ne défaillent pas ce tour.
+    const covered = state.turn <= (actor.coverArmedUntil ?? -1);
+    const def = resolveCouponDefaults(actor.couponPositions, state.fragility, inCreditCrisis && !covered, rng, state.params);
     actor.couponPositions = def.survivors; // les défauts disparaissent (long perd U, short gagne U)
     actor.cash += accrueCoupons(actor.couponPositions) * carryBoostMult(actor, state); // long encaisse, short paie ; décrémente le RCE (boosté si Récolte active)
     const mat = settleMatured(actor.couponPositions);
@@ -159,7 +169,7 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
     let pa = PA_PAR_TOUR;
     for (const action of policy.decide(actor, state, rng)) {
       const cost = action.verb === 'COMPETENCE'
-        ? (actor.carrySkill?.paCost ?? 3)
+        ? (action.skill === 'cover_arm' ? (actor.coverSkill?.paCost ?? 2) : (actor.carrySkill?.paCost ?? 3))
         : PA_COST[action.verb === 'RESERVER' ? 'RESERVER' : action.op] ?? 1;
       if (cost > pa) break;
       pa -= cost;
