@@ -1,7 +1,15 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.20
+> Dernière mise à jour : 2026-06-14 — v1.21
+>
+> 🛡️ **VAUTOUR — PAIRE de compétences off/def (2026-06-14)** : 2ᵉ compétence **Couverture** (défensive,
+> armer + auto-tir) : ARMER (2 PA) → anti-défaut des coupons **W=2 tours** → cooldown 10 ; auto-tir en crise
+> (pas d'auto-seuil → la décision « sentir le danger » reste au joueur). Data-driven (`coverSkill`, gate dans
+> `runCreditLifecycle`). **Finding** : 2 pouvoirs partagent le budget de neutralité → **co-doser** (Récolte
+> seule déjà 43 %). Choix : Récolte ×2 mais **cd 12→18** (rareté, punch gardé) + Couverture W=2 → top1 **~42 %**,
+> duel ~50 % (§28.8 ✓). UI 2 boutons. 104 tests (+cover), svelte-check 0. Leçon : garder la magnitude, payer
+> la 2ᵉ compétence par la fréquence. Reste fiche Vautour §6 : ressource « Réserve sèche » + contrainte de cadre.
 >
 > 🦅 **VAUTOUR — 1ᵉʳ pouvoir d'archétype « Récolte » (2026-06-14)** : compétence active (3 PA) →
 > carry ×2 pendant 2 tours, cooldown 12. Data-driven (`Archetype.carrySkill`) → ajouter un pouvoir =
