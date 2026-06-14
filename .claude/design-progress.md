@@ -1,7 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-13 — v1.19
+> Dernière mise à jour : 2026-06-14 — v1.20
+>
+> 🦅 **VAUTOUR — 1ᵉʳ pouvoir d'archétype « Récolte » (2026-06-14)** : compétence active (3 PA) →
+> carry ×2 pendant 2 tours, cooldown 12. Data-driven (`Archetype.carrySkill`) → ajouter un pouvoir =
+> une ligne. Moteur : `COMPETENCE` (action, coût PA) arme `carryBoostUntil` + pose `carrySkillReadyAt` ;
+> `carryBoostMult` booste le carry V + coupons. **Inerte si non activé** → calibration intacte.
+> Contre-poids : 3 PA + cooldown 12 + défaut crédit en krach (exagéré ×2, neutre en espérance).
+> Validé moteur (`scripts/vautour-skill.ts`) : top1 **31 %→40 %**, duel 51 % (§28.8 ✓). UI « 🦅 Récolte ».
+> **102 tests** (+3 `archetype.test`), svelte-check 0, build OK. **Pipeline archétype prouvé bout-en-bout.**
+> Reste fiche Vautour §6 : câbler la ressource « Réserve sèche » + une contrainte permanente de cadre.
 >
 > 🎭 **Archétypes — réflexion ouverte + RÈGLE DES POUVOIRS (2026-06-13)** : on est prêt à concevoir
 > (physique calibrée + archi data-driven + pouvoir prouvé `ignoreLockup`). **Règle clé** : un pouvoir
