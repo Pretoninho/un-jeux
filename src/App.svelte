@@ -306,6 +306,12 @@
     if (!res) return;
     player.cash += res.entryCash; // long −U, short +U
     player.couponPositions.push(res.position);
+    // Investir sur un crédit = aller sur la case : on s'y déplace si on y est adjacent (le crédit
+    // est traversable). Émetteur lointain (desk à distance) = trade en place, sans téléportation.
+    if (issuer !== playerHex && neighborsOfPlayer().includes(issuer)) {
+      playerHex = issuer;
+      reveal(issuer); // révèle les nouveaux voisins
+    }
     selected = issuer;
     log = [`Coupon ${side === 'long' ? 'LONG' : 'SHORT'} ${hexById(issuer)?.label} ${maturity} · ${notional.toFixed(0)} @ ${(offered.rate * 100).toFixed(1)}%/t`, ...log].slice(0, 8);
     spend(1);
