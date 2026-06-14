@@ -75,6 +75,12 @@ export interface ActorState {
   coverArmedUntil?: number;
   /** « Couverture » ré-armable quand `state.turn >= coverReadyAt`. */
   coverReadyAt?: number;
+  /** Contrainte permanente (Vautour) : jamais de levier (copiée à l'init). */
+  noLeverage?: boolean;
+  /** Config de la ressource « Réserve sèche » (Vautour) : décote de déploiement (copiée à l'init). */
+  dryPowderCfg?: { max: number; discountPerPowder: number; maxDiscount: number; fThreshold: number };
+  /** Réserve sèche accumulée (+1/tour patient, plafonnée) ; consommée à l'ouverture en haute F. */
+  dryPowder?: number;
 }
 
 /** État par hexe : valorisation publique `V` et ancre cachée `A` (memo §25.2). */

@@ -11,6 +11,7 @@ import { simulate, type SimResult } from './simulate';
 import { policyForProfile } from './ai';
 import { steadyLong } from './policy';
 import { presetMvp } from '../data/config-mvp';
+import { NEUTRE } from '../data/archetypes/neutre';
 import { FONDS_LEVERAGE } from '../data/profiles/fonds-leverage';
 import { VALUE_PATIENT } from '../data/profiles/value-patient';
 
@@ -18,8 +19,11 @@ const N = 300;
 const SEED = 1000;
 const AIS = [policyForProfile(FONDS_LEVERAGE), policyForProfile(VALUE_PATIENT)];
 
+// Sondes de PHYSIQUE : on injecte des politiques abstraites (steadyLong) dans le slot joueur,
+// avec l'archétype NEUTRE (sans pouvoir ni contrainte) → on teste le moteur, pas le Vautour.
+// (Le Vautour porte `noLeverage` : il faut un archétype neutre pour qu'un pyromane puisse leviérer.)
 const run = (playerPolicy: ReturnType<typeof steadyLong>) =>
-  simulate(presetMvp(SEED), N, { policies: [playerPolicy, ...AIS] });
+  simulate({ ...presetMvp(SEED), archetype: NEUTRE }, N, { policies: [playerPolicy, ...AIS] });
 
 const rate = (rs: SimResult[], pred: (r: SimResult) => boolean) =>
   rs.filter(pred).length / rs.length;

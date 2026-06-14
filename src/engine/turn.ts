@@ -68,9 +68,18 @@ function executeAction(actor: ActorState, action: PlannedAction, state: GameStat
     // Illiquidité (spec immo) : long-only (pas de short) et SANS levier (option a → pas
     // d'appel de marge sur un asset bloqué). `entryTurn` arme le verrou de sortie.
     const direction = hex?.longOnly ? 'long' : action.direction;
-    const leverage = hex?.illiquid ? 0 : action.leverage;
+    // Levier : 0 si illiquide OU si l'acteur a la contrainte `noLeverage` (Vautour, capital patient).
+    const leverage = hex?.illiquid || actor.noLeverage ? 0 : action.leverage;
+    // Réserve sèche (Vautour) : déployer en HAUTE FRAGILITÉ décote l'entrée (achat au creux du
+    // krach), à hauteur de la poudre accumulée — puis on la consomme. Meilleure base = plus d'upside.
+    let entryV = m.V;
+    const dp = actor.dryPowderCfg;
+    if (dp && state.fragility > dp.fThreshold && (actor.dryPowder ?? 0) > 0) {
+      entryV = m.V * (1 - Math.min(dp.maxDiscount, actor.dryPowder! * dp.discountPerPowder));
+      actor.dryPowder = 0; // poudre dépensée
+    }
     actor.cash -= equity;
-    actor.positions.push({ hexId: action.hexId, direction, equity, leverage, entryV: m.V, entryTurn: state.turn });
+    actor.positions.push({ hexId: action.hexId, direction, equity, leverage, entryV, entryTurn: state.turn });
     const sign = direction === 'short' ? -1 : 1; // long = achat (+), short = vente (−)
     flux[action.hexId] = (flux[action.hexId] ?? 0) + sign * equity * (1 + leverage);
   } else if (action.op === 'cloture_partielle') {
@@ -166,6 +175,7 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
   state.actors.forEach((actor, i) => {
     const policy = policies[i];
     if (!policy) return;
+    const posBefore = actor.positions.length;
     let pa = PA_PAR_TOUR;
     for (const action of policy.decide(actor, state, rng)) {
       const cost = action.verb === 'COMPETENCE'
@@ -174,6 +184,10 @@ export function runTurn(state: GameState, policies: Policy[], rng: Rng): void {
       if (cost > pa) break;
       pa -= cost;
       executeAction(actor, action, state, flux);
+    }
+    // Réserve sèche (Vautour) : +1 par tour PATIENT (aucune ouverture de position-V), plafonnée.
+    if (actor.dryPowderCfg && actor.positions.length === posBefore) {
+      actor.dryPowder = Math.min(actor.dryPowderCfg.max, (actor.dryPowder ?? 0) + 1);
     }
   });
 

@@ -20,6 +20,7 @@ import { simulate, type SimResult } from '../src/engine/simulate';
 import { steadyLong, alwaysReserve, type Policy } from '../src/engine/policy';
 import { policyForProfile } from '../src/engine/ai';
 import { presetMvp } from '../src/data/config-mvp';
+import { NEUTRE } from '../src/data/archetypes/neutre';
 import { FONDS_LEVERAGE } from '../src/data/profiles/fonds-leverage';
 import { VALUE_PATIENT } from '../src/data/profiles/value-patient';
 import { maxDrawdown, totalReturn } from '../src/engine/score';
@@ -99,7 +100,9 @@ interface Row {
 }
 
 function measure(name: string, policy: Policy): Row {
-  const results = simulate(presetMvp(SEED), N, {
+  // Sonde de PHYSIQUE : archétype NEUTRE (sans pouvoir ni contrainte) pour que les politiques
+  // abstraites (steadyLong) testent le moteur, pas le Vautour (qui porte noLeverage).
+  const results = simulate({ ...presetMvp(SEED), archetype: NEUTRE }, N, {
     policies: [policy, policyForProfile(FONDS_LEVERAGE), policyForProfile(VALUE_PATIENT)],
   });
   const counts = results.map((r) => r.crisisCount);
@@ -160,7 +163,7 @@ console.log(`  2+ crises  : ${pct(agg.twoPlus)}   (cible ~45%)`);
 // Trajectoire MOYENNE de F (vraie courbe cachée) — pour voir la vitesse de montée.
 // On la calcule sur deux profils contrastés. La zone morte est à 0.40.
 function fTrajectory(policy: Policy): number[] {
-  const results = simulate(presetMvp(SEED), N, {
+  const results = simulate({ ...presetMvp(SEED), archetype: NEUTRE }, N, {
     policies: [policy, policyForProfile(FONDS_LEVERAGE), policyForProfile(VALUE_PATIENT)],
   });
   const maxLen = Math.max(...results.map((r) => r.fragilityHistory.length));

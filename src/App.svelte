@@ -183,6 +183,10 @@
       bcDelta: gs.credit.bc.rate - prevBcRate,
       bcTarget: gs.credit.bc.target, // cible de la fonction de réaction (révélée par la présence BC)
       cashCarryFloor: gs.params.cashCarryFloor, // franchise : la réserve au-dessus encaisse r_BC
+      // Vautour : contrainte (pas de levier) + ressource « Réserve sèche » (poudre → décote de krach).
+      noLeverage: !!player.noLeverage,
+      dryPowder: player.dryPowder ?? 0,
+      dryPowderMax: player.dryPowderCfg?.max ?? 0,
       // Compétence « Récolte » (Vautour) : carry ×factor pendant duration tours, cooldown.
       // L'activation vise la PROCHAINE résolution (tour gs.turn+1) → décalage d'un tour.
       hasCarrySkill: !!player.carrySkill,
@@ -256,6 +260,20 @@
     view = buildView();
   }
 
+  // Réserve sèche (Vautour) : déployer en HAUTE FRAGILITÉ décote l'entrée (achat au creux du
+  // krach), à hauteur de la poudre accumulée — puis on la consomme. F reste cachée (effet silencieux).
+  function vautourEntry(hexId: string): number {
+    const player = gs.actors[0]!;
+    const V = gs.market[hexId]!.V;
+    const cfg = player.dryPowderCfg;
+    const powder = player.dryPowder ?? 0;
+    if (cfg && gs.fragility > cfg.fThreshold && powder > 0) {
+      player.dryPowder = 0; // poudre dépensée
+      return V * (1 - Math.min(cfg.maxDiscount, powder * cfg.discountPerPowder));
+    }
+    return V;
+  }
+
   function open(hexId: string, frac: number, direction: 'long' | 'short') {
     const here = hexId === playerHex; // investir « ici » (hexe courant) = sans se déplacer
     const h = hexById(hexId);
@@ -266,10 +284,11 @@
     const equity = player.cash * frac;
     if (equity <= 0) return;
     // Illiquidité (spec immo) : long-only + sans levier ; entryTurn arme le verrou.
+    // Levier 0 si illiquide OU contrainte noLeverage (Vautour). Entrée décotée si Réserve sèche.
     const dir = h?.longOnly ? 'long' : direction;
-    const lev = h?.illiquid ? 0 : openLev;
+    const lev = (h?.illiquid || player.noLeverage) ? 0 : openLev;
     player.cash -= equity;
-    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: vautourEntry(hexId), entryTurn: gs.turn });
     if (!here) {
       playerHex = hexId; // déplacement
       reveal(hexId); // révèle les nouveaux voisins
@@ -338,10 +357,10 @@
     const h = hexById(hexId);
     // Renforce dans le sens dominant déjà détenu sur l'hexe (forcé long si longOnly).
     const dir = h?.longOnly ? 'long' : ((view.exposure[hexId]?.short ?? 0) > (view.exposure[hexId]?.long ?? 0) ? 'short' : 'long');
-    const lev = h?.illiquid ? 0 : openLev;
+    const lev = (h?.illiquid || player.noLeverage) ? 0 : openLev;
     player.cash -= equity;
     // entryTurn : renforcer un illiquide RE-VERROUILLE (la tranche la plus récente fait foi).
-    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: gs.market[hexId]!.V, entryTurn: gs.turn });
+    player.positions.push({ hexId, direction: dir, equity, leverage: lev, entryV: vautourEntry(hexId), entryTurn: gs.turn });
     spend(1);
   }
 
@@ -645,7 +664,11 @@
                   <button class:active={openDir === 'short'} onclick={() => (openDir = 'short')}>SHORT</button>
                 {/if}
               </div>
-              {#if !illiquid}
+              {#if illiquid}
+                <!-- levier déjà interdit (illiquide) -->
+              {:else if view.noLeverage}
+                <div class="muted small">🚫 <b>Sans levier</b> — capital patient (contrainte du Vautour) : pas d'amplification.</div>
+              {:else}
                 <div class="lev-row">
                   <span>Levier</span>
                   <button class:active={openLev === 0} onclick={() => (openLev = 0)}>0×</button>
@@ -721,6 +744,12 @@
                   {view.coverReadyIn > 0 ? `🔒 prête dans ${view.coverReadyIn} tour(s)` : `Armer · anti-défaut ${view.coverWindow}t (${view.coverPaCost} PA)`}
                 </button>
               {/if}
+            </div>
+          {/if}
+          {#if view.dryPowderMax > 0}
+            <div class="skill">
+              <div class="court" style="margin:0">🦅 <b>Réserve sèche</b> <b class="up">{view.dryPowder}/{view.dryPowderMax}</b> <span class="muted small">+1/tour patient</span></div>
+              <div class="muted small">Déployer dans un krach (forte fragilité) achète <b>décoté</b> — la poudre fixe la ristourne, puis se vide.</div>
             </div>
           {/if}
           <div class="cash">
