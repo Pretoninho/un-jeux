@@ -1,7 +1,15 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.21
+> Dernière mise à jour : 2026-06-14 — v1.22
+>
+> 🧪 **UI : 2 fixes crédit + logique extraite/testée (2026-06-14)** : (1) acheter un crédit DÉPLACE le
+> joueur sur la case si adjacent (cohérence ; le crédit est traversable) ; (2) l'achat de crédit COMPTE
+> dans le CHAIN (une position sur un autre actif ensuite = enchaînement 2 PA). Puis **option 2** : logique
+> UI tricky extraite en fonctions PURES (`src/lib/interaction.ts` : traversée, CHAIN, déplacement crédit,
+> timing compétences avec décalage écran→résolution) — App.svelte délègue (source unique). 12 tests
+> (`interaction.test.ts`) verrouillent ces comportements hors DOM. 116 tests, svelte-check 0, build OK.
+> Note : « 1 crédit/tour » observé = émergent (géographie), PAS une règle dure — à formaliser si voulu.
 >
 > 🛡️ **VAUTOUR — PAIRE de compétences off/def (2026-06-14)** : 2ᵉ compétence **Couverture** (défensive,
 > armer + auto-tir) : ARMER (2 PA) → anti-défaut des coupons **W=2 tours** → cooldown 10 ; auto-tir en crise
