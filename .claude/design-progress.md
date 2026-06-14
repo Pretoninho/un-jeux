@@ -113,7 +113,16 @@
 > rétabli à **~50 %** via `leverageBorrowRate`↓ (0.015-0.03) + `marginCallThreshold`↑
 > (0.35-0.55) ; tempo **26/62/12**. Chiffres ci-dessus (28/59/13, duel 46 %) = état pré-crédit.
 >
-> 🖼️ **Portabilité / rendu (note 2026-06-13, memo §13)** : moteur (TS pur) / UI séparés → rendu interchangeable. Meilleurs graphismes = **rendu web enrichi** (PixiJS/Phaser/WebGL, réutilise le moteur tel quel). **Unity** possible mais = portage C# (cadré par les tests), surtout pour builds natifs. Choix du rendu différé ; ne jamais mélanger logique et affichage.
+> 🖼️ **MOTEUR DE RENDU — TRANCHÉ : SVG (2026-06-14, memo §13)** : décision prise (plus différée). Le jeu
+> rend ~13-16 hexes statiques + jauges + barres + data-viz + texte : profil **tour par tour, UI-lourd**, PAS
+> d'action temps réel ni de milliers d'entités → un moteur « jeu » serait un contre-emploi. **Choix : garder
+> SVG** (actuel, `App.svelte` : `<polygon>`/`<circle>` liés à la réactivité Svelte, 0 boucle de rendu). Le
+> « juice » passe par **CSS + transitions/motion Svelte** (remplissage de jauge, pulsation rouge de F, glow
+> d'hexe, fondus de révélation) — suffisant et gratuit en archi. **Escape hatch** : le SEUL gain réel de
+> PixiJS/Phaser ici = les **particules de krach** → si un jour ce moment les mérite, **overlay PixiJS sur ce
+> seul effet**, jamais un framework qui avale l'UI (une couche, pas une migration). **Unity** = réservé à un
+> éventuel virage build natif (portage C# cadré par les 60+ tests). Discipline maintenue : logique/affichage
+> jamais mélangés. **Direction artistique (palette/icônes/mood)** reste indépendante du moteur → chantier à part.
 >
 > 🧩 **Nouveaux nœuds (piste 2026-06-13)** : provisionner des **hexes à effets via le système de nœuds** (réutilise présence/S'installer/durée). **D'abord des nœuds VIDES, mécanique ensuite** (un à la fois). Menu : Chambre de compensation (marge), Réseau d'initiés (4ᵉ signal), Bourse (impact-prix), Desk recherche (délai signaux), Banque d'investissement (frontières), Média (réputation). Détail memo §22/§21.
 >
@@ -162,6 +171,7 @@
 | **Restructuration profils : primitives d'abord (profil NEUTRE = bac à sable), archétypes = spécificités par-dessus (un à la fois). Short = primitive, modulée par archétype** | §30 | v1.10 |
 | **Défaite : 3 stades (Stress → Crise → Effondrement)** | §14 | v0.5 |
 | **Parties indépendantes — aucun carry-over entre runs** | §14 | v0.5 |
+| **Moteur de rendu = SVG (juice par CSS/transitions Svelte ; Pixi en overlay ciblé pour les particules de krach seulement ; Unity = build natif futur)** | §13 | v1.26 |
 
 ---
 
