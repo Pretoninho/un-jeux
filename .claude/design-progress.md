@@ -1,7 +1,18 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.25
+> Dernière mise à jour : 2026-06-14 — v1.26
+>
+> 🎮 **FOCUS COURANT = GAMEPLAY (2026-06-14)** : l'esthétique est **mise de côté** (parquée, pas annulée). Le
+> moteur de rendu est tranché (SVG, ci-dessous) et la **direction artistique** (palette/icônes/mood/juice CSS)
+> devient un **chantier séparé à reprendre plus tard** — on ne le travaille PAS maintenant. Toute l'énergie va
+> sur les **mécaniques de jeu**. (Le concepteur s'apprête à exposer une nouvelle idée gameplay.)
+>
+> 👥 **MULTIJOUEUR = BOARD PARTAGÉ (confirmé explicitement 2026-06-14, §10/§31)** : un **seul plateau commun**,
+> une **seule fragilité `F` commune** + sentiment partagé (états systémiques que tous influencent ET subissent,
+> §10) ; **paris privés** révélés par bribes (plan & TICKs §31 : déplacements visibles, investissements cachés).
+> PAS de boards individuels — c'est *parce que* le plateau est commun que le jeu de fragilité fonctionne à
+> plusieurs. Statut : tranché solo-first / multi phase 2 ; §31 reste une proposition non implémentée.
 >
 > 🎯 **SISMOGRAPHE rendu ACTIF — « Le Grand Pari » (2026-06-14)** : il était trop passif (jauge + thêta
 > = info/coût subis, aucun geste). Mesuré : **levier + jauge = GAME-BREAKING** (top1 88-99 %, robuste au
