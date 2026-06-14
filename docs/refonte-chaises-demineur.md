@@ -81,6 +81,29 @@ Donc : **se presser sur une case → volatilité ↑ → `F` ↑ → précipite 
 case.** Le joueur **charge physiquement la mine** en s'y entassant. Conséquence de
 gameplay majeure : le **mislead a un coût réel** (cf. §7).
 
+### Forcer la détonation en 1 tour (boucle moteur, vérifiée)
+
+Un joueur **peut** déclencher la crise dans la résolution d'**un seul tour** — mais
+**uniquement sur une mine déjà armée** (encombrée + à levier). Deux leviers, dans le
+moteur actuel :
+
+1. **La fire-sale → cascade d'appels de marge** (le vrai détonateur).
+   `applyMarginCalls` + `fluxImpact` : (a) tu **largues une grosse position** sur un
+   hexe encombré → (b) **flux net négatif** → le prix chute → (c) les voisins **à
+   levier** franchissent `marginCallThreshold` → (d) ils sont **liquidés de force**,
+   leur vente **rajoute du flux négatif** → le prix rechute → liquide les suivants.
+   **Chaîne, en un tour.** C'est « le gros capital sort en premier et déclenche l'appel
+   de marge des suivants » — déjà câblé. Le joueur est la **whale qui fait du stop
+   hunting** ; la magnitude dépend du **levier + crowding** alentour.
+2. **Charger la dernière dose** (`F` déjà ≈0.80) : un tour de levier max sur le cluster
+   encombré franchit `crisisCeiling` (0.85) → **crise déterministe**.
+
+**Garde-fou de design (émergent, gratuit) :** sur un plateau **vide**, le largage ne
+fait **rien** (`F` ne se force pas en 1 tour depuis le bas). On ne détonne donc qu'une
+mine **fabriquée par l'avidité collective** — pas une case au hasard. La compétence
+« sortir avant le tick » (`ignoreClosePerimeter`) = le **bouton de détonation maîtrisé**
+du gros joueur.
+
 ---
 
 ## 6. L'information (la couche démineur)
@@ -90,13 +113,45 @@ L'opacité de la finance était *non-résoluble* (signaux bruités → pari). L'
 de « devine la jauge » à « **déduis le plateau** ».
 
 - L'**adjacence = corrélation** existe déjà dans la grille → un **chiffre de démineur**
-  (« N hexes adjacents dangereux ») tombe pile sur cette structure. On **rhabille
-  l'adjacence**, on n'invente pas de mécanique.
+  tombe pile sur cette structure. On **rhabille l'adjacence**, on n'invente pas de
+  mécanique.
 - Les **pièces achètent l'enquête** : révéler une case **pour soi seul**, acheter un
   **indice** (à éviter / refuge) **avant** l'arrêt de la musique.
 - **Pression croisée** = le sel du mariage : **temps limité** (la musique) + **budget
   limité** (les pièces) pour résoudre *assez* du plateau avant de devoir **s'engager
   avec une déduction incomplète** (plan secret → ticks).
+
+### Ce que compte le chiffre (tranché)
+
+- Le chiffre = **nombre de dangers adjacents** (démineur classique, familier,
+  déductible). Le **refuge** = *« la case que la déduction laisse propre »*. Révéler une
+  case proche donne **un autre chiffre** → on **triangule par réflexion**.
+- **Géométrie variable :** la carte n'a pas 6 voisins partout (13 hexes en clusters,
+  adjacence variable) → le chiffre est *« N sur (voisins réels) »*. Les **hexes de
+  bordure** (peu de voisins) donnent des indices **plus tranchants** → une **géographie
+  de l'information** émerge gratuitement.
+
+### L'enquête est réflexive : payer l'info fait monter le prix (tranché)
+
+L'idée-clé qui **boucle le système** : **acheter un indice sur une case = manifester de
+l'intérêt = demande = prix ↑** (`fluxImpact`). Conséquences :
+
+- **L'enquête n'est pas gratuite de conséquence** — *regarder une case la déplace*.
+  C'est la **réflexivité** des marchés, gamifiée (effet d'observateur).
+- **Auto-sabotage salvateur :** enquêter sur le **bon** hexe le rend **plus cher, plus
+  convoité, donc plus minable** → trouver la chaise sûre **la rend moins sûre**. L'info
+  parfaite est **auto-équilibrée sans bruit artificiel** : la chercher l'abîme.
+- **Vecteur de mislead :** payer de l'info sur un **leurre** monte *son* prix → les
+  autres croient que tu sais → s'y entassent → tu **charges la mine du leurre** sans
+  avoir misé. Le mislead a donc **deux vecteurs** : la mise *et* l'achat d'info ostensible.
+- **Privé vs public (tranché) :** le **chiffre** révélé reste **privé** (pour toi seul),
+  mais la **trace de prix** est **publique** → acheter de l'info devient un **tell** que
+  les autres lisent sur le marché. Feature, pas bug : on lit l'enquête adverse au prix.
+
+### La boucle de mise (tranché)
+
+Miser des pièces sur l'hexe qu'on **pense** être le bon → à la détonation : **bon hexe →
+récompense** (encaisse la valeur de chaise), **sinon → −1 PV**.
 
 ---
 
@@ -146,20 +201,27 @@ deviennent piégées) mais **n'est plus l'énigme du tronc commun**.
 - ✅ Le **caché (`F`) → pouvoir d'archétype** (Sismographe), pas la règle de base.
 - ✅ **Solo** = démineur contre le plateau ; **fausses pistes/pièges = couche multi**.
 - ✅ **Musique** = esthétique/tempo (accélère avec la tension) — polish, pas structurel.
+- ✅ **Détonation forçable en 1 tour** = **fire-sale → cascade d'appels de marge**
+  (`applyMarginCalls` + `fluxImpact`), ou « dernière dose » quand `F` est déjà chargée.
+  **Garde-fou** : on ne détonne qu'une **mine déjà armée** (un plateau vide ne pète pas).
+- ✅ **Chiffre de démineur = nb de dangers adjacents** ; refuge = la case que la
+  déduction laisse propre ; géométrie variable → bordures = indices plus tranchants.
+- ✅ **Enquête réflexive** : payer l'info **monte le prix** de la case (auto-sabotage de
+  l'info parfaite + 2ᵉ vecteur de mislead). **Chiffre privé, trace de prix publique**
+  (l'achat d'info est un *tell*).
+- ✅ **Boucle de mise** : miser sur l'hexe présumé bon → récompense si bon, **−1 PV** sinon.
+- ✅ **Indices de base EXACTS** (déduction pure) ; seule la **corruption adverse** ment.
 
 ---
 
 ## 10. Forks encore ouverts (à trancher en continuant)
 
-1. **Indices exacts ou bruités ?** Le démineur veut de l'**exact** (déduction pure) ;
-   les **fausses pistes** réintroduisent le mensonge, mais *joueur*. Tronc = exact,
-   corruption = adversaires → à confirmer.
-2. **Que représente précisément une « mine » ?** Un hexe qui blesse à l'arrêt ; lien
+1. **Que représente précisément une « mine » ?** Un hexe qui blesse à l'arrêt ; lien
    exact avec la **cascade** (morphologie chute→rebond→jambe) à définir.
-3. **Combien de PV de base ? de PA de base ? de pièces de départ ?** Valeurs à régler.
-4. **Granularité du refuge** : une **case** précise, ou une **zone/cluster** ? (la
+2. **Combien de PV de base ? de PA de base ? de pièces de départ ?** Valeurs à régler.
+3. **Granularité du refuge** : une **case** précise, ou une **zone/cluster** ? (la
    chaise musicale pure = rareté : moins de refuges que de joueurs/menaces).
-5. **Source des pièges en solo** : système vs IA — qui « ment » quand il n'y a pas
+4. **Source des pièges en solo** : système vs IA — qui « ment » quand il n'y a pas
    d'adversaire humain ?
 
 ---
