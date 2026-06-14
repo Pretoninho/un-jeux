@@ -21,7 +21,7 @@
   import { hexFill, axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
   import {
     isInvestable, isCredit, openCost as chainCost, canOpenAt, canOccupyAt, canMoveToAt,
-    canTradeCouponAt, couponBuyMoves, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
+    canTradeCouponAt, couponBuyMoves, canActOnPositionAt, activateWindow, readyInFromDisplay, activeLeftFromDisplay,
   } from './lib/interaction';
 
   let gs: GameState;
@@ -102,6 +102,11 @@
   // Se déplacer (sans investir) : marcher sur un hexe TRAVERSABLE adjacent (marché V ou crédit,
   // frontière verrouillée comprise) — on traverse le crédit pour atteindre les nœuds derrière.
   const canMoveTo = (id: string) => canMoveToAt(hexById(id), revealed, neighborsOfPlayer());
+  // Périmètre de CLÔTURE (§9bis) : on ne ferme/clôture une position que si on est dessus,
+  // adjacent, ou dans le même cluster — sauf compétence `ignoreClosePerimeter` (verrou sauté).
+  const canActOn = (id: string) =>
+    canActOnPositionAt(id, playerHex, neighborsOfPlayer(), (h) => hexById(h)?.cluster,
+      gs?.actors[0]?.ignoreClosePerimeter);
 
   function buildView() {
     const player = gs.actors[0]!;
@@ -373,6 +378,7 @@
   function partial(hexId: string) {
     if (view?.over || !view?.held.has(hexId) || paLeft() < 2) return;
     if (lockTurnsLeft(hexId, gs.actors[0]!, gs) > 0) return; // illiquide encore verrouillé
+    if (!canActOn(hexId)) return; // hors périmètre de clôture (§9bis)
     const player = gs.actors[0]!;
     for (const p of player.positions) {
       if (p.hexId !== hexId) continue;
@@ -387,6 +393,7 @@
   function close(hexId: string) {
     if (view?.over || !view?.held.has(hexId) || paLeft() < 1) return;
     if (lockTurnsLeft(hexId, gs.actors[0]!, gs) > 0) return; // illiquide encore verrouillé
+    if (!canActOn(hexId)) return; // hors périmètre de clôture (§9bis)
     const player = gs.actors[0]!;
     const kept = [];
     for (const p of player.positions) {
@@ -737,9 +744,12 @@
             {#if canMoveTo(selected)}<button onclick={() => deplacer(selected!)} disabled={paLeft() < 1}>Se déplacer (sans investir) · 1 PA{#if credit} · traverser le crédit{/if}</button>{/if}
             {#if isPresent(selected)}<div class="court">Présence active — <b>{presenceLeft(selected)}</b> tour(s) restant(s){#if hexById(selected)?.nodeType === 'liquidite'} · débloque le <b>Financement</b> + <b>levier −50%</b>{/if}{#if hexById(selected)?.nodeType === 'information'} · <b>signaux plus nets</b>{/if}{#if hexById(selected)?.nodeType === 'reglementaire'} · <b>cible de taux BC anticipée</b>{/if}</div>{/if}
             {#if held}
+              {@const inPerimeter = canActOn(selected)}
+              {@const outOfReach = locked === 0 && !inPerimeter}
               <button onclick={() => reinforce(selected!)} disabled={view.over || paLeft() < 1}>Renforcer (+25%) · 1 PA{#if illiquid} · re-verrouille{/if}</button>
-              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2 || locked > 0}>Clôture partielle (−50%) · 2 PA</button>
-              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || locked > 0}>Fermer (totale) · 1 PA{#if locked > 0} · 🔒{/if}</button>
+              <button onclick={() => partial(selected!)} disabled={view.over || paLeft() < 2 || locked > 0 || !inPerimeter}>Clôture partielle (−50%) · 2 PA{#if outOfReach} · 🔒{/if}</button>
+              <button onclick={() => close(selected!)} disabled={view.over || paLeft() < 1 || locked > 0 || !inPerimeter}>Fermer (totale) · 1 PA{#if locked > 0 || outOfReach} · 🔒{/if}</button>
+              {#if outOfReach}<div class="muted small">🔒 Hors de portée — rapproche-toi (hexe, adjacent, ou même cluster) pour clôturer.</div>{/if}
             {/if}
             {#if !canInvest && !canOccupy(selected) && !held && !credit}
               <div class="muted small">{here ? 'Rien à faire sur cet hexe.' : 'Pas adjacent / non accessible.'}</div>

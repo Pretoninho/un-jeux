@@ -47,6 +47,29 @@ export function canMoveToAt(h: Hex | undefined, revealed: Set<HexId>, neighbors:
   return reachable(h, revealed, neighbors) && isWalkable(h);
 }
 
+/**
+ * PÉRIMÈTRE D'ACTION sur une position EXISTANTE (memo §9bis) — verrou de clôture.
+ * On peut agir sur une position détenue en `posHex` (FERMER / clôture partielle) si on est
+ * « assez proche » : SUR l'hexe, ADJACENT, ou dans le MÊME CLUSTER (adjacence = corrélation,
+ * cluster = voisinage corrélé élargi, §11). Au-delà → trop loin pour piloter la sortie.
+ * Asymétrie voulue avec l'OUVERTURE (qui exige l'adjacence stricte) : on sort d'un peu plus
+ * loin qu'on n'entre. `ignorePerimeter` (compétence d'archétype) FAIT SAUTER le verrou →
+ * clôture n'importe où (desk de trading à distance).
+ */
+export function canActOnPositionAt(
+  posHex: HexId,
+  playerHex: HexId,
+  neighbors: HexId[],
+  clusterOf: (id: HexId) => string | undefined,
+  ignorePerimeter = false,
+): boolean {
+  if (ignorePerimeter) return true;
+  if (posHex === playerHex) return true; // on est dessus
+  if (neighbors.includes(posHex)) return true; // adjacent = assez proche
+  const here = clusterOf(playerHex);
+  return here !== undefined && here === clusterOf(posHex); // même cluster
+}
+
 /** Peut TRADER un coupon : émetteur crédit révélé (pas d'adjacence requise — « desk obligataire »). */
 export function canTradeCouponAt(h: Hex | undefined, revealed: Set<HexId>): boolean {
   return isCredit(h) && !!h && revealed.has(h.id);

@@ -66,6 +66,14 @@ export interface Archetype {
   /** Pouvoir d'archétype : échappe au verrou d'illiquidité (sortie immédiate, spec immo). */
   ignoreLockup?: boolean;
   /**
+   * Pouvoir d'archétype : fait SAUTER le verrou de PÉRIMÈTRE de clôture (memo §9bis). Par défaut,
+   * agir sur une position détenue (FERMER / clôture partielle) exige d'être « assez proche » : SUR
+   * l'hexe, ADJACENT, ou dans le MÊME CLUSTER — au-delà, on est trop loin pour piloter la sortie.
+   * Un acteur porteur de ce trait clôture N'IMPORTE OÙ sur la carte (desk de trading à distance).
+   * Latent pour l'instant : aucun archétype ne l'a → c'est le HOOK qu'une compétence fera sauter.
+   */
+  ignoreClosePerimeter?: boolean;
+  /**
    * Compétence active « Récolte » (Vautour) : coûte `paCost` PA, multiplie le carry encaissé
    * (positions V + coupons) par `factor` pendant `duration` tours, puis indisponible `cooldown`
    * tours (réutilisable au tour activation + duration + cooldown). Mesuré équilibré à

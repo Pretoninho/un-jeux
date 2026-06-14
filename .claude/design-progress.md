@@ -3,6 +3,12 @@
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
 > Dernière mise à jour : 2026-06-14 — v1.26
 >
+> 🔒 **CLÔTURE — verrou de périmètre (2026-06-14, §9bis)** : FERMER (1 PA) + clôture partielle exigent d'être
+> SUR l'hexe / ADJACENT / MÊME CLUSTER pour agir (sinon 🔒 hors de portée). Asymétrie voulue vs ouverture
+> (adjacence stricte). Hook de compétence : trait `ignoreClosePerimeter` (Archetype→Actor, mirroir `ignoreLockup`)
+> **fait sauter le verrou** — latent (aucun archétype ne l'a encore). Couche UI (`interaction.ts canActOnPositionAt`
+> pur+testé, `App.svelte`). 127 tests (+6), moteur INCHANGÉ. À muer ENSUITE en compétence active (PA+fenêtre+cd).
+>
 > 🎮 **FOCUS COURANT = GAMEPLAY (2026-06-14)** : l'esthétique est **mise de côté** (parquée, pas annulée). Le
 > moteur de rendu est tranché (SVG, ci-dessous) et la **direction artistique** (palette/icônes/mood/juice CSS)
 > devient un **chantier séparé à reprendre plus tard** — on ne le travaille PAS maintenant. Toute l'énergie va

@@ -43,6 +43,7 @@ export function buildInitialState(config: ConfigPartie): InitResult {
 
   const player = mkActor(config.archetype.id);
   player.ignoreLockup = config.archetype.ignoreLockup; // pouvoir d'archétype (spec immo)
+  player.ignoreClosePerimeter = config.archetype.ignoreClosePerimeter; // verrou de périmètre de clôture (§9bis)
   player.carrySkill = config.archetype.carrySkill; // compétence « Récolte » (Vautour)
   player.coverSkill = config.archetype.coverSkill; // compétence « Couverture » (Vautour)
   player.noLeverage = config.archetype.noLeverage; // contrainte permanente (Vautour)
