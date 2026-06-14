@@ -593,7 +593,8 @@
               <div class="bar"><div class="fill" style="width:{Math.min(100, view.fReal * 100)}%"></div></div>
             </div>
             <div class="small">F = <b>{view.fReal.toFixed(2)}</b> · {view.fReal < 0.4 ? 'zone morte — aucun krach possible' : view.fReal >= 0.85 ? '⚠️ PLAFOND — krach imminent' : 'zone roulette — ça peut sauter (proba ↑ avec F)'}</div>
-            <div class="muted small">Tu vois la magnitude du séisme — pas sa date (roulette). {view.inCrisis ? '🔥 Crise : tes couvertures paient (pas de thêta).' : `🩸 Thêta de couverture : −${(view.calmTheta * 100).toFixed(1)}%/tour au calme (tu fonds tant que rien ne tremble).`}</div>
+            <div class="muted small">🎯 <b>Le Grand Pari</b> : zone rouge → <b>SHORT</b> le krach (pari directionnel) ou cash · creux → frappe <b>LONG</b> all-in. Tu vois la magnitude, pas la date (roulette).</div>
+            <div class="muted small">{view.inCrisis ? '🔥 Crise : tes couvertures paient (pas de thêta).' : `🩸 Thêta de couverture : −${(view.calmTheta * 100).toFixed(1)}%/tour au calme (tu fonds tant que rien ne tremble).`}</div>
           </section>
         {/if}
 
