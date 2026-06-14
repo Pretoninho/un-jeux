@@ -1,10 +1,35 @@
 # Refonte — Chaises musicales × Démineur
 
-> ⏸️ **STATUT (2026-06-14) : EXPLORATION PARKÉE — en réflexion.** Le concepteur prend
-> une nuit avant de trancher. Cette piste est désormais envisagée comme un **JEU SÉPARÉ
-> réutilisant le moteur actuel**, *pas* comme une refonte qui remplace le jeu de base.
-> **Le jeu de base reprend son développement normal** (cf. `docs/game-design-memo.md` /
-> `.claude/design-progress.md`). Document conservé intact comme point de reprise.
+> ⭐ **ÉTOILE POLAIRE (2026-06-14) — le principe qui prime sur tout le reste de ce doc.**
+>
+> **Le moteur est une machine à états déterministe ; on lui a mis une peau *réaliste*
+> (caché, incertain, latent, façon quant). On la remplace par une peau *ludique*
+> (visible, déterministe, logique). Même moteur, philosophie d'information OPPOSÉE.**
+>
+> **Règle d'or :** *tout ce qui est caché devient soit **VISIBLE**, soit **SUPPRIMÉ**.
+> Une règle valide est un **SI→ALORS** qu'un joueur peut énoncer à voix haute.*
+>
+> Pourquoi : le fun tactique a besoin de **(1) conséquence lisible** et **(3) lire les
+> autres**. La peau quant **mure** précisément ces deux choses (on ne lit pas un RNG
+> caché, on ne déjoue pas du bruit) → le jeu ne s'allume pas. Le moteur (la part chère,
+> réussie) **reste** ; la peau incertaine (la part qui bloque le fun) est aussi la **moins
+> chère à changer**. Application concrète : `F` cachée → **charge visible** (chiffre sur
+> l'hexe) ; signaux bruités/retardés/menteurs, ancre `A`, régimes, mensonge du rebond →
+> **supprimés** ; crowding→danger → **règle énonçable** (« trop de monde charge cet hexe
+> → il explose au prochain tick ») ; contagion → **chaîne visible à la Bomberman**.
+>
+> **Convergence :** sous cette étoile, le « jeu de base » et la piste ci-dessous visent
+> la **même** réponse — *des règles simples et logiques sur un excellent moteur*. Il n'y a
+> peut-être jamais eu deux jeux, juste un moteur qui attendait la bonne peau. Décision
+> concepteur en cours (« se découpler de la réalité, c'est un jeu » ; moteur = 100 %
+> validé, c'est **la peau** qui est trop complexe).
+
+---
+
+> ⏸️ **STATUT (2026-06-14) : EXPLORATION EN RÉFLEXION.** Le concepteur prend une nuit
+> avant de trancher. Piste d'abord envisagée comme **jeu séparé réutilisant le moteur** ;
+> l'étoile polaire ci-dessus suggère qu'elle pourrait **converger avec le jeu de base**.
+> Document conservé intact comme point de reprise.
 >
 > Document vivant. Capture le **virage de thème et de gameplay** exploré en session
 > 2026-06-14. Le **moteur** (grille d'hexes, ticks, fragilité `F`, cascade, crowding,

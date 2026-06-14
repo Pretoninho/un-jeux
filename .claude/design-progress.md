@@ -13,12 +13,23 @@
 > finance, ce memo). L'esthétique reste **parquée** (DA = chantier séparé) ; le moteur de rendu est tranché (SVG).
 > Toute l'énergie va sur les **mécaniques du jeu de base**.
 >
+> ⭐ **ÉTOILE POLAIRE — SIMPLICITÉ / PEAU LUDIQUE (2026-06-14, détail `docs/refonte-chaises-demineur.md` en tête)** :
+> diagnostic franc du concepteur — **le moteur est 100 % validé**, mais **« la peau » est trop complexe** et **le fun
+> ne se sent pas**. Cause : le jeu de base est bâti sur la **prise de décision en info cachée/latente** (façon quant),
+> ce qui **mure** les deux ingrédients du fun (conséquence lisible + lire les autres). **Décision de direction** :
+> *se découpler de la réalité (c'est un jeu)*. **Règle d'or** : *tout ce qui est caché devient VISIBLE ou SUPPRIMÉ ;
+> une règle valide est un SI→ALORS énonçable à voix haute*. Le moteur (machine à états déterministe) est gardé ; on
+> remplace la peau **réaliste/incertaine** par une peau **visible/déterministe/logique** (`F`→charge visible ; signaux
+> bruités/ancre `A`/régimes/mensonge du rebond → supprimés ; crowding→danger = règle énonçable ; contagion = chaîne
+> visible). **Convergence** : « jeu de base » et piste « chaises × démineur » visent désormais la **même** réponse.
+> Skill central candidat = **B « ne pas être le dernier debout »** (crowding = seule grandeur honnêtement observable) ;
+> A (anticiper `F`) et C (poudre sèche) deviennent des **lentilles d'archétype**. À reprendre après la nuit du concepteur.
+>
 > ⏸️ **PISTE PARKÉE — « Chaises musicales × Démineur » (`docs/refonte-chaises-demineur.md`)** : exploration d'un
 > **virage de thème** (abandon du registre finance) → chaise musicale + démineur + économie d'information (pièces =
-> enquête, PV = survie). Le concepteur **réfléchit une nuit** ; envisagé désormais comme un **JEU SÉPARÉ réutilisant
-> le moteur**, PAS une refonte du jeu de base. Acquis notés dans le doc (mine = faille×charge, enquête réflexive,
-> détonation forçable = fire-sale→marge). **Décision en suspens** : effacer le `bounce` + détonation chaque tour avec
-> `F` = sévérité croissante (a) vs déclencheur occasionnel (b). À reprendre si/quand le concepteur revient dessus.
+> enquête, PV = survie). Le concepteur **réfléchit une nuit**. Acquis notés dans le doc (mine = faille×charge, enquête
+> réflexive, détonation forçable = fire-sale→marge). **Décision en suspens** : effacer le `bounce` + détonation chaque
+> tour avec `F` = sévérité croissante (a) vs déclencheur occasionnel (b). À reprendre si/quand le concepteur revient dessus.
 >
 > 👥 **MULTIJOUEUR = BOARD PARTAGÉ (confirmé explicitement 2026-06-14, §10/§31)** : un **seul plateau commun**,
 > une **seule fragilité `F` commune** + sentiment partagé (états systémiques que tous influencent ET subissent,
