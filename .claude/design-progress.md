@@ -1,7 +1,18 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.23
+> Dernière mise à jour : 2026-06-14 — v1.24
+>
+> 🌋 **SISMOGRAPHE — 2ᵉ archétype (2026-06-14)** : trader macro (réf. Soros). **POUVOIR** : jauge de
+> fragilité `F` INNÉE (voit le séisme caché — exclusif ; les autres n'ont que les signaux bruités) →
+> débloque le timing + la frappe all-in au creux. **CONTRAINTE** : `calmTheta` 0.5 %/tour, « fragile au
+> calme » (ponction de richesse hors crise — couvertures qui décaient dans le boom ; clouée sur la crise
+> OBSERVABLE → pas de fuite de F). Mesuré : jauge seule = survie (top1 26 %, drawdown 14.7→2.8 %), FRAPPE
+> = win-con (50 % à θ=0), thêta = dial → **θ=0.5 % → top1 38 %, duel 50 % (neutre §28.8)**. La frappe
+> ÉMERGE du jeu agressif que la jauge autorise (pas de mécanique séparée). Au sélecteur d'archétype UI.
+> 121 tests, svelte-check 0. ⚠️ Découverte annexe : le forward guidance BC était MORT (target==rate en
+> mode réunions) → réparé (la cible suit F en continu, mène le taux) ; mais la BC reste un mauvais signal
+> macro (elle coupe en crise) → le Sismographe lit F directement, pas la BC.
 >
 > ✅ **VAUTOUR COMPLET — fiche §6 bouclée (2026-06-14)** : victoire (Score) + 2 compétences (Récolte/
 > Couverture) + **ressource** + **contrainte**. **Contrainte** `noLeverage` (capital patient, levier→0,
