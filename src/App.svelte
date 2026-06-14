@@ -314,7 +314,9 @@
     }
     selected = issuer;
     log = [`Coupon ${side === 'long' ? 'LONG' : 'SHORT'} ${hexById(issuer)?.label} ${maturity} · ${notional.toFixed(0)} @ ${(offered.rate * 100).toFixed(1)}%/t`, ...log].slice(0, 8);
-    spend(1);
+    opensThisTurn += 1; // le crédit est une ouverture de position → compte dans le CHAIN (la
+    //                     prochaine position sur un AUTRE actif sera un enchaînement, 2 PA).
+    spend(1); // coût du crédit lui-même : 1 PA fixe (appel du desk, pas de surcoût CHAIN)
   }
 
   function occupy(hexId: string) {
