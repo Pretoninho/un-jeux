@@ -11,8 +11,22 @@
 // par acteur. Aucune mutation en place → testable, rejouable, déterministe.
 
 import type { GameStateV2, ActorV2 } from './state2';
-import { actorIncome } from './revenue';
+import { actorIncome, isCampHex } from './revenue';
 import { actorCharges } from './camp';
+
+/** Nombre d'hexes d'INCOME (hors QG) possédés par un acteur — base de l'upkeep. */
+function incomeHexCount(state: GameStateV2, actorId: string): number {
+  let n = 0;
+  for (const h of state.map.hexes) {
+    if (state.ownership[h.id] === actorId && !isCampHex(h.id, state.revenueCfg)) n++;
+  }
+  return n;
+}
+
+/** Charge totale d'un acteur/tour = charges des camps (dette) + upkeep × hexes d'income. */
+export function actorTotalCharges(state: GameStateV2, actorId: string): number {
+  return actorCharges(actorId, state.camps) + state.hexUpkeep * incomeHexCount(state, actorId);
+}
 
 /** Bilan d'un acteur pour un tour. */
 export interface ActorTickReport {
@@ -31,11 +45,10 @@ export interface TickResult {
   reports: ActorTickReport[];
 }
 
-/** Income net d'un acteur ce tour = revenu des hexes − charges des camps. */
+/** Income net d'un acteur ce tour = revenu des hexes − charges totales (camps + upkeep). */
 export function actorNet(state: GameStateV2, actorId: string): number {
   const income = actorIncome(actorId, state.ownership, state.map, state.revenueCfg);
-  const charges = actorCharges(actorId, state.camps);
-  return income - charges;
+  return income - actorTotalCharges(state, actorId);
 }
 
 /**
@@ -53,7 +66,7 @@ export function tick(state: GameStateV2): TickResult {
       return a;
     }
     const income = actorIncome(a.id, state.ownership, state.map, state.revenueCfg);
-    const charges = actorCharges(a.id, state.camps);
+    const charges = actorTotalCharges(state, a.id);
     const net = income - charges;
     const cashAfter = a.cash + net;
     const wentBankrupt = cashAfter < 0;

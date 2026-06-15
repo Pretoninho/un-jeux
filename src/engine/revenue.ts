@@ -22,6 +22,16 @@ export interface RevenueConfig {
   baseByHex: Record<HexId, number>;
   /** Prime d'agglomération : +ce montant par hex adjacent du MÊME propriétaire. */
   agglomerationBonus: number;
+  /**
+   * Hexes « camp de base » : ils ne rapportent AUCUN income et ne confèrent pas
+   * d'agglomération (pur coût stratégique = le foyer dont la charge motive l'expansion).
+   */
+  campHexes?: HexId[];
+}
+
+/** Cet hex est-il un camp de base (0 income) ? */
+export function isCampHex(hexId: HexId, cfg: RevenueConfig): boolean {
+  return cfg.campHexes?.includes(hexId) ?? false;
 }
 
 /** Liste des hexes possédés par un acteur. */
@@ -29,26 +39,27 @@ export function ownedHexes(actorId: string, ownership: Ownership): HexId[] {
   return Object.keys(ownership).filter((id) => ownership[id] === actorId);
 }
 
-/** Nombre de voisins de `hexId` appartenant à `ownerId` (agglomération). */
-function ownedNeighborCount(hexId: HexId, ownerId: string, ownership: Ownership, map: GameMap): number {
+/** Nombre de voisins de `hexId` appartenant à `ownerId` (camps exclus : ils n'agglomèrent pas). */
+function ownedNeighborCount(hexId: HexId, ownerId: string, ownership: Ownership, map: GameMap, cfg: RevenueConfig): number {
   const hex = map.hexes.find((h) => h.id === hexId);
   if (!hex) return 0;
   let n = 0;
   for (const nb of hex.neighbors) {
-    if (ownership[nb] === ownerId) n++;
+    if (ownership[nb] === ownerId && !isCampHex(nb, cfg)) n++;
   }
   return n;
 }
 
 /**
  * Revenu/tour que le PROPRIÉTAIRE COURANT encaisse sur cet hex.
- * 0 si l'hex est libre. Sinon : base + agglomération.
+ * 0 si l'hex est libre OU si c'est un camp de base. Sinon : base + agglomération.
  */
 export function hexRevenue(hexId: HexId, ownership: Ownership, map: GameMap, cfg: RevenueConfig): number {
   const owner = ownership[hexId];
   if (!owner) return 0;
+  if (isCampHex(hexId, cfg)) return 0; // le camp de base ne rapporte rien
   const base = cfg.baseByHex[hexId] ?? 0;
-  const bonus = cfg.agglomerationBonus * ownedNeighborCount(hexId, owner, ownership, map);
+  const bonus = cfg.agglomerationBonus * ownedNeighborCount(hexId, owner, ownership, map, cfg);
   return base + bonus;
 }
 

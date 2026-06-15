@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.39.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.40.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -17,29 +17,38 @@ riche en valeur nette à la fin gagne**, ou fais couler les autres.
 ## La boucle
 
 ```
-Hexes possédés        → revenu/tour (+ prime d'agglomération si voisins du même proprio)
-Camp(s) / emprunts    → charge/tour (la dette de base, posée au départ)
+Hexes d'income        → revenu/tour (+ prime d'agglomération si voisins du même proprio)
+Camp de base + hexes  → charges/tour = charge de dette + upkeep × hexes d'income
 revenu − charges      → net/tour → ajouté au cash
 cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
 ```
 
+**Tension income/charge** : chaque hex rapporte un revenu (6) et coûte un upkeep (3) → ratio unitaire
+**2:1**. Le **camp de base** (QG sans income mais qui charge) tire le ratio **sous 1 en début de partie**
+→ on démarre sous l'eau, ce qui **force l'acquisition du 1ᵉʳ hex d'income**. Le ratio est affiché en jeu.
+
 ## Les pièces
 
-### Hexes = revenus
+### Hexes = revenus (avec upkeep)
 - Un hex = **une place**, **un seul occupant** (pas de partage).
 - Carte = hexagone **rayon 3 = 37 hexes**, revenu de base **plat** (6 partout, pour l'instant — on
   isole le facteur d'équilibre avant de différencier les cases).
 - **Agglomération** : chaque hex adjacent appartenant au **même** propriétaire ajoute une prime
-  (`agglomerationBonus`, +3) au revenu de l'hex → un cluster contigu rapporte plus que des hexes dispersés.
+  (`agglomerationBonus`, +2) → un cluster contigu rapporte plus que des hexes dispersés.
+- **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**3**) par tour. La charge **monte avec le
+  territoire** → la tension income/charge reste stable (~2:1) au lieu d'exploser quand on s'étend.
 
 ### Acquisition d'un hex libre
 - Prix = `base × claimMultiple` (6 × 4 = **24**), payé en cash.
 - À l'achat, **le carnet d'ordres s'ouvre obligatoirement** (voir ci-dessous).
 
-### Camp de base = dette (le facteur de pondération)
-- **Posé au départ pour tous** : le premier emprunt est déjà effectué (`foundBaseCamps`, **120** de capital).
-- **Charge/tour = `chargeRate × montant`** (0.20 × 120 = **24/tour**). Modèle **permanent** : la charge
-  ne s'éteint pas (un seul tronc de base ; les variantes soldables viendront via des **branches**).
+### Camp de base = QG sans income + 1ᵉʳ emprunt
+- **Posé au départ pour tous** (`foundBaseCamps`). C'est **le 1ᵉʳ emprunt** : il donne le **capital de
+  lancement** (cash = `baseCampLoan` **100**) **ET** impose sa **charge permanente** (`chargeRate × montant`
+  = 0.20 × 100 = **20/tour**).
+- Son **hex (le QG)** ne rapporte **aucun income** et ne s'agglomère pas → tu démarres avec du cash mais
+  une charge qui saigne, sur une case stérile : tu **dois** acquérir des hexes d'income pour la couvrir.
+- Le QG **ne peut pas être évincé** (pas d'ask) et ne paie pas d'upkeep (il porte déjà sa dette).
 - On peut **ré-emprunter** en cours de partie (capital immédiat, charge supplémentaire à vie).
 - La dette compte comme **passif** dans la valeur nette → emprunter n'est jamais de l'argent gratuit.
 
@@ -48,7 +57,9 @@ cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
   ordre de vente (pas d'achat : on ne peut pas forcer quelqu'un à vendre).
 - **Flux imposé** : *achat (ou éviction) d'un hex → le moteur propose un ask par défaut
   (`revenu × askDefaultMultiple`, ×12) → une **modale obligatoire** « place ton ordre de vente » →
-  validation*. Tu peux ré-ajuster tes asks depuis le panel Carnet.
+  validation*.
+- **Modifiable à tout moment** : clique un de tes hexes (sur la carte **ou** dans le panel Carnet), même
+  les tours suivants, pour ré-ajuster ton prix de sortie.
 - **Plancher** : un ask ne peut pas descendre sous `base × askFloorMultiple` (×4) — on ne brade pas un hex
   sous son prix d'achat.
 
@@ -77,14 +88,19 @@ gardant toujours une réserve pour couvrir ses charges.
 | --- | --- | --- |
 | `horizonTurns` | 14 | durée de partie |
 | `claimMultiple` | 4 | prix d'un hex libre = base × 4 |
-| `chargeRate` | 0.20 | charge/tour = taux × emprunt (≈ l'income que le capital génère) |
-| `baseCampLoan` | 120 | capital de lancement (camp de base) |
-| `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (rend l'éviction viable mais non dominante) |
+| `chargeRate` | 0.20 | charge/tour de la dette = taux × emprunt |
+| `baseCampLoan` | 100 | camp de base = 1ᵉʳ emprunt (capital + charge 20/tour) |
+| `hexUpkeep` | 3 | upkeep/tour par hex d'income → ratio income/charge unitaire = 6/3 = **2:1** |
+| `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (éviction viable mais non dominante) |
 | `askFloorMultiple` | 4 | plancher d'un ask = base × 4 |
 
-**Calibrage** : `npx vite-node scripts/balance.ts` rejoue **rentier vs conquérant** et mesure qui gagne.
-Au réglage ci-dessus, ~50/50 (aucun style ne domine). ⚠️ Bots crus → calibrage de 1ère passe, à affiner au
-playtest. Le vrai régulateur de l'équilibre est le **taux de charge** + le **prix de sortie par défaut**.
+Revenu de base/hex = **6**, agglomération = **+2**/voisin.
+
+**Calibrage** : `npx vite-node scripts/balance.ts` balaie un panel large (`hexUpkeep × baseCampLoan`) et
+mesure le **ratio income/charge** (mi-partie / fin) + faillites + qui gagne. Le levier de la **tension** est
+`hexUpkeep` (ratio unitaire = `base / upkeep`) ; le `baseCampLoan` fixe le capital/charge de départ. ⚠️ Les
+bots « rentier/conquérant » expansent tous deux → le 50/50 n'est pas l'indicateur clé ; la vraie tension
+(sur-emprunter → faillite) est une décision **humaine**. **À valider au playtest.**
 
 ## Carte des fichiers
 

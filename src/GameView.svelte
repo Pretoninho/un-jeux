@@ -3,9 +3,8 @@
   // posé au départ, carnet d'ordres (chaque achat force un ordre de vente), éviction = payer l'ask.
   import { makeFlatBoard } from './engine/board';
   import { makeGameStateV2, makeActorV2, type GameStateV2 } from './engine/state2';
-  import { actorNet, checkEnd, type ActorTickReport } from './engine/tick';
-  import { actorIncome, hexRevenue } from './engine/revenue';
-  import { actorCharges } from './engine/camp';
+  import { actorNet, actorTotalCharges, checkEnd, type ActorTickReport } from './engine/tick';
+  import { actorIncome, hexRevenue, isCampHex, type RevenueConfig } from './engine/revenue';
   import {
     claimCost, canClaim, claimHex, borrow, foundBaseCamps,
     defaultAsk, askFloor, setAsk, evictionCost, canEvict, evict, netWorth, endTurn,
@@ -17,21 +16,25 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Plateau plat 37 hexes (rayon 3), revenu de base = 6 partout ───────────────
+  // ── Plateau plat 37 hexes (rayon 3), revenu de base = 6 ; 2 coins = QG (0 income) ──
   const RADIUS = 3;
-  const BOARD = makeFlatBoard(RADIUS, 6, 3);
+  const BOARD = makeFlatBoard(RADIUS, 6, 2);
   const CFG: GameConfig = { ...DEFAULT_CONFIG };
+  // Les deux coins deviennent les QG : aucun income, pas d'agglomération.
+  const REV: RevenueConfig = {
+    ...BOARD.rev,
+    baseByHex: { ...BOARD.rev.baseByHex, [BOARD.corners[0]]: 0, [BOARD.corners[1]]: 0 },
+    campHexes: [BOARD.corners[0], BOARD.corners[1]],
+  };
 
   function initial(): GameStateV2 {
-    let s = makeGameStateV2(BOARD.map, BOARD.rev, [
+    let s = makeGameStateV2(BOARD.map, REV, [
       makeActorV2('alice', 'Alice (toi)', 0),
       makeActorV2('bob', 'Bob (IA)', 0),
-    ]);
-    s.ownership[BOARD.corners[0]] = 'alice';
-    s.ownership[BOARD.corners[1]] = 'bob';
-    s = foundBaseCamps(s, CFG); // premier emprunt déjà effectué (camp de base)
-    // ordres de vente de départ sur les hexes initiaux
-    for (const hid of BOARD.corners) s.asks[hid] = defaultAsk(s, hid, CFG);
+    ], CFG.hexUpkeep);
+    s.ownership[BOARD.corners[0]] = 'alice'; // QG d'Alice
+    s.ownership[BOARD.corners[1]] = 'bob';   // QG de Bob
+    s = foundBaseCamps(s, CFG); // camp de base = 1ᵉʳ emprunt (capital + charge), QG sans income
     return s;
   }
 
@@ -47,13 +50,16 @@
 
   function label(id: string) { return game.actors.find((a) => a.id === id)?.label ?? id; }
   const income = (id: string) => actorIncome(id, game.ownership, game.map, game.revenueCfg);
-  const charges = (id: string) => actorCharges(id, game.camps);
+  const charges = (id: string) => actorTotalCharges(game, id);
+  const ratio = (id: string) => { const c = charges(id); return c > 0 ? income(id) / c : 0; };
   const net = (id: string) => actorNet(game, id);
   const worth = (id: string) => netWorth(game, id, CFG);
-  const hexCount = (id: string) => Object.values(game.ownership).filter((o) => o === id).length;
+  const hexCount = (id: string) => game.map.hexes.filter((h) => game.ownership[h.id] === id && !isCampHex(h.id, game.revenueCfg)).length;
   const hexRev = (hexId: string) => hexRevenue(hexId, game.ownership, game.map, game.revenueCfg);
+  const isCamp = (hexId: string) => isCampHex(hexId, game.revenueCfg);
   const human = $derived(game.actors.find((a) => a.id === HUMAN)!);
-  const myHexes = $derived(game.map.hexes.filter((h) => game.ownership[h.id] === HUMAN));
+  // hexes d'income possédés (le QG est exclu du carnet : il n'a pas d'ask)
+  const myHexes = $derived(game.map.hexes.filter((h) => game.ownership[h.id] === HUMAN && !isCamp(h.id)));
 
   function log(msg: string) { journal = [msg, ...journal].slice(0, 8); }
 
@@ -67,7 +73,10 @@
       game = claimHex(game, HUMAN, hexId, CFG);
       log(`🪙 Achat de ${hexId} (−${cost})`);
       openOrder(hexId);
-    } else if (owner !== HUMAN) {
+    } else if (owner === HUMAN) {
+      // mon hex d'income → ajuster son ordre de vente (le QG n'a pas d'ask)
+      if (!isCamp(hexId)) editOrder(hexId);
+    } else {
       if (!canEvict(game, HUMAN, hexId)) return;
       const cost = evictionCost(game, hexId);
       game = evict(game, HUMAN, hexId, CFG);
@@ -153,12 +162,14 @@
       {#each game.map.hexes as h (h.id)}
         {@const c = centers[h.id]!}
         {@const owner = game.ownership[h.id]}
+        {@const camp = isCamp(h.id)}
         {@const isMine = owner === HUMAN}
         {@const isEnemy = !!owner && owner !== HUMAN}
         {@const claimable = !owner && canClaim(game, HUMAN, h.id, CFG) && !ended && !blocked}
         {@const evictable = isEnemy && canEvict(game, HUMAN, h.id) && !ended && !blocked}
+        {@const editable = isMine && !camp && !ended && !blocked}
         {@const isPending = pending?.hexId === h.id}
-        <g class="hex" class:claimable class:evictable role="button" tabindex="0"
+        <g class="hex" class:claimable class:evictable class:editable role="button" tabindex="0"
            onclick={() => onHex(h.id)}
            onkeydown={(e) => e.key === 'Enter' && onHex(h.id)}>
           <polygon
@@ -166,7 +177,10 @@
             fill={owner ? COLORS[owner] : '#171a22'}
             stroke={isPending ? '#ffd479' : claimable ? '#5ab0a0' : evictable ? '#e0604a' : owner ? '#0e1015' : '#262b36'}
             stroke-width={isPending || claimable || evictable ? 3 : 1.5} />
-          {#if isMine}
+          {#if camp && owner}
+            <text x={c[0]} y={c[1] - 1} class="qg">🏕</text>
+            <text x={c[0]} y={c[1] + 12} class="qgl">QG</text>
+          {:else if isMine}
             <text x={c[0]} y={c[1] + 2} class="rev">+{hexRev(h.id)}</text>
             <text x={c[0]} y={c[1] + 13} class="ask">📒{game.asks[h.id]}</text>
           {:else if isEnemy}
@@ -189,18 +203,19 @@
           <div><span>Valeur nette</span><b>{worth(HUMAN)}</b></div>
           <div><span>Income</span><b class="pos">+{income(HUMAN)}</b></div>
           <div><span>Charges</span><b class="neg">−{charges(HUMAN)}</b></div>
+          <div><span>Ratio I/C</span><b class:bad={ratio(HUMAN) < 1}>{ratio(HUMAN).toFixed(2)}:1</b></div>
           <div><span>Net / tour</span><b class:bad={net(HUMAN) < 0}>{net(HUMAN) >= 0 ? '+' : ''}{net(HUMAN)}</b></div>
-          <div><span>Hexes</span><b>⬡{hexCount(HUMAN)}</b></div>
         </div>
+        <div class="muted small tip2">⬡ {hexCount(HUMAN)} hex d'income · upkeep {CFG.hexUpkeep}/hex · tension visée ~2:1</div>
       </section>
 
       <!-- CAMPS -->
       <section class="card">
-        <h3>Camps (dette)</h3>
+        <h3>Camp de base (dette)</h3>
         <div class="muted small">
           {game.camps.filter((c) => c.ownerId === HUMAN).length} camp(s) ·
           dette {game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.debtRemaining, 0)} ·
-          charge −{charges(HUMAN)}/tour
+          charge dette −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
         </div>
         <div class="loan-btns">
           <button onclick={() => takeLoan(80)} disabled={ended || blocked}>Emprunter +80 <i>(−{Math.round(80 * CFG.chargeRate)}/t)</i></button>
@@ -223,7 +238,7 @@
               </button>
             {/each}
           </div>
-          <div class="muted small tip">Clic = ajuster. Plus l'ask est haut, plus tu résistes — mais l'éviction reste possible si l'adversaire paie.</div>
+          <div class="muted small tip">Clic (ici ou sur la carte) = ajuster ton prix de sortie, à tout moment. Plus l'ask est haut, plus tu résistes — mais l'éviction reste possible si l'adversaire paie.</div>
         {/if}
       </section>
 
@@ -284,13 +299,17 @@
   .layout { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; align-items: start; }
   .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; }
   .hex { cursor: default; }
-  .hex.claimable, .hex.evictable { cursor: pointer; }
+  .hex.claimable, .hex.evictable, .hex.editable { cursor: pointer; }
   .hex.claimable:hover polygon { stroke: #b9f5cf; stroke-width: 4; }
   .hex.evictable:hover polygon { stroke: #ff8a6a; stroke-width: 4; }
+  .hex.editable:hover polygon { stroke: #cfe0ff; stroke-width: 3; }
   .rev { fill: #fff; font-size: 10px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .ask { fill: #cfe0ff; font-size: 8px; text-anchor: middle; pointer-events: none; }
   .evictc { fill: #ffd0c4; font-size: 8px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .cost { fill: #c2a04a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .qg { font-size: 13px; text-anchor: middle; pointer-events: none; }
+  .qgl { fill: #fff; font-size: 8px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .tip2 { margin-top: .4rem; }
 
   .panel { display: flex; flex-direction: column; gap: .6rem; }
   .card { background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; padding: .6rem .75rem; }

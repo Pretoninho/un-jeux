@@ -1,7 +1,22 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.39
+> Dernière mise à jour : 2026-06-15 — v1.40
+>
+> 🏕️ **CAMP DE BASE = QG SANS INCOME + 1ᵉʳ EMPRUNT ; UPKEEP PAR HEX ; RATIO 2:1 (2026-06-15, retour de partie)** :
+> - **Camp de base réconcilié** (« 1ᵉʳ camp de base = 1ᵉʳ emprunt ») : il donne le **capital de lancement**
+>   (cash = baseCampLoan 100) ET impose sa **charge permanente** (20/tour), et son **hex (QG) ne rapporte
+>   AUCUN income** (`RevenueConfig.campHexes`, `hexRevenue`=0, pas d'agglo, non évinçable). On démarre avec du
+>   cash mais sous l'eau → ça force l'achat du 1ᵉʳ hex d'income. (`foundBaseCamps` = borrow + corner = camp hex.)
+> - **Upkeep par hex** (`GameStateV2.hexUpkeep`, `actorTotalCharges` dans tick.ts) : chaque hex d'income coûte
+>   3/tour → la charge **monte avec le territoire** → la **tension income/charge reste STABLE** (~2:1) au lieu
+>   d'exploser quand on s'étend (le sim montrait des ratios 7-17 sans upkeep). Ratio unitaire = base/upkeep = 6/3.
+> - **Ratio income/charge cible = 2:1** (option du concepteur), trouvé via `scripts/balance.ts` (panel large
+>   `hexUpkeep × baseCampLoan`, mesure du ratio mi/fin + faillites). Le QG tire le ratio sous 1 tôt (le hook).
+> - **Modifier l'ask à tout moment** : clic sur un de mes hexes (carte OU panel Carnet), y compris les tours
+>   suivants → ré-ouvre la modale de prix de sortie. Le QG n'a pas d'ask.
+> - UI : carte 37 hexes avec 🏕 QG (sans income), ratio I/C affiché dans le panel Toi, charge totale = dette + upkeep.
+> - 142 tests verts (`game.test.ts` 15), svelte-check 0, build OK. ⚠️ Calibrage à valider au playtest (bots crus).
 >
 > 📘 **RÈGLES DU NOUVEAU JEU (état réel) : `docs/nouveau-jeu.md`** — référence à jour des mécaniques qui tournent
 > (hexes/revenus, camp de base, carnet d'ordres = prix de sortie, éviction, valeur nette, réglages calibrés,

@@ -19,9 +19,8 @@
 
 import type { GameStateV2 } from './state2';
 import { makeCamp } from './camp';
-import { actorCharges } from './camp';
-import { hexRevenue } from './revenue';
-import { tick, type TickResult } from './tick';
+import { hexRevenue, isCampHex } from './revenue';
+import { tick, actorTotalCharges, type TickResult } from './tick';
 
 export interface GameConfig {
   horizonTurns: number;
@@ -33,21 +32,30 @@ export interface GameConfig {
   askFloorMultiple: number;
   /** Charge/tour d'un emprunt = ce taux × montant. */
   chargeRate: number;
-  /** Montant du camp de BASE posé au départ (le « facteur de pondération » income/charge). */
+  /**
+   * Camp de BASE = le 1ᵉʳ EMPRUNT, posé au départ : il donne ce capital de lancement (cash)
+   * ET impose sa charge permanente (chargeRate × ce montant). Son hex (le QG) ne rapporte
+   * AUCUN income → on démarre avec du cash mais sous l'eau, ce qui force l'acquisition du 1ᵉʳ hex.
+   */
   baseCampLoan: number;
+  /**
+   * Upkeep/tour par hex d'income possédé. Fait monter la charge AVEC le territoire → tension
+   * income/charge STABLE : le ratio asymptotique ≈ revenu de base / upkeep (ex. 6/3 = 2:1).
+   */
+  hexUpkeep: number;
 }
 
-// Calibré par scripts/balance.ts (rentier vs conquérant, ~50/50, aucun style ne domine) :
-// le charge (0.20) approche l'income que le capital emprunté génère (~0.25·L/tour) → le
-// levier n'est pas gratuit ; le prix de sortie par défaut (×12) rend l'éviction viable
-// mais non dominante (l'agression doit surpayer un territoire établi).
+// Calibré par scripts/balance.ts. Ratio unitaire income/charge = base/upkeep = 6/3 = 2:1
+// (la tension visée) ; le camp de base (QG sans income, capital 100 + charge 20) tire le ratio
+// sous 1 en début de partie → on démarre sous l'eau, ce qui force l'expansion.
 export const DEFAULT_CONFIG: GameConfig = {
   horizonTurns: 14,
   claimMultiple: 4,
   askDefaultMultiple: 12,
   askFloorMultiple: 4,
   chargeRate: 0.2,
-  baseCampLoan: 120,
+  baseCampLoan: 100,
+  hexUpkeep: 3,
 };
 
 // ─────────────────────── Acquisition d'un hex libre ──────────────────────────
@@ -117,7 +125,10 @@ export function borrow(state: GameStateV2, actorId: string, amount: number, cfg:
   };
 }
 
-/** Pose le camp de BASE de chaque acteur (premier emprunt déjà effectué au départ). */
+/**
+ * Pose le camp de BASE de chaque acteur = son 1ᵉʳ emprunt (capital de lancement + charge
+ * permanente). Le QG (hex camp, déclaré dans `revenueCfg.campHexes`) ne rapporte aucun income.
+ */
 export function foundBaseCamps(state: GameStateV2, cfg: GameConfig): GameStateV2 {
   let s = state;
   for (const a of s.actors) s = borrow(s, a.id, cfg.baseCampLoan, cfg);
@@ -131,10 +142,11 @@ export function evictionCost(state: GameStateV2, hexId: string): number {
   return state.asks[hexId] ?? Infinity;
 }
 
-/** Peut-on évincer ? Hex occupé par un AUTRE, assaillant vivant, cash ≥ ask de l'occupant. */
+/** Peut-on évincer ? Hex occupé par un AUTRE (jamais un camp de base), assaillant vivant, cash ≥ ask. */
 export function canEvict(state: GameStateV2, buyerId: string, hexId: string): boolean {
   const occ = state.ownership[hexId];
   if (!occ || occ === buyerId) return false;
+  if (isCampHex(hexId, state.revenueCfg)) return false; // le QG ne se rachète pas
   const buyer = state.actors.find((a) => a.id === buyerId);
   if (!buyer || buyer.bankrupt) return false;
   return buyer.cash >= evictionCost(state, hexId);
@@ -169,11 +181,13 @@ export function evict(state: GameStateV2, buyerId: string, hexId: string, cfg: G
 // emprunter = argent gratuit. Net = cash + valeur du territoire (prix de marché des hexes
 // possédés) − dette restante (le principal du camp, jamais remboursé en modèle permanent).
 
-/** Valeur de marché du territoire d'un acteur (somme des prix d'acquisition de ses hexes). */
+/** Valeur de marché du territoire d'un acteur (hexes d'income ; le QG sans income vaut 0). */
 export function territoryValue(state: GameStateV2, actorId: string, cfg: GameConfig): number {
   let v = 0;
   for (const h of state.map.hexes) {
-    if (state.ownership[h.id] === actorId) v += claimCost(state, h.id, cfg);
+    if (state.ownership[h.id] === actorId && !isCampHex(h.id, state.revenueCfg)) {
+      v += claimCost(state, h.id, cfg);
+    }
   }
   return v;
 }
@@ -204,11 +218,11 @@ function freeHexesByValue(state: GameStateV2, actorId: string): string[] {
   return free.map((h) => h.id).sort((a, b) => score(b) - score(a));
 }
 
-/** Garantit que chaque hex possédé par `actorId` a un ask (au défaut si manquant). */
+/** Garantit que chaque hex d'income possédé par `actorId` a un ask (le QG n'en a pas). */
 function ensureAsks(state: GameStateV2, actorId: string, cfg: GameConfig): GameStateV2 {
   let s = state;
   for (const h of s.map.hexes) {
-    if (s.ownership[h.id] === actorId && s.asks[h.id] == null) {
+    if (s.ownership[h.id] === actorId && !isCampHex(h.id, s.revenueCfg) && s.asks[h.id] == null) {
       s = { ...s, asks: { ...s.asks, [h.id]: defaultAsk(s, h.id, cfg) } };
     }
   }
@@ -227,7 +241,7 @@ export function aiTurn(state: GameStateV2, actorId: string, cfg: GameConfig): Ga
   const me0 = s.actors.find((a) => a.id === actorId);
   if (!me0 || me0.bankrupt) return s;
 
-  const reserve = () => actorCharges(actorId, s.camps) * 2;
+  const reserve = () => actorTotalCharges(s, actorId) * 2;
   const cash = () => s.actors.find((a) => a.id === actorId)!.cash;
 
   // 1. Emprunter si le cash est trop bas pour saisir une opportunité ET que le revenu
