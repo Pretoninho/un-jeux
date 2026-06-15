@@ -65,6 +65,17 @@ export function makeBoard(
     decided.add(mirror);
   }
 
+  // Garantit qu'au moins un hex d'income jouxte chaque QG → départ toujours jouable
+  // (sinon un placement malheureux isole un QG et le condamne). Symétrique par construction.
+  const c0 = { q: -radius, r: 0 };
+  const c0nbs = DIRS.map(([dq, dr]) => ({ q: c0.q + dq, r: c0.r + dr }))
+    .filter(({ q, r }) => has(q, r) && !cornerSet.has(hexId(q, r)));
+  if (c0nbs.length > 0 && !c0nbs.some(({ q, r }) => incomeSet.has(hexId(q, r)))) {
+    const pick = c0nbs[0]!;
+    incomeSet.add(hexId(pick.q, pick.r));
+    incomeSet.add(hexId(-pick.q, -pick.r)); // miroir → jouxte l'autre QG
+  }
+
   const hexes: Hex[] = coords.map((c) => ({
     id: hexId(c.q, c.r),
     label: hexId(c.q, c.r),

@@ -81,14 +81,20 @@ describe('game — rareté des hexes à income', () => {
     expect(canClaim(sterile, 'alice', 'B', GAME)).toBe(false);
   });
 
-  it('makeBoard : incomeFraction 1 → toutes les cases (hors QG) produisent ; 0 → aucune', () => {
+  it('makeBoard : incomeFraction 1 → toutes les cases (hors QG) produisent', () => {
     const full = makeBoard(2, 6, 2, 1, 1);
     const incomeFull = full.map.hexes.filter((h) => (full.rev.baseByHex[h.id] ?? 0) > 0).length;
     expect(incomeFull).toBe(full.map.hexes.length - 2); // tous sauf les 2 QG
+  });
 
-    const empty = makeBoard(2, 6, 2, 0, 1);
-    const incomeEmpty = empty.map.hexes.filter((h) => (empty.rev.baseByHex[h.id] ?? 0) > 0).length;
-    expect(incomeEmpty).toBe(0);
+  it('makeBoard : même à fraction 0, chaque QG a ≥1 hex d\'income adjacent (départ jouable)', () => {
+    const b = makeBoard(3, 6, 2, 0, 1);
+    const income = b.map.hexes.filter((h) => (b.rev.baseByHex[h.id] ?? 0) > 0).map((h) => h.id);
+    expect(income.length).toBe(2); // un hex garanti par QG (+ son miroir)
+    for (const corner of b.corners) {
+      const hex = b.map.hexes.find((h) => h.id === corner)!;
+      expect(hex.neighbors.some((nb) => income.includes(nb))).toBe(true);
+    }
   });
 
   it('makeBoard : les QG (coins) sont des camps sans income', () => {

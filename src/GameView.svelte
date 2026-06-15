@@ -16,11 +16,12 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Plateau rayon 3 ; hexes à income RARES (≈ la moitié) ; 2 coins = QG (0 income) ──
-  const RADIUS = 3;
+  // ── Grand plateau rayon 5 = 91 hexes ; hexes à income RARES (≈ la moitié) ; 2 coins = QG ──
+  const RADIUS = 5;
   const INCOME_FRACTION = 0.5;   // rareté : seule la moitié des cases produit un revenu
   const GEO = makeBoard(RADIUS, 6, 2, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
-  const CFG: GameConfig = { ...DEFAULT_CONFIG };
+  // Mêmes proportions économiques ; horizon allongé pour remplir le plus grand plateau.
+  const CFG: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: 20 };
 
   let seed = $state(Math.floor(Math.random() * 1e9)); // un plateau différent à chaque partie
 

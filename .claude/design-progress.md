@@ -1,7 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.42
+> Dernière mise à jour : 2026-06-15 — v1.43
+>
+> 🗺️ **GRAND PLATEAU — RAYON 5 = 91 HEXES (2026-06-15, retour de partie)** : agrandissement « considérable »
+> (37 → 91 hexes, ×2.5) à **proportions établies inchangées** (rareté 0.5, base 6, agglo 2, upkeep 1, camp de
+> base 70, charge 0.2). Vérifié au sim (`scripts/balance.ts`, balayage **rayon × horizon** 3-6 × 14-28) : les
+> proportions tiennent à toutes les tailles (~44/44, l'IA atteint les mêmes ~2 hexes). Horizon allongé à **20
+> tours** (CFG du jeu) pour laisser le temps de remplir le plus grand plateau. **Garantie de départ jouable**
+> ajoutée dans `board.ts` : ≥1 hex d'income adjacent à chaque QG (sinon un placement seedé isole un QG) →
+> faillites parasites réduites. 147 tests verts, svelte-check 0, build OK. ⚠️ Les QG sont plus éloignés → plus
+> de construction, moins de conflit précoce (à valider au playtest ; ajustable via le rayon / la position des QG).
 >
 > 🚫 **RÉ-EMPRUNT SUPPRIMÉ (2026-06-15, retour de partie)** : on retire la possibilité d'emprunter à nouveau
 > (joueur ET IA) — mais le **camp de base reste la dette de départ** (1ᵉʳ emprunt posé au setup = capital +

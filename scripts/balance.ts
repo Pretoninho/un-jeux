@@ -71,8 +71,8 @@ const conquerant: Policy = (s, id, cfg) => {
   return s;
 };
 
-function setup(cfg: GameConfig, frac: number, seed: number): GameStateV2 {
-  const board = makeBoard(RADIUS, FLAT_BASE, AGGLO, frac, seed);
+function setup(cfg: GameConfig, frac: number, seed: number, radius: number): GameStateV2 {
+  const board = makeBoard(radius, FLAT_BASE, AGGLO, frac, seed);
   const [c0, c1] = board.corners;
   let s = makeGameStateV2(board.map, board.rev, [makeActorV2('alice', 'A', 0), makeActorV2('bob', 'B', 0)], cfg.hexUpkeep);
   s.ownership[c0] = 'alice';
@@ -86,8 +86,8 @@ const ownedIncomeHexes = (s: GameStateV2, id: string) =>
 
 interface GameOut { winner: string | null; reason: string | null; turn: number; ratioMid: number; ratioEnd: number; hexes: number; }
 
-function playGame(cfg: GameConfig, pA: Policy, pB: Policy, swap: boolean, frac: number, seed: number): GameOut {
-  let s = setup(cfg, frac, seed);
+function playGame(cfg: GameConfig, pA: Policy, pB: Policy, swap: boolean, frac: number, seed: number, radius: number): GameOut {
+  let s = setup(cfg, frac, seed, radius);
   let ratioMid = 0;
   const ratioOf = (id: string) => income(s, id) / Math.max(1, charges(s, id));
   const done = (): GameOut => {
@@ -108,14 +108,14 @@ function playGame(cfg: GameConfig, pA: Policy, pB: Policy, swap: boolean, frac: 
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8]; // 8 placements différents
 
-function evalConfig(cfg: GameConfig, frac: number) {
+function evalConfig(cfg: GameConfig, frac: number, radius = RADIUS) {
   let rWins = 0, cWins = 0, draws = 0, bankrupts = 0, turns = 0, rMid = 0, rEnd = 0, hexes = 0, n = 0;
   for (const seed of SEEDS) for (const swap of [false, true]) {
-    let g = playGame(cfg, rentier, conquerant, swap, frac, seed); n++;
+    let g = playGame(cfg, rentier, conquerant, swap, frac, seed, radius); n++;
     turns += g.turn; rMid += g.ratioMid; rEnd += g.ratioEnd; hexes += g.hexes;
     if (g.winner === 'alice') rWins++; else if (g.winner === 'bob') cWins++; else draws++;
     if (g.reason === 'last_standing') bankrupts++;
-    g = playGame(cfg, conquerant, rentier, swap, frac, seed); n++;
+    g = playGame(cfg, conquerant, rentier, swap, frac, seed, radius); n++;
     turns += g.turn; rMid += g.ratioMid; rEnd += g.ratioEnd; hexes += g.hexes;
     if (g.winner === 'bob') rWins++; else if (g.winner === 'alice') cWins++; else draws++;
     if (g.reason === 'last_standing') bankrupts++;
@@ -123,33 +123,20 @@ function evalConfig(cfg: GameConfig, frac: number) {
   return { rWins, cWins, draws, bankrupts, avgTurns: turns / n, ratioMid: rMid / n, ratioEnd: rEnd / n, hexes: hexes / n, n };
 }
 
-const total = makeBoard(RADIUS, FLAT_BASE, AGGLO, 1, 0).map.hexes.length;
-console.log(`Plateau rayon ${RADIUS} (${total} hexes dont 2 QG), base income ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}, loan ${DEFAULT_CONFIG.baseCampLoan}`);
-console.log('RARETÉ des hexes à income : on balaie incomeFraction (8 placements seedés × rôles permutés).\n');
-console.log(' fraction | ~hex income | rentier | conquér | nuls | faillite | tours | ratio mi | ratio fin | hex/joueur');
-console.log('----------|-------------|---------|---------|------|----------|-------|----------|-----------|-----------');
-for (const frac of [1.0, 0.75, 0.6, 0.5, 0.4, 0.3, 0.2]) {
-  const cfg: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: 14 };
-  const r = evalConfig(cfg, frac);
-  const pct = (x: number) => `${Math.round((x / r.n) * 100)}%`;
-  const approxIncome = Math.round((total - 2) * frac);
-  console.log(
-    `${frac.toFixed(2).padStart(9)} | ${String(approxIncome).padStart(11)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.draws).padStart(4)} | ${pct(r.bankrupts).padStart(8)} | ${r.avgTurns.toFixed(0).padStart(5)} | ${r.ratioMid.toFixed(2).padStart(8)} | ${r.ratioEnd.toFixed(2).padStart(9)} | ${r.hexes.toFixed(1).padStart(9)}`,
-  );
-}
-
-// 2ᵉ passe : affinage de l'îlot survivable+disputé (upkeep 1 : avec la rareté, la tension
-// vient surtout de la charge du camp de base, pas de l'upkeep). On cherche faillite modérée + ratio tendu.
-console.log('\n=== affinage upkeep 1 : rareté × camp de base ===');
-console.log(' frac | loan | rentier | conquér | nuls | faillite | tours | ratio mi | ratio fin | hex/j');
-console.log('------|------|---------|---------|------|----------|-------|----------|-----------|------');
-for (const frac of [0.5, 0.55, 0.6, 0.65]) {
-  for (const loan of [65, 75, 85]) {
-    const cfg: GameConfig = { ...DEFAULT_CONFIG, baseCampLoan: loan, hexUpkeep: 1, horizonTurns: 14 };
-    const r = evalConfig(cfg, frac);
+const FRAC = 0.5; // rareté établie
+const hexCount = (radius: number) => makeBoard(radius, FLAT_BASE, AGGLO, 1, 0).map.hexes.length;
+console.log(`Proportions établies : base ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}, loan ${DEFAULT_CONFIG.baseCampLoan}, rareté ${FRAC}`);
+console.log('AGRANDISSEMENT : on balaie le RAYON × HORIZON (proportions fixées).\n');
+console.log(' rayon | hexes | horizon | rentier | conquér | nuls | faillite | tours | ratio mi | ratio fin | hex/joueur');
+console.log('-------|-------|---------|---------|---------|------|----------|-------|----------|-----------|-----------');
+for (const radius of [3, 4, 5, 6]) {
+  for (const horizon of [14, 20, 28]) {
+    const cfg: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: horizon };
+    const r = evalConfig(cfg, FRAC, radius);
     const pct = (x: number) => `${Math.round((x / r.n) * 100)}%`;
     console.log(
-      `${frac.toFixed(2).padStart(5)} | ${String(loan).padStart(4)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.draws).padStart(4)} | ${pct(r.bankrupts).padStart(8)} | ${r.avgTurns.toFixed(0).padStart(5)} | ${r.ratioMid.toFixed(2).padStart(8)} | ${r.ratioEnd.toFixed(2).padStart(9)} | ${r.hexes.toFixed(1).padStart(4)}`,
+      `${String(radius).padStart(6)} | ${String(hexCount(radius)).padStart(5)} | ${String(horizon).padStart(7)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.draws).padStart(4)} | ${pct(r.bankrupts).padStart(8)} | ${r.avgTurns.toFixed(0).padStart(5)} | ${r.ratioMid.toFixed(2).padStart(8)} | ${r.ratioEnd.toFixed(2).padStart(9)} | ${r.hexes.toFixed(1).padStart(9)}`,
     );
   }
+  console.log('');
 }
