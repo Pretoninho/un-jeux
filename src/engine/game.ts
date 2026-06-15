@@ -45,17 +45,17 @@ export interface GameConfig {
   hexUpkeep: number;
 }
 
-// Calibré par scripts/balance.ts avec hexes à income RARES (incomeFraction ~0.5). Avec la
-// rareté, la tension vient surtout de la CHARGE du camp de base (le ratio income/charge réalisé
-// est ~1.2, très tendu) ; l'upkeep par hex devient léger (1). loan 70 = survivable + disputé (50/50).
+// Calibré par scripts/balance.ts (rayon 5, rareté 0.5, horizon 20). Objectif : PROGRESSION (ne pas
+// rester bloqué à 2 hexes) + tension. Charge de base 7 (= 0.10 × 70) surmontable dès 2 hexes ; upkeep 3
+// plafonne la croissance → ratio income/charge réalisé ~2:1 en fin de partie. netT2 ~+10 (on accumule).
 export const DEFAULT_CONFIG: GameConfig = {
-  horizonTurns: 14,
+  horizonTurns: 20,
   claimMultiple: 4,
   askDefaultMultiple: 12,
   askFloorMultiple: 4,
-  chargeRate: 0.2,
+  chargeRate: 0.1,
   baseCampLoan: 70,
-  hexUpkeep: 1,
+  hexUpkeep: 3,
 };
 
 // ─────────────────────── Acquisition d'un hex libre ──────────────────────────

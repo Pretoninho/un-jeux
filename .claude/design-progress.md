@@ -1,7 +1,17 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.43
+> Dernière mise à jour : 2026-06-15 — v1.44
+>
+> 🔓 **DÉBLOCAGE DE LA PROGRESSION (2026-06-15, retour de partie : « bloqué au tour 2, ratio 1/1 »)** : la
+> calibration v1.43 était un **soft-lock** — charge de base 14 ≈ income de 2 hexes (16) → net ≈ 0, on n'accumule
+> jamais les 24 pour un 3ᵉ hex. Deux causes corrigées : (1) **charge de base trop forte** → `chargeRate 0.20→0.10`
+> (charge 14→**7**, surmontable dès 2 hexes ; comme il n'y a plus de ré-emprunt, ce taux ne règle QUE le camp de
+> base) ; (2) **bots sur-prudents** dans le sim (réservaient 1× charges) → réserve = **déficit seul** (net positif
+> → on dépense). Nouveau métrique sim = **PROGRESSION** : netT2 (>0), hexes en fin, ratio fin. Réglage retenu
+> `loan 70 / chargeRate 0.10 / upkeep 3` → **netT2 ≈ +10**, **~20 hexes** en fin, **ratio fin ≈ 2:1**, 0 % faillite.
+> L'**upkeep remonté à 3** plafonne la croissance et tient la tension 2:1 (sinon le territoire devient gratuit en fin).
+> horizon 20 intégré à `DEFAULT_CONFIG`. 147 tests verts, svelte-check 0, build OK.
 >
 > 🗺️ **GRAND PLATEAU — RAYON 5 = 91 HEXES (2026-06-15, retour de partie)** : agrandissement « considérable »
 > (37 → 91 hexes, ×2.5) à **proportions établies inchangées** (rareté 0.5, base 6, agglo 2, upkeep 1, camp de

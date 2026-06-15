@@ -20,8 +20,7 @@
   const RADIUS = 5;
   const INCOME_FRACTION = 0.5;   // rareté : seule la moitié des cases produit un revenu
   const GEO = makeBoard(RADIUS, 6, 2, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
-  // Mêmes proportions économiques ; horizon allongé pour remplir le plus grand plateau.
-  const CFG: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: 20 };
+  const CFG: GameConfig = { ...DEFAULT_CONFIG }; // horizon 20 inclus dans DEFAULT_CONFIG
 
   let seed = $state(Math.floor(Math.random() * 1e9)); // un plateau différent à chaque partie
 

@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.43.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.44.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -23,10 +23,10 @@ revenu − charges      → net/tour → ajouté au cash
 cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
 ```
 
-**Tension income/charge** : avec la rareté on possède peu d'hexes, donc c'est surtout la **charge du camp de
-base** qui porte la tension (ratio income/charge réalisé ~1.2, très tendu). Le **camp de base** (QG sans income
-mais qui charge) tire le ratio **sous 1 en début de partie** → on démarre sous l'eau, ce qui **force
-l'acquisition du 1ᵉʳ hex d'income**. Le ratio est affiché en jeu.
+**Tension income/charge** : chaque hex d'income rapporte 6 et coûte un **upkeep** de 3 → ratio unitaire **2:1**
+(l'upkeep plafonne la croissance et tient la tension tout du long). Le **camp de base** (QG sans income, charge 7)
+te met **sous l'eau au départ** → il faut acquérir ~2 hexes pour le couvrir, puis on **progresse** (net positif,
+on accumule pour acheter plus). Le ratio est affiché en jeu.
 
 ## Les pièces
 
@@ -39,9 +39,9 @@ l'acquisition du 1ᵉʳ hex d'income**. Le ratio est affiché en jeu.
   jouable). La rareté rend chaque hex à income **disputé** (éviction).
 - **Agglomération** : chaque hex adjacent appartenant au **même** propriétaire ajoute une prime
   (`agglomerationBonus`, +2) → un cluster contigu rapporte plus que des hexes dispersés.
-- **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**1**) par tour. Avec la rareté, on possède
-  peu d'hexes → c'est surtout la **charge du camp de base** qui porte la tension (ratio réalisé ~1.2, très
-  tendu) ; l'upkeep reste un coût léger par case.
+- **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**3**) par tour. Il fait monter la charge avec le
+  territoire → **plafonne la croissance** et tient le ratio income/charge vers **2:1** en fin de partie (au lieu
+  d'exploser). Chaque hex net = 6 − 3 = +3/tour (avant agglomération) : on progresse, mais la charge mord toujours.
 
 ### Acquisition d'un hex libre
 - Prix = `base × claimMultiple` (6 × 4 = **24**), payé en cash.
@@ -50,7 +50,7 @@ l'acquisition du 1ᵉʳ hex d'income**. Le ratio est affiché en jeu.
 ### Camp de base = QG sans income + dette de départ (fixe)
 - **Posé au départ pour tous** (`foundBaseCamps`). C'est **le 1ᵉʳ et SEUL emprunt** : il donne le **capital de
   lancement** (cash = `baseCampLoan` **70**) **ET** impose sa **charge permanente** (`chargeRate × montant`
-  = 0.20 × 70 = **14/tour**).
+  = 0.10 × 70 = **7/tour**) — surmontable dès ~2 hexes d'income, mais réelle.
 - Son **hex (le QG)** ne rapporte **aucun income** et ne s'agglomère pas → tu démarres avec du cash mais
   une charge qui saigne, sur une case stérile : tu **dois** acquérir des hexes d'income pour la couvrir.
 - Le QG **ne peut pas être évincé** (pas d'ask) et ne paie pas d'upkeep (il porte déjà sa dette).
@@ -93,19 +93,21 @@ charges. (Pas de ré-emprunt : comme le joueur, elle s'étend avec son capital d
 | --- | --- | --- |
 | `horizonTurns` | 20 | durée de partie (allongée pour le grand plateau) |
 | `claimMultiple` | 4 | prix d'un hex libre = base × 4 |
-| `chargeRate` | 0.20 | charge/tour de la dette = taux × emprunt |
-| `baseCampLoan` | 70 | camp de base = 1ᵉʳ emprunt (capital + charge 14/tour) |
-| `hexUpkeep` | 1 | upkeep/tour par hex d'income (léger : la rareté limite le nombre d'hexes) |
+| `chargeRate` | 0.10 | charge/tour de la dette = taux × emprunt (camp de base = 7/tour) |
+| `baseCampLoan` | 70 | camp de base = 1ᵉʳ emprunt (capital 70 + charge 7/tour) |
+| `hexUpkeep` | 3 | upkeep/tour par hex d'income → plafonne la croissance, ratio fin ~2:1 |
 | `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (éviction viable mais non dominante) |
 | `askFloorMultiple` | 4 | plancher d'un ask = base × 4 |
 
 Revenu de base/hex à income = **6**, agglomération = **+2**/voisin, **incomeFraction ≈ 0.5** (rareté).
 
-**Calibrage** : `npx vite-node scripts/balance.ts` balaie d'abord la **rareté** (`incomeFraction`, 8 placements
-seedés), puis affine `baseCampLoan × hexUpkeep`. Constat : avec la rareté, la tension vient surtout de la
-**charge du camp de base** (ratio réalisé ~1.2) ; à `loan 70 / upkeep 1`, le jeu est **survivable et disputé**
-(50/50, pas de faillite systématique). ⚠️ Les bots expansent peu (≈2 hexes) → la vraie tension (sur-emprunter,
-se battre pour les hexes rares) est une décision **humaine**. **À valider au playtest.**
+**Calibrage** : `npx vite-node scripts/balance.ts` (rayon 5, rareté 0.5, horizon 20, 8 placements seedés)
+mesure la **PROGRESSION** — net/tour au tour 2 (doit être > 0, sinon on est *bloqué*), nombre d'hexes en fin
+de partie, ratio income/charge final, faillites. Réglage retenu (`loan 70 / chargeRate 0.10 / upkeep 3`) :
+**netT2 ≈ +10** (on accumule et on continue d'acheter), **~20 hexes** en fin, **ratio fin ≈ 2:1**, **0 % de
+faillite**. Leçon : une charge de base trop forte (×0.20 = 14) **bloque** la progression (net ≈ 0 après 2 hexes) ;
+0.10 (charge 7) la débloque, et l'**upkeep 3** maintient la tension à 2:1 sans laisser le territoire devenir
+gratuit. ⚠️ Bots crus → à valider au playtest.
 
 ## Carte des fichiers
 
