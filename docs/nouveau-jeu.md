@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.41.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.42.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -45,15 +45,15 @@ cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
 - Prix = `base × claimMultiple` (6 × 4 = **24**), payé en cash.
 - À l'achat, **le carnet d'ordres s'ouvre obligatoirement** (voir ci-dessous).
 
-### Camp de base = QG sans income + 1ᵉʳ emprunt
-- **Posé au départ pour tous** (`foundBaseCamps`). C'est **le 1ᵉʳ emprunt** : il donne le **capital de
-  lancement** (cash = `baseCampLoan` **100**) **ET** impose sa **charge permanente** (`chargeRate × montant`
-  = 0.20 × 100 = **20/tour**).
+### Camp de base = QG sans income + dette de départ (fixe)
+- **Posé au départ pour tous** (`foundBaseCamps`). C'est **le 1ᵉʳ et SEUL emprunt** : il donne le **capital de
+  lancement** (cash = `baseCampLoan` **70**) **ET** impose sa **charge permanente** (`chargeRate × montant`
+  = 0.20 × 70 = **14/tour**).
 - Son **hex (le QG)** ne rapporte **aucun income** et ne s'agglomère pas → tu démarres avec du cash mais
   une charge qui saigne, sur une case stérile : tu **dois** acquérir des hexes d'income pour la couvrir.
 - Le QG **ne peut pas être évincé** (pas d'ask) et ne paie pas d'upkeep (il porte déjà sa dette).
-- On peut **ré-emprunter** en cours de partie (capital immédiat, charge supplémentaire à vie).
-- La dette compte comme **passif** dans la valeur nette → emprunter n'est jamais de l'argent gratuit.
+- **Pas de ré-emprunt** : la dette est **fixe**. Ton seul levier économique est d'acquérir des hexes d'income.
+- La dette compte comme **passif** dans la valeur nette → le capital reçu n'est pas de la richesse gratuite.
 
 ### Carnet d'ordres = prix de sortie (ask)
 - Chaque hex possédé porte **un ordre de vente** (ask) **fixé par son propriétaire** — et **seulement** un

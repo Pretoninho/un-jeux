@@ -1,7 +1,15 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.41
+> Dernière mise à jour : 2026-06-15 — v1.42
+>
+> 🚫 **RÉ-EMPRUNT SUPPRIMÉ (2026-06-15, retour de partie)** : on retire la possibilité d'emprunter à nouveau
+> (joueur ET IA) — mais le **camp de base reste la dette de départ** (1ᵉʳ emprunt posé au setup = capital +
+> charge fixe). La dette est désormais **fixe** : le seul levier économique est d'acquérir des hexes d'income.
+> Concrètement : boutons « Emprunter » retirés de l'UI, bloc d'emprunt mid-game retiré de `aiTurn`. **L'IA joue
+> normalement** (vérifié `scripts/balance.ts` : 50/50, **0 % faillite**, 14 tours, ~2 hexes/IA) — supprimer le
+> ré-emprunt a même **stabilisé** le jeu (plus de faillites par sur-emprunt). `borrow` reste interne (utilisé par
+> `foundBaseCamps`). 146 tests verts, svelte-check 0, build OK.
 >
 > 🗺️ **HEXES À INCOME RARES (2026-06-15, retour de partie)** : sur demande, tous les hexes ne produisent plus
 > de revenu. `board.ts` `makeBoard(radius, base, agglo, incomeFraction, seed)` : seule une fraction (~0.5) des

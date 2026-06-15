@@ -246,14 +246,10 @@ export function aiTurn(state: GameStateV2, actorId: string, cfg: GameConfig): Ga
   const reserve = () => actorTotalCharges(s, actorId) * 2;
   const cash = () => s.actors.find((a) => a.id === actorId)!.cash;
 
-  // 1. Emprunter si le cash est trop bas pour saisir une opportunité ET que le revenu
-  //    couvre confortablement les charges (marge pour servir la dette supplémentaire).
-  const cheapest = freeHexesByValue(s, actorId).map((id) => claimCost(s, id, cfg)).sort((a, b) => a - b)[0];
-  if (cheapest != null && cash() < cheapest && s.camps.filter((c) => c.ownerId === actorId).length < 3) {
-    s = borrow(s, actorId, cfg.baseCampLoan, cfg);
-  }
+  // (Plus de ré-emprunt : le camp de base est la seule dette. L'IA s'étend avec son
+  //  capital de départ + son income accumulé.)
 
-  // 2. Acheter en boucle (garde la réserve).
+  // 1. Acheter en boucle (garde la réserve).
   let safety = 12;
   while (safety-- > 0) {
     const target = freeHexesByValue(s, actorId).find((id) => claimCost(s, id, cfg) <= cash() - reserve());

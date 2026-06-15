@@ -6,7 +6,7 @@
   import { actorNet, actorTotalCharges, checkEnd, type ActorTickReport } from './engine/tick';
   import { actorIncome, hexRevenue, isCampHex } from './engine/revenue';
   import {
-    claimCost, canClaim, claimHex, borrow, foundBaseCamps,
+    claimCost, canClaim, claimHex, foundBaseCamps,
     defaultAsk, askFloor, setAsk, evictionCost, canEvict, evict, netWorth, endTurn,
     DEFAULT_CONFIG, type GameConfig,
   } from './engine/game';
@@ -97,12 +97,6 @@
   function editOrder(hexId: string) {
     if (ended || blocked) return;
     pending = { hexId, price: game.asks[hexId] ?? defaultAsk(game, hexId, CFG) };
-  }
-
-  function takeLoan(amount: number) {
-    if (ended || blocked) return;
-    game = borrow(game, HUMAN, amount, CFG);
-    log(`🏦 Emprunt +${amount} (charge +${Math.round(amount * CFG.chargeRate)}/tour)`);
   }
 
   function finishTurn() {
@@ -217,14 +211,10 @@
       <section class="card">
         <h3>Camp de base (dette)</h3>
         <div class="muted small">
-          {game.camps.filter((c) => c.ownerId === HUMAN).length} camp(s) ·
           dette {game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.debtRemaining, 0)} ·
-          charge dette −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
+          charge −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
         </div>
-        <div class="loan-btns">
-          <button onclick={() => takeLoan(80)} disabled={ended || blocked}>Emprunter +80 <i>(−{Math.round(80 * CFG.chargeRate)}/t)</i></button>
-          <button onclick={() => takeLoan(150)} disabled={ended || blocked}>+150 <i>(−{Math.round(150 * CFG.chargeRate)}/t)</i></button>
-        </div>
+        <div class="muted small tip2">Dette fixe : pas de ré-emprunt. Ton seul levier est d'acquérir des hexes d'income pour couvrir cette charge.</div>
       </section>
 
       <!-- CARNET D'ORDRES -->
@@ -329,11 +319,6 @@
   .neg { color: #e07a3a; }
   .bad { color: #e05050; }
 
-  .loan-btns { display: flex; gap: .4rem; margin-top: .5rem; }
-  .loan-btns button { flex: 1; background: #1a1e28; border: 1px solid #3a4050; color: #cdd3df; border-radius: 5px; padding: .35rem; cursor: pointer; font-size: .78rem; }
-  .loan-btns button i { font-style: normal; color: #e08a5a; font-size: .68rem; }
-  .loan-btns button:hover:not(:disabled) { border-color: #5a8090; }
-  .loan-btns button:disabled { opacity: .4; cursor: not-allowed; }
 
   .asks { display: flex; flex-direction: column; gap: .25rem; max-height: 160px; overflow: auto; }
   .ask-row { display: flex; align-items: baseline; gap: .5rem; background: #1a1e28; border: 1px solid #2a2f3a; border-radius: 5px; padding: .3rem .5rem; cursor: pointer; text-align: left; color: #cdd3df; font-size: .8rem; }

@@ -50,11 +50,8 @@ const rentier: Policy = (s, id, cfg) => {
   return s;
 };
 
+// CONQUÉRANT : pas de ré-emprunt (supprimé) — s'étend avec son capital + évince agressivement.
 const conquerant: Policy = (s, id, cfg) => {
-  const cheapest = Math.min(...s.map.hexes.filter((h) => !s.ownership[h.id]).map((h) => claimCost(s, h.id, cfg)), Infinity);
-  if (cash(s, id) < cheapest * 2 && s.camps.filter((c) => c.ownerId === id).length < 4) {
-    s = borrow(s, id, cfg.baseCampLoan, cfg);
-  }
   let safety = 16;
   while (safety-- > 0) {
     const t = affordableFree(s, id, cfg, reserve(s, id, 1));
