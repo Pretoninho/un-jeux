@@ -1,11 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.32
+> Dernière mise à jour : 2026-06-15 — v1.34
 >
 > 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
 > validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
-> isolée (`*Demo.svelte`, bouton dédié dans `App.svelte`, sans toucher l'ancienne boucle de jeu).
+> isolée (`*Demo.svelte`).
+>
+> 🖥️ **UI PROPRE — `NewGameView.svelte` est la vue PAR DÉFAUT (2026-06-15)** : aucune interférence de l'ancien
+> jeu. Sélecteur de briques (une à la fois : 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien jeu reste
+> accessible via le lien discret *« ancien jeu (référence) → »* (`App.svelte` garde un `mode` 'new'/'legacy',
+> default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 158 tests verts.
 >
 > | # | Brique | Moteur | Tests | Démo UI | État |
 > | --- | --- | --- | --- | --- | --- |
@@ -23,6 +28,15 @@
 > **Revenu (`revenue.ts`)** : *possédé → +base ; voisin du même proprio → +bonus/voisin (agglomération) ;
 > libre → 0*. `actorIncome` = somme. Cluster contigu > hexes dispersés (testé). svelte-check 0 erreur.
 > ⚠️ Ces briques sont **autonomes** — pas encore câblées dans une boucle de jeu unifiée (brique 4/5).
+>
+> ✂️ **DÉBRANCHEMENT DE L'ANCIEN MOTEUR — COUPE NETTE À LA BRIQUE 5 (décision 2026-06-15)** : on **ne supprime
+> rien en pièces détachées**. L'ancien jeu reste **runnable comme référence** (+ ses ~200 tests) jusqu'à ce que
+> la nouvelle boucle le remplace dans `App.svelte` (brique 5) → **une seule coupe franche, jamais d'état cassé
+> intermédiaire**. **Règle dure d'ici là** : le nouveau jeu se construit sur un **state PROPRE** (`GameStateV2`
+> dédié, à créer brique 3) — **jamais** réutiliser l'ancien `GameState` (fragility/crisis/regime/credit) pour ne
+> pas entremêler neuf et mort. **🗑️ Condamnés** (partent à la brique 5) : `market` `fragility` `signals` `regime`
+> `credit` `score` `ai` `policy` `turn` `init` `simulate` `portfolio` + l'ancien `GameState`/`params`. **♻️ Gardés**
+> (infra saine) : `rng` `map-utils` les types carte de `types.ts`. **🆕 Neuf** : `orderbook` `revenue` (+ à venir).
 >
 > 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
 >
