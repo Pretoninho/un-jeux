@@ -1,7 +1,38 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.38
+> Dernière mise à jour : 2026-06-15 — v1.39
+>
+> 📒 **CARNET D'ORDRES EFFECTIF + 1 TRONC + CALIBRAGE (2026-06-15, retour de partie)**. Quatre décisions appliquées,
+> toutes DANS le jeu (`game.ts` + `GameView.svelte`), validé par `npx vite-node scripts/balance.ts` :
+>
+> 1. **UN seul tronc + branches plus tard (décision tranchée)**. Les 2 troncs asymétriques n'étaient pas
+>    exerçables ni équilibrables tant que la boucle de base ne l'est pas (leçon §30 : *primitives d'abord, bac à
+>    sable neutre ; spécificités par-dessus, une à la fois*). → **un seul modèle de dette de base permanente**.
+>    **Camp de base posé AU DÉPART pour tous** (`foundBaseCamps` : le premier emprunt est déjà effectué = le
+>    capital de lancement). Le tronc A/B reste dans `camp.ts` pour les futures **branches** d'évolution.
+> 2. **Carnet d'ordres = prix de SORTIE déclaré (ask)**. Fini la formule d'éviction. `GameStateV2.asks` : chaque
+>    hex possédé porte un **ordre de vente** posé par son propriétaire. **Flux imposé** : *achat (ou éviction) →
+>    le moteur pose un ask par défaut → modale OBLIGATOIRE « place ton ordre de vente » → validation*. Le
+>    propriétaire ne peut poser QU'UN ask (pas de bid). **Évincer = payer l'ask** de l'occupant (zéro-sum, testé).
+>    Le siège est le prix public que l'occupant a déclaré ; un ask haut = résistance (mais l'éviction reste
+>    possible si l'assaillant paie). Plancher d'ask = base × 4 (on ne brade pas sous le prix d'achat).
+> 3. **Carte plus grande + PRIX PLAT**. `board.ts` génère un hexagone **rayon 3 = 37 hexes**, revenu de base
+>    **identique partout** (6) pour isoler le facteur d'équilibre. Joueurs aux deux coins opposés.
+> 4. **Point d'équilibre trouvé (`scripts/balance.ts`, rentier vs conquérant)**. **Mesure de victoire corrigée** :
+>    `netWorth = cash + valeur du territoire − dette restante` (sinon emprunter = argent gratuit ; la dette
+>    permanente est un vrai passif). **Le levier d'équilibre = le taux de charge ET le prix de sortie par défaut** :
+>    à `chargeRate 0.20` (≈ l'income que le capital génère, ~0.25·L/tour) + `askDefaultMultiple 12`, le sim donne
+>    **~50/50** (aucun style ne domine). Verrouillé dans `DEFAULT_CONFIG`. ⚠️ Bots crus → calibrage de 1ère passe,
+>    à affiner au playtest. `game.test.ts` : 18 tests. 145 verts, svelte-check 0, build OK.
+> 5. **Panels (façon ancien jeu)** : `GameView` a des sections denses (Toi / Camps / 📒 Carnet d'ordres éditable /
+>    Journal) + bandeau de valeur nette. Carte 37 hexes : 🪙 prix sur libre, ⚔ ask sur adverse, +revenu / 📒 ask sur les miens.
+>
+> 🌳 **TRONCS — STATUT RÉVISÉ** : la table « 2 troncs » ci-dessous reste la piste d'inspiration pour les futures
+> **branches**, mais le jeu tourne désormais sur **1 tronc de base** (voir décision 1 ci-dessus). À rouvrir quand
+> la boucle de base sera validée au playtest.
+>
+> ⚔️ **BRIQUE 5 LIVRÉE — ÉVICTION + GRANDE CARTE (2026-06-15)**
 >
 > ⚔️ **BRIQUE 5 LIVRÉE — ÉVICTION + GRANDE CARTE (2026-06-15)**, branchée DIRECTEMENT dans le jeu (pas de démo).
 > **Carte agrandie : hexagone rayon 2 = 19 hexes** (cœur à 12, anneau 1 à 9, anneau 2 à 6). Alice et Bob démarrent

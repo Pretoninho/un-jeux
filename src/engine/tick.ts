@@ -75,11 +75,15 @@ export function tick(state: GameStateV2): TickResult {
     return { ...a, cash: cashAfter };
   });
 
-  // Libère les hexes et purge les camps des acteurs qui viennent de couler.
+  // Libère les hexes (+ leurs ordres de vente) et purge les camps des acteurs coulés.
   const ownership = { ...state.ownership };
+  const asks = { ...state.asks };
   if (newlyBankrupt.size > 0) {
     for (const id of Object.keys(ownership)) {
-      if (ownership[id] && newlyBankrupt.has(ownership[id]!)) ownership[id] = null;
+      if (ownership[id] && newlyBankrupt.has(ownership[id]!)) {
+        ownership[id] = null;
+        delete asks[id];
+      }
     }
   }
   const camps = newlyBankrupt.size > 0
@@ -87,7 +91,7 @@ export function tick(state: GameStateV2): TickResult {
     : state.camps;
 
   return {
-    state: { ...state, turn: state.turn + 1, actors, ownership, camps },
+    state: { ...state, turn: state.turn + 1, actors, ownership, camps, asks },
     reports,
   };
 }
@@ -104,14 +108,23 @@ export interface EndStatus {
   winnerId: string | null;
 }
 
-export function checkEnd(state: GameStateV2, horizonTurns: number): EndStatus {
+/**
+ * Conditions de fin. `wealthOf` mesure la richesse d'un acteur pour départager au temps
+ * — par défaut le cash seul, mais le jeu passe la VALEUR NETTE (cash + territoire − dette)
+ * pour que l'emprunt ne soit pas de l'argent gratuit (cf. game.ts `netWorth`).
+ */
+export function checkEnd(
+  state: GameStateV2,
+  horizonTurns: number,
+  wealthOf: (actorId: string) => number = (id) => state.actors.find((a) => a.id === id)?.cash ?? 0,
+): EndStatus {
   const live = state.actors.filter((a) => !a.bankrupt);
 
   if (live.length <= 1) {
     return { ended: true, reason: 'last_standing', winnerId: live[0]?.id ?? null };
   }
   if (state.turn >= horizonTurns) {
-    const richest = live.reduce((best, a) => (a.cash > best.cash ? a : best), live[0]!);
+    const richest = live.reduce((best, a) => (wealthOf(a.id) > wealthOf(best.id) ? a : best), live[0]!);
     return { ended: true, reason: 'time', winnerId: richest.id };
   }
   return { ended: false, reason: null, winnerId: null };
