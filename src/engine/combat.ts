@@ -1,44 +1,44 @@
-// Combat tactique — NOYAU. Déplacement + attaque, budget en POINTS D'ACTION (PA).
+// Combat tactique — NOYAU. Plusieurs pièces par camp ; chaque PIÈCE a ses propres PA.
 //
-// Budget : chaque tour, l'unité active dispose d'un pool de PA qu'elle répartit librement.
+// Budget : à ton tour, chacune de tes pièces dispose d'un pool de PA.
 //   - un pas de déplacement coûte 1 PA (terrain uniforme) ;
 //   - une attaque coûte `attackCost` PA et inflige `attackDamage` à une cible à portée.
-// On peut donc bouger PUIS frapper, frapper PUIS reculer (kiting), ou tout dépenser à bouger.
+// Tu joues tes pièces dans l'ordre que tu veux ; « finir le tour » recharge les PA du camp
+// suivant. On peut donc concentrer le feu (focus-fire), faire écran, kiter, etc.
 //
-// Règles de déplacement : une pièce par case ; les unités sont des OBSTACLES (ni arrêt ni
-// passage sur une case occupée). Mort = PV ≤ 0 → l'unité quitte le plateau ; le dernier
-// camp avec au moins une pièce gagne.
+// Règles de déplacement : une pièce par case ; les pièces sont des OBSTACLES (ni arrêt ni
+// passage). Mort = PV ≤ 0 → la pièce quitte le plateau ; le dernier camp avec au moins une
+// pièce gagne.
 //
 // Module PUR, immuable : chaque action rend un NOUVEAU CombatState. Aucune dépendance DOM.
 
 import type { GameMap, HexId } from './types';
 
-/** Une unité : à qui elle est, où elle est, ses points de vie. */
+/** Une pièce : à qui elle est, où elle est, ses PV, ses PA du tour. */
 export interface Unit {
   id: string;
   owner: string;
   hex: HexId;
   hp: number;
+  ap: number;
 }
 
 /** Réglages d'attaque (données → réglables sans toucher la logique). */
 export interface AttackConfig {
-  range: number;       // portée (1 = corps-à-corps / adjacent)
-  cost: number;        // coût en PA
-  damage: number;      // dégâts infligés
+  range: number;  // portée (1 = corps-à-corps / adjacent)
+  cost: number;   // coût en PA
+  damage: number; // dégâts infligés
 }
 
-/** État d'un affrontement. `ap` = PA restants de l'unité active ce tour. */
 export interface CombatState {
   map: GameMap;
   units: Unit[];
   turn: number;
-  active: string;
-  ap: number;
+  active: string; // camp dont c'est le tour
 }
 
-export function makeCombatState(map: GameMap, units: Unit[], active: string, apPerTurn: number): CombatState {
-  return { map, units, turn: 1, active, ap: apPerTurn };
+export function makeCombatState(map: GameMap, units: Unit[], active: string): CombatState {
+  return { map, units, turn: 1, active };
 }
 
 export function unitById(state: CombatState, unitId: string): Unit | undefined {
@@ -49,7 +49,12 @@ export function unitAt(state: CombatState, hexId: HexId): Unit | undefined {
   return state.units.find((u) => u.hex === hexId);
 }
 
-/** Camps ayant encore au moins une unité. */
+/** Pièces du camp actif. */
+export function activeUnits(state: CombatState): Unit[] {
+  return state.units.filter((u) => u.owner === state.active);
+}
+
+/** Camps ayant encore au moins une pièce. */
 export function liveOwners(state: CombatState): string[] {
   return [...new Set(state.units.map((u) => u.owner))];
 }
@@ -63,8 +68,8 @@ export function winner(state: CombatState): string | null {
 // ─────────────────────── Déplacement ─────────────────────────────────────────
 
 /**
- * Cases atteignables par une unité, avec leur distance (1..steps). Parcours en largeur ;
- * une case occupée par une AUTRE unité est infranchissable (ni arrêt, ni traversée).
+ * Cases atteignables par une pièce, avec leur distance (1..steps). Parcours en largeur ;
+ * une case occupée par une AUTRE pièce est infranchissable (ni arrêt, ni traversée).
  * La case de départ est exclue. `steps` = PA disponibles (1 PA / pas).
  */
 export function reachable(state: CombatState, unitId: string, steps: number): Map<HexId, number> {
@@ -92,22 +97,21 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
   return dist;
 }
 
-/** Déplace l'unité active vers `dest` si atteignable avec ses PA ; déduit la distance. Immuable. */
+/** Déplace une pièce du camp actif vers `dest` si atteignable ; déduit la distance de SES PA. */
 export function moveUnit(state: CombatState, unitId: string, dest: HexId): CombatState {
   const unit = unitById(state, unitId);
   if (!unit || unit.owner !== state.active) return state;
-  const d = reachable(state, unitId, state.ap).get(dest);
+  const d = reachable(state, unitId, unit.ap).get(dest);
   if (d === undefined) return state;
   return {
     ...state,
-    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest } : u)),
-    ap: state.ap - d,
+    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest, ap: u.ap - d } : u)),
   };
 }
 
 // ─────────────────────── Attaque ─────────────────────────────────────────────
 
-/** Distance dans le graphe de cases (ignore les unités), ou Infinity si non relié. */
+/** Distance dans le graphe de cases (ignore les pièces), ou Infinity si non relié. */
 export function graphDistance(map: GameMap, from: HexId, to: HexId): number {
   if (from === to) return 0;
   const byId = new Map(map.hexes.map((h) => [h.id, h] as const));
@@ -130,33 +134,43 @@ export function graphDistance(map: GameMap, from: HexId, to: HexId): number {
   return Infinity;
 }
 
-/** L'unité active peut-elle attaquer cette cible (camp adverse, à portée, assez de PA) ? */
-export function canAttack(state: CombatState, targetId: string, cfg: AttackConfig): boolean {
-  const attacker = state.units.find((u) => u.owner === state.active);
+/** `attackerId` (du camp actif) peut-il attaquer `targetId` (adverse, à portée, assez de PA) ? */
+export function canAttack(state: CombatState, attackerId: string, targetId: string, cfg: AttackConfig): boolean {
+  const attacker = unitById(state, attackerId);
   const target = unitById(state, targetId);
-  if (!attacker || !target || target.owner === state.active) return false;
-  if (state.ap < cfg.cost) return false;
+  if (!attacker || attacker.owner !== state.active) return false;
+  if (!target || target.owner === state.active) return false;
+  if (attacker.ap < cfg.cost) return false;
   return graphDistance(state.map, attacker.hex, target.hex) <= cfg.range;
 }
 
 /**
- * L'unité active attaque `targetId` : inflige `cfg.damage`, dépense `cfg.cost` PA.
+ * `attackerId` attaque `targetId` : inflige `cfg.damage`, dépense `cfg.cost` PA de l'attaquant.
  * Une cible à 0 PV ou moins quitte le plateau. Sans effet si l'attaque est illégale.
  */
-export function attack(state: CombatState, targetId: string, cfg: AttackConfig): CombatState {
-  if (!canAttack(state, targetId, cfg)) return state;
+export function attack(state: CombatState, attackerId: string, targetId: string, cfg: AttackConfig): CombatState {
+  if (!canAttack(state, attackerId, targetId, cfg)) return state;
   const units = state.units
-    .map((u) => (u.id === targetId ? { ...u, hp: u.hp - cfg.damage } : u))
+    .map((u) => {
+      if (u.id === attackerId) return { ...u, ap: u.ap - cfg.cost };
+      if (u.id === targetId) return { ...u, hp: u.hp - cfg.damage };
+      return u;
+    })
     .filter((u) => u.hp > 0);
-  return { ...state, units, ap: state.ap - cfg.cost };
+  return { ...state, units };
 }
 
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
-/** Passe la main au camp suivant (encore en vie) et recharge ses PA. */
+/** Passe la main au camp suivant (encore en vie) et recharge SES PA. */
 export function endTurn(state: CombatState, apPerTurn: number): CombatState {
   const owners = liveOwners(state);
   const i = owners.indexOf(state.active);
   const next = owners[(i + 1) % owners.length] ?? state.active;
-  return { ...state, active: next, turn: state.turn + 1, ap: apPerTurn };
+  return {
+    ...state,
+    active: next,
+    turn: state.turn + 1,
+    units: state.units.map((u) => (u.owner === next ? { ...u, ap: apPerTurn } : u)),
+  };
 }
