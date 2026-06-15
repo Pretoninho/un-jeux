@@ -1,11 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.33
+> Dernière mise à jour : 2026-06-15 — v1.34
 >
 > 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
 > validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
-> isolée (`*Demo.svelte`, bouton dédié dans `App.svelte`, sans toucher l'ancienne boucle de jeu).
+> isolée (`*Demo.svelte`).
+>
+> 🖥️ **UI PROPRE — `NewGameView.svelte` est la vue PAR DÉFAUT (2026-06-15)** : aucune interférence de l'ancien
+> jeu. Sélecteur de briques (une à la fois : 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien jeu reste
+> accessible via le lien discret *« ancien jeu (référence) → »* (`App.svelte` garde un `mode` 'new'/'legacy',
+> default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 158 tests verts.
 >
 > | # | Brique | Moteur | Tests | Démo UI | État |
 > | --- | --- | --- | --- | --- | --- |

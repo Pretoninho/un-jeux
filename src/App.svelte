@@ -13,11 +13,11 @@
   import { openCouponPosition, type CouponMaturity } from './engine/credit';
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
-  import OrderBookDemo from './OrderBookDemo.svelte';
-  import RevenueDemo from './RevenueDemo.svelte';
+  import NewGameView from './NewGameView.svelte';
 
-  let showOrderBookDemo = $state(false);
-  let showRevenueDemo = $state(false);
+  // Mode d'affichage : 'new' = vue propre du nouveau jeu (par défaut, aucune
+  // interférence) ; 'legacy' = ancien jeu, gardé runnable comme référence (brique 5).
+  let mode = $state<'new' | 'legacy'>('new');
   import type { GameState, SignalReading } from './engine/state';
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
@@ -476,6 +476,10 @@
   newGame(1);
 </script>
 
+{#if mode === 'new'}
+  <NewGameView onShowLegacy={() => (mode = 'legacy')} />
+{:else}
+<button class="back-to-new" onclick={() => (mode = 'new')}>← nouveau jeu</button>
 <main>
   <header>
     <div class="brand">
@@ -823,22 +827,16 @@
           <input type="number" bind:value={seed} min="1" />
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
           <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
-          <button class:active={showOrderBookDemo} onclick={() => (showOrderBookDemo = !showOrderBookDemo)} title="Tester le carnet d'ordres">📒 Carnet</button>
-          <button class:active={showRevenueDemo} onclick={() => (showRevenueDemo = !showRevenueDemo)} title="Tester le revenu + agglomération">🏞️ Revenu</button>
         </section>
       </aside>
     </div>
-
-    {#if showOrderBookDemo}
-      <OrderBookDemo />
-    {/if}
-    {#if showRevenueDemo}
-      <RevenueDemo />
-    {/if}
   {/if}
 </main>
+{/if}
 
 <style>
+  .back-to-new { display: block; margin: .5rem auto; background: none; border: 1px solid #2a2f3a; color: #7a8294; padding: .3rem .8rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
+  .back-to-new:hover { border-color: #888; color: #cdd3df; }
   :global(body) { margin: 0; background: #14161c; color: #cdd3df; font-family: system-ui, sans-serif; }
   main { max-width: 980px; margin: 0 auto; padding: 1rem; }
   header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2f3a; padding-bottom: .5rem; }
