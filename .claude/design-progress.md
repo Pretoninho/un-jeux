@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.29
+> Dernière mise à jour : 2026-06-15 — v1.30
 >
 > 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
 >
@@ -41,6 +41,23 @@
 > l'outcome, ni l'inverse*. Si l'income gagne toujours → personne n'emprunte, jeu plat. Si l'outcome gagne
 > toujours → course au tapis. → Fait coexister **deux stratégies valides**, qui correspondent pile aux deux
 > conditions de victoire (rentier = être le plus riche ; conquérant = faire couler les autres).
+>
+> 🎭 **EMPRUNT PORTÉ PAR LES ARCHÉTYPES (2026-06-15)** — résout le point « rembourser ou loyer permanent ? »
+> sans trancher en général : **les deux modèles coexistent, incarnés par des archétypes**. Chaque archétype = un
+> profil de dette de départ → impose un style de jeu et penche vers une condition de victoire.
+>
+> | | **A — Le Conquérant** | **B — Le Rentier** |
+> |---|---|---|
+> | Capital de départ | élevé (frappe fort tôt) | modeste (départ lent) |
+> | Charge | lourde, **non soldable** (permanente) | douce, **soldable** (libérable) |
+> | Contrainte de style | *obligé* de conquérir pour survivre (s'il s'arrête, il saigne) | peut devenir **sans dette** → income = richesse pure |
+> | Vise | **la faillite des autres** (seule sortie) | **être le plus riche** (s'enrichit tranquille) |
+>
+> **Pourquoi l'équilibre tient** : les deux ne jouent pas le même jeu mais **sur le même plateau** → course à
+> deux vitesses. Le Conquérant doit éliminer *avant* que le Rentier ne devienne trop riche ; le Rentier doit
+> solder sa dette *avant* que le Conquérant ne l'étouffe. Les archétypes **incarnent les deux pôles de l'axe
+> income/outcome**. L'affinage se fera ensuite via les **améliorations** propres à chaque archétype (bonus qui
+> renforcent le style sans le rendre dominant — règle des pouvoirs §7 : friction, pas synergie).
 >
 > 🏁 **FIN & VICTOIRE TRANCHÉES (2026-06-15)** :
 > - ⏱️ **Fin par le TEMPS** — horloge fixe de tours, pas un volume atteint (colle au `horizonTurns` du moteur).
