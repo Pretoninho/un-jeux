@@ -1,9 +1,19 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.40
+> Dernière mise à jour : 2026-06-15 — v1.41
 >
-> 🏕️ **CAMP DE BASE = QG SANS INCOME + 1ᵉʳ EMPRUNT ; UPKEEP PAR HEX ; RATIO 2:1 (2026-06-15, retour de partie)** :
+> 🗺️ **HEXES À INCOME RARES (2026-06-15, retour de partie)** : sur demande, tous les hexes ne produisent plus
+> de revenu. `board.ts` `makeBoard(radius, base, agglo, incomeFraction, seed)` : seule une fraction (~0.5) des
+> cases produit (base 6), les autres sont **stériles** (0 revenu, non achetables via `canClaim` cost>0).
+> Placement **symétrique** (rotation 180°, seedé) → plateau équitable, différent à chaque partie. **Effet** :
+> les hexes à income deviennent rares → disputés (l'éviction prend tout son sens). **Recalibrage** (panel large
+> `scripts/balance.ts` : balayage `incomeFraction` 8 seeds, puis `loan × upkeep`) : la rareté fait porter la
+> tension par la **charge du camp de base** (pas l'upkeep) → `baseCampLoan 70 / hexUpkeep 1` = survivable +
+> disputé (50/50, ratio réalisé ~1.2, 14 tours). UI : cases stériles en gris (·), non cliquables ; nouveau
+> plateau à chaque « Rejouer ». 146 tests verts (`game.test.ts` 19, dont rareté + symétrie), svelte-check 0, build OK.
+>
+> 🏕️ **CAMP DE BASE = QG SANS INCOME + 1ᵉʳ EMPRUNT ; UPKEEP PAR HEX (2026-06-15, retour de partie)** :
 > - **Camp de base réconcilié** (« 1ᵉʳ camp de base = 1ᵉʳ emprunt ») : il donne le **capital de lancement**
 >   (cash = baseCampLoan 100) ET impose sa **charge permanente** (20/tour), et son **hex (QG) ne rapporte
 >   AUCUN income** (`RevenueConfig.campHexes`, `hexRevenue`=0, pas d'agglo, non évinçable). On démarre avec du

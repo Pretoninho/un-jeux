@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.40.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.41.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -29,14 +29,17 @@ cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
 
 ## Les pièces
 
-### Hexes = revenus (avec upkeep)
+### Hexes = revenus (rares, avec upkeep)
 - Un hex = **une place**, **un seul occupant** (pas de partage).
-- Carte = hexagone **rayon 3 = 37 hexes**, revenu de base **plat** (6 partout, pour l'instant — on
-  isole le facteur d'équilibre avant de différencier les cases).
+- Carte = hexagone **rayon 3 = 37 hexes**. Les **hexes à income sont RARES** : seule une fraction
+  (`incomeFraction` ≈ **0.5**) produit un revenu (base 6) ; les autres sont **stériles** (0 revenu,
+  non achetables, cases grises). Placement **symétrique** (rotation 180°) → plateau équitable, **seedé**
+  (un plateau différent à chaque partie). La rareté rend chaque hex à income **disputé** (éviction).
 - **Agglomération** : chaque hex adjacent appartenant au **même** propriétaire ajoute une prime
   (`agglomerationBonus`, +2) → un cluster contigu rapporte plus que des hexes dispersés.
-- **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**3**) par tour. La charge **monte avec le
-  territoire** → la tension income/charge reste stable (~2:1) au lieu d'exploser quand on s'étend.
+- **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**1**) par tour. Avec la rareté, on possède
+  peu d'hexes → c'est surtout la **charge du camp de base** qui porte la tension (ratio réalisé ~1.2, très
+  tendu) ; l'upkeep reste un coût léger par case.
 
 ### Acquisition d'un hex libre
 - Prix = `base × claimMultiple` (6 × 4 = **24**), payé en cash.
@@ -89,18 +92,18 @@ gardant toujours une réserve pour couvrir ses charges.
 | `horizonTurns` | 14 | durée de partie |
 | `claimMultiple` | 4 | prix d'un hex libre = base × 4 |
 | `chargeRate` | 0.20 | charge/tour de la dette = taux × emprunt |
-| `baseCampLoan` | 100 | camp de base = 1ᵉʳ emprunt (capital + charge 20/tour) |
-| `hexUpkeep` | 3 | upkeep/tour par hex d'income → ratio income/charge unitaire = 6/3 = **2:1** |
+| `baseCampLoan` | 70 | camp de base = 1ᵉʳ emprunt (capital + charge 14/tour) |
+| `hexUpkeep` | 1 | upkeep/tour par hex d'income (léger : la rareté limite le nombre d'hexes) |
 | `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (éviction viable mais non dominante) |
 | `askFloorMultiple` | 4 | plancher d'un ask = base × 4 |
 
-Revenu de base/hex = **6**, agglomération = **+2**/voisin.
+Revenu de base/hex à income = **6**, agglomération = **+2**/voisin, **incomeFraction ≈ 0.5** (rareté).
 
-**Calibrage** : `npx vite-node scripts/balance.ts` balaie un panel large (`hexUpkeep × baseCampLoan`) et
-mesure le **ratio income/charge** (mi-partie / fin) + faillites + qui gagne. Le levier de la **tension** est
-`hexUpkeep` (ratio unitaire = `base / upkeep`) ; le `baseCampLoan` fixe le capital/charge de départ. ⚠️ Les
-bots « rentier/conquérant » expansent tous deux → le 50/50 n'est pas l'indicateur clé ; la vraie tension
-(sur-emprunter → faillite) est une décision **humaine**. **À valider au playtest.**
+**Calibrage** : `npx vite-node scripts/balance.ts` balaie d'abord la **rareté** (`incomeFraction`, 8 placements
+seedés), puis affine `baseCampLoan × hexUpkeep`. Constat : avec la rareté, la tension vient surtout de la
+**charge du camp de base** (ratio réalisé ~1.2) ; à `loan 70 / upkeep 1`, le jeu est **survivable et disputé**
+(50/50, pas de faillite systématique). ⚠️ Les bots expansent peu (≈2 hexes) → la vraie tension (sur-emprunter,
+se battre pour les hexes rares) est une décision **humaine**. **À valider au playtest.**
 
 ## Carte des fichiers
 

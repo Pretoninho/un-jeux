@@ -6,6 +6,7 @@ import {
   netWorth, territoryValue, outstandingDebt, type GameConfig,
 } from './game';
 import { actorTotalCharges } from './tick';
+import { makeBoard } from './board';
 import type { GameMap } from './types';
 import type { RevenueConfig } from './revenue';
 
@@ -69,6 +70,41 @@ describe('game — charge totale = camps + upkeep par hex d\'income', () => {
     let s = fresh(0, 0, 3);
     s.ownership['A'] = 'alice'; // seulement le QG
     expect(actorTotalCharges(s, 'alice')).toBe(0); // pas de camp, pas d'upkeep sur le QG
+  });
+});
+
+describe('game — rareté des hexes à income', () => {
+  it('une case stérile (base 0) n\'est pas achetable, même libre', () => {
+    const s = fresh(500);
+    // B a une base > 0 → achetable ; fabriquons une case stérile en mettant sa base à 0
+    const sterile: GameStateV2 = { ...s, revenueCfg: { ...s.revenueCfg, baseByHex: { ...s.revenueCfg.baseByHex, B: 0 } } };
+    expect(canClaim(sterile, 'alice', 'B', GAME)).toBe(false);
+  });
+
+  it('makeBoard : incomeFraction 1 → toutes les cases (hors QG) produisent ; 0 → aucune', () => {
+    const full = makeBoard(2, 6, 2, 1, 1);
+    const incomeFull = full.map.hexes.filter((h) => (full.rev.baseByHex[h.id] ?? 0) > 0).length;
+    expect(incomeFull).toBe(full.map.hexes.length - 2); // tous sauf les 2 QG
+
+    const empty = makeBoard(2, 6, 2, 0, 1);
+    const incomeEmpty = empty.map.hexes.filter((h) => (empty.rev.baseByHex[h.id] ?? 0) > 0).length;
+    expect(incomeEmpty).toBe(0);
+  });
+
+  it('makeBoard : les QG (coins) sont des camps sans income', () => {
+    const b = makeBoard(3, 6, 2, 0.5, 7);
+    expect(b.rev.campHexes).toEqual(b.corners);
+    for (const c of b.corners) expect(b.rev.baseByHex[c]).toBe(0);
+  });
+
+  it('makeBoard : placement symétrique (rotation 180°)', () => {
+    const b = makeBoard(3, 6, 2, 0.5, 42);
+    const isIncome = (q: number, r: number) => (b.rev.baseByHex[`${q},${r}`] ?? 0) > 0;
+    // chaque hex income a son miroir income (hors QG)
+    for (const h of b.map.hexes) {
+      const { q, r } = h.coord!;
+      if (isIncome(q, r)) expect(isIncome(-q, -r) || b.corners.includes(`${-q},${-r}`)).toBe(true);
+    }
   });
 });
 

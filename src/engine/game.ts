@@ -45,17 +45,17 @@ export interface GameConfig {
   hexUpkeep: number;
 }
 
-// Calibré par scripts/balance.ts. Ratio unitaire income/charge = base/upkeep = 6/3 = 2:1
-// (la tension visée) ; le camp de base (QG sans income, capital 100 + charge 20) tire le ratio
-// sous 1 en début de partie → on démarre sous l'eau, ce qui force l'expansion.
+// Calibré par scripts/balance.ts avec hexes à income RARES (incomeFraction ~0.5). Avec la
+// rareté, la tension vient surtout de la CHARGE du camp de base (le ratio income/charge réalisé
+// est ~1.2, très tendu) ; l'upkeep par hex devient léger (1). loan 70 = survivable + disputé (50/50).
 export const DEFAULT_CONFIG: GameConfig = {
   horizonTurns: 14,
   claimMultiple: 4,
   askDefaultMultiple: 12,
   askFloorMultiple: 4,
   chargeRate: 0.2,
-  baseCampLoan: 100,
-  hexUpkeep: 3,
+  baseCampLoan: 70,
+  hexUpkeep: 1,
 };
 
 // ─────────────────────── Acquisition d'un hex libre ──────────────────────────
@@ -65,12 +65,14 @@ export function claimCost(state: GameStateV2, hexId: string, cfg: GameConfig): n
   return (state.revenueCfg.baseByHex[hexId] ?? 0) * cfg.claimMultiple;
 }
 
-/** Peut-on acquérir cet hex ? Libre + acteur vivant + cash suffisant. */
+/** Peut-on acquérir cet hex ? Hex à income (base > 0), libre, acteur vivant, cash suffisant. */
 export function canClaim(state: GameStateV2, actorId: string, hexId: string, cfg: GameConfig): boolean {
   const actor = state.actors.find((a) => a.id === actorId);
   if (!actor || actor.bankrupt) return false;
   if (state.ownership[hexId]) return false;
-  return actor.cash >= claimCost(state, hexId, cfg);
+  const cost = claimCost(state, hexId, cfg);
+  if (cost <= 0) return false; // case stérile (0 income) ou QG → non achetable
+  return actor.cash >= cost;
 }
 
 /**
