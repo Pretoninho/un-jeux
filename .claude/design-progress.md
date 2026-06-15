@@ -1,7 +1,46 @@
 # Suivi de conception — Jeu 4X Investissement
 
+> 🔀 **VIRAGE DE DIRECTION + GRANDE SIMPLIFICATION (2026-06-15) — lire en premier.**
+> Décision concepteur : viser un **MOBA tour par tour**, par **fusion** de l'économie
+> territoriale existante avec une couche de **combat tactique** (inspiration *Divinity:
+> Original Sin* — points d'action, surfaces élémentaires, combos). Avant de greffer le combat,
+> on a **simplifié à fond** :
+> - 🗑️ **Ancien jeu finance SUPPRIMÉ du code** (moteur fragilité/crises/régime/crédit/signaux/
+>   score/IA/simulate + données archétypes/profils/cartes + ~1 731 lignes de scripts de
+>   calibrage + branche legacy d'`App.svelte` + démos). Tout reste dans l'historique git.
+> - ✂️ **Cœur éco ramené à l'essentiel** (« trim maximal ») : retirés l'**éviction par carnet
+>   d'ordres** (asks/ask par défaut/plancher — le combat remplacera la prise d'un hex adverse),
+>   l'**upkeep par hex** et le **bonus d'agglomération**. Reste : possession d'hexes → income,
+>   **camp de base = dette permanente**, **valeur nette** = victoire, faillite si charges non
+>   couvertes. Un hex occupé n'est plus achetable (placeholder du combat à venir).
+> - 🧹 **Polish structurel** : `state2.ts → state.ts` (types `GameStateV2→GameState`,
+>   `ActorV2→Actor`), passe-plat `NewGameView` fusionné dans `App.svelte`, `orderbook`/
+>   `map-utils` retirés, `types.ts` réduit au domaine carte.
+> - ✅ **État après coupe** : `src/` = 14 fichiers (vs ~50), **19 tests verts**, svelte-check 0,
+>   build OK. Moteur vivant : `board · revenue · camp · state · tick · game · rng · types`.
+> - 📌 Les notes finance ci-dessous + `docs/*` (hors `nouveau-jeu.md`) sont **historiques**.
+>
+> 🧭 **FONDATIONS DU JEU TACTIQUE : `docs/jeu-tactique-fondations.md`** — cadrage des règles de
+> base (4 atomes + victoire), les 3 questions (comment jouer / quoi faire / comment gagner),
+> l'ordre de construction (noyau 1v1 « bouger + frapper » → une chose à la fois) et les forks
+> gardés OUVERTS (victoire, nb de pièces, budget). Rien n'y est tranché. À lire avant de coder
+> le combat.
+>
+> ---
+>
+> # (Historique finance ci-dessous — conservé pour référence)
+>
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.45
+> Dernière mise à jour : 2026-06-15 — v1.46
+>
+> 🩹 **DÉBUT NÉGATIF CORRIGÉ (2026-06-15, retour de partie : « income/charge négatif dès le tour 2 »)** : la
+> moyenne netT2 +2.1 du sim était **trompeuse** — les bots qui clusterisent (agglo) la tiraient vers le haut.
+> Ajout au sim de la colonne **% de parties réellement net-négatives à T2** : la config v1.45 (camp charge 7)
+> en donnait **63 %**. Cause : income **rare** (0.15) → hexes **dispersés** → pas d'agglo au départ → 2 hexes
+> (income 12, charge 7+6=13) = net **−1**. Correctif (Option A, choix concepteur, chiffres ronds) : **charge du
+> camp 7 → 5** via `chargeRate 0.10 → 5/70` (capital 70 et upkeep 3 inchangés ; charge affichée = **5** exact).
+> Sim rayon 8 / 0.15 : **netT2 +4.1**, **0 %** net<0 à T2, ratio fin **2.07 (~2:1)**, équilibre 63/37, 0 faillite.
+> Leçon : avec income rare, calibrer sur le **% de parties négatives**, pas la moyenne. 147 tests verts.
 >
 > 🗺️ **TRÈS GRANDE MAP + INCOME TRÈS RARE (2026-06-15, vision concepteur)** : décidé après simulation + consultation
 > (nouveau process : *simuler → montrer les chiffres → l'humain tranche → coder*). **Rayon 8 = 217 hexes**, mais
