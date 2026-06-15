@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.30
+> Dernière mise à jour : 2026-06-15 — v1.31
 >
 > 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
 >
@@ -41,6 +41,30 @@
 > l'outcome, ni l'inverse*. Si l'income gagne toujours → personne n'emprunte, jeu plat. Si l'outcome gagne
 > toujours → course au tapis. → Fait coexister **deux stratégies valides**, qui correspondent pile aux deux
 > conditions de victoire (rentier = être le plus riche ; conquérant = faire couler les autres).
+>
+> 🌳 **DEUX TRONCS D'ARCHÉTYPES (2026-06-15)** — la dette (soldable/permanente) est un **tronc**, pas le
+> squelette complet. Chaque tronc contient plusieurs archétypes qui partagent le profil de dette mais se
+> différencient par leur ressource, compétence, bonus d'amélioration.
+>
+> ```
+> TRONC A — Dette Permanente
+> (gros capital, charge non soldable, style offensif → doit conquérir)
+>     ├── Archétype A1 : à définir
+>     ├── Archétype A2 : à définir
+>     └── …
+>
+> TRONC B — Dette Soldable
+> (capital modeste, charge libérable, style patient → peut se libérer)
+>     ├── Archétype B1 : à définir
+>     ├── Archétype B2 : à définir
+>     └── …
+> ```
+>
+> **Lecture plateau** : le tronc d'un joueur est **visible** (info publique) → *« il est sur le Tronc A, il
+> doit conquérir ou mourir »* — la surprise vient des **améliorations choisies en partie**, pas du profil de
+> base. Deux joueurs du même tronc = styles différents, concurrence interne. Troncs différents = courses
+> parallèles, affrontement sur le plateau. ⚠️ Archétypes non nommés ni définis encore — à développer un à
+> la fois.
 >
 > 🎭 **EMPRUNT PORTÉ PAR LES ARCHÉTYPES (2026-06-15)** — résout le point « rembourser ou loyer permanent ? »
 > sans trancher en général : **les deux modèles coexistent, incarnés par des archétypes**. Chaque archétype = un
