@@ -33,6 +33,12 @@ export interface GameStateV2 {
    * L'éviction = payer cet ask (le siège est le prix que l'occupant a déclaré).
    */
   asks: Record<HexId, number>;
+  /**
+   * Charge d'occupation par hex d'INCOME possédé et par tour. Fait monter la charge
+   * AVEC le territoire → garde la tension income/charge stable (ratio ≈ revenu/upkeep)
+   * au lieu d'exploser quand on s'étend. Le QG (camp) n'en paie pas (il a déjà sa dette).
+   */
+  hexUpkeep: number;
 }
 
 export function makeActorV2(id: string, label: string, cash: number): ActorV2 {
@@ -44,10 +50,11 @@ export function makeGameStateV2(
   map: GameMap,
   revenueCfg: RevenueConfig,
   actors: ActorV2[],
+  hexUpkeep = 0,
 ): GameStateV2 {
   const ownership: Ownership = {};
   for (const h of map.hexes) ownership[h.id] = null;
-  return { turn: 0, map, revenueCfg, actors, ownership, camps: [], asks: {} };
+  return { turn: 0, map, revenueCfg, actors, ownership, camps: [], asks: {}, hexUpkeep };
 }
 
 /** Acteurs encore en jeu (non faillis). */

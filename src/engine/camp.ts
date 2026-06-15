@@ -8,10 +8,14 @@ export type Tronc = 'A' | 'B';
 export interface Camp {
   id: string;
   ownerId: string;
-  loanAmount: number;   // capital initial emprunté
+  loanAmount: number;   // capital initial emprunté (0 pour un camp de base/upkeep)
   chargeRate: number;   // fraction du montant dûe par tour
   tronc: Tronc;
   debtRemaining: number; // Tronc A : toujours = loanAmount ; Tronc B : diminue
+  /** Charge fixe directe (camp de base = upkeep pur, sans principal de dette). */
+  chargePerTurn?: number;
+  /** 'loan' = emprunt avec capital ; 'base' = camp de base (charge sans dette). */
+  kind?: 'loan' | 'base';
 }
 
 export interface RepayResult {
@@ -40,11 +44,31 @@ export function makeCamp(
     chargeRate,
     tronc,
     debtRemaining: loanAmount,
+    kind: 'loan',
+  };
+}
+
+/**
+ * Camp de BASE : un foyer qui ne rapporte rien mais coûte `chargePerTurn` à vie.
+ * Pas de capital reçu, pas de dette (principal 0) → c'est l'upkeep qui motive l'expansion.
+ */
+export function makeBaseCamp(ownerId: string, chargePerTurn: number): Camp {
+  if (chargePerTurn <= 0) throw new Error('chargePerTurn must be > 0');
+  return {
+    id: makeCampId(),
+    ownerId,
+    loanAmount: 0,
+    chargeRate: 0,
+    tronc: 'A',
+    debtRemaining: 0,
+    chargePerTurn,
+    kind: 'base',
   };
 }
 
 /** Charge due par ce camp pour un tour. */
 export function campCharge(camp: Camp): number {
+  if (camp.chargePerTurn != null) return camp.chargePerTurn; // camp de base : charge directe
   if (camp.tronc === 'A') {
     // Charge fixe : intérêts sur le montant initial, pour toujours.
     return camp.chargeRate * camp.loanAmount;

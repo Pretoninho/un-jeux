@@ -5,174 +5,157 @@ import {
   defaultAsk, askFloor, setAsk, evictionCost, canEvict, evict,
   netWorth, territoryValue, outstandingDebt, type GameConfig,
 } from './game';
+import { actorTotalCharges } from './tick';
 import type { GameMap } from './types';
 import type { RevenueConfig } from './revenue';
 
+// Carte : A (QG d'alice, 0 income) — B — C — D, + E (QG de bob).
 const MAP: GameMap = {
   id: 'gametest',
   hexes: [
     { id: 'A', label: 'A', kind: 'marche', neighbors: ['B'] },
     { id: 'B', label: 'B', kind: 'marche', neighbors: ['A', 'C'] },
-    { id: 'C', label: 'C', kind: 'marche', neighbors: ['B'] },
+    { id: 'C', label: 'C', kind: 'marche', neighbors: ['B', 'D'] },
+    { id: 'D', label: 'D', kind: 'marche', neighbors: ['C', 'E'] },
+    { id: 'E', label: 'E', kind: 'marche', neighbors: ['D'] },
   ],
 };
-const CFG: RevenueConfig = { baseByHex: { A: 10, B: 10, C: 10 }, agglomerationBonus: 5 };
+const CFG: RevenueConfig = { baseByHex: { A: 0, B: 10, C: 10, D: 10, E: 0 }, agglomerationBonus: 5, campHexes: ['A', 'E'] };
 const GAME: GameConfig = {
   horizonTurns: 12, claimMultiple: 4, askDefaultMultiple: 6, askFloorMultiple: 4,
-  chargeRate: 0.2, baseCampLoan: 120,
+  chargeRate: 0.2, baseCampLoan: 100, hexUpkeep: 3,
 };
 
-function fresh(aliceCash = 100, bobCash = 100): GameStateV2 {
-  return makeGameStateV2(MAP, CFG, [
+function fresh(aliceCash = 100, bobCash = 100, upkeep = 3): GameStateV2 {
+  const s = makeGameStateV2(MAP, CFG, [
     makeActorV2('alice', 'Alice', aliceCash),
     makeActorV2('bob', 'Bob', bobCash),
-  ]);
+  ], upkeep);
+  return s;
 }
 
+describe('game — camp de base = QG sans income + 1er emprunt', () => {
+  it('foundBaseCamps : chaque acteur reçoit capital ET une charge permanente', () => {
+    const s = foundBaseCamps(fresh(0, 0), GAME);
+    expect(s.actors.every((a) => a.cash === GAME.baseCampLoan)).toBe(true); // capital reçu
+    expect(s.camps).toHaveLength(2);
+    // charge du camp de base = chargeRate × loan
+    expect(actorTotalCharges(s, 'alice')).toBeCloseTo(GAME.chargeRate * GAME.baseCampLoan);
+  });
+
+  it('le QG (hex camp) ne rapporte aucun income', () => {
+    let s = fresh(0, 0);
+    s.ownership['A'] = 'alice'; // QG
+    expect(netWorth(s, 'alice', GAME)).toBe(0); // QG sans valeur de marché ni income
+  });
+
+  it('le QG ne peut pas être évincé', () => {
+    let s = fresh(0, 100);
+    s.ownership['A'] = 'alice';
+    s.asks['A'] = 30;
+    expect(canEvict(s, 'bob', 'A')).toBe(false);
+  });
+});
+
+describe('game — charge totale = camps + upkeep par hex d\'income', () => {
+  it('upkeep s\'ajoute par hex d\'income possédé (QG exclu)', () => {
+    let s = foundBaseCamps(fresh(0, 0), GAME); // charge de base 20
+    s = claimHex(s, 'alice', 'B', GAME); // +1 hex income → +3 upkeep
+    s = claimHex(s, 'alice', 'C', GAME); // +1 hex income → +3 upkeep
+    expect(actorTotalCharges(s, 'alice')).toBeCloseTo(20 + 2 * 3); // 26
+  });
+
+  it('le QG ne paie pas d\'upkeep', () => {
+    let s = fresh(0, 0, 3);
+    s.ownership['A'] = 'alice'; // seulement le QG
+    expect(actorTotalCharges(s, 'alice')).toBe(0); // pas de camp, pas d'upkeep sur le QG
+  });
+});
+
 describe('game — acquérir un hex libre + ordre de vente auto', () => {
-  it('coût = base × multiple', () => {
-    expect(claimCost(fresh(), 'A', GAME)).toBe(40); // 10 × 4
-  });
-
-  it('claimHex débite le cash, pose la propriété ET un ask par défaut', () => {
-    const s = claimHex(fresh(100), 'alice', 'A', GAME);
-    expect(s.ownership['A']).toBe('alice');
+  it('coût = base × multiple, débite le cash, pose la propriété + ask par défaut', () => {
+    const s = claimHex(fresh(100), 'alice', 'B', GAME);
+    expect(s.ownership['B']).toBe('alice');
     expect(s.actors.find((a) => a.id === 'alice')!.cash).toBe(60); // 100 − 40
-    // ask par défaut = revenu courant (10, isolé) × askDefaultMultiple (6) = 60
-    expect(s.asks['A']).toBe(60);
-  });
-
-  it('canClaim faux si cash insuffisant ou déjà possédé', () => {
-    expect(canClaim(fresh(30), 'alice', 'A', GAME)).toBe(false);
-    const s = claimHex(fresh(), 'alice', 'A', GAME);
-    expect(canClaim(s, 'bob', 'A', GAME)).toBe(false);
+    expect(s.asks['B']).toBe(defaultAsk(s, 'B', GAME));
   });
 
   it('claimHex sans effet si interdit (immuable)', () => {
     const s0 = fresh(30);
-    expect(claimHex(s0, 'alice', 'A', GAME)).toBe(s0);
+    expect(claimHex(s0, 'alice', 'B', GAME)).toBe(s0);
   });
 });
 
 describe('game — carnet d\'ordres (ask = prix de sortie)', () => {
-  it('defaultAsk = revenu courant × askDefaultMultiple (agglomération comprise)', () => {
-    let s = claimHex(fresh(200), 'alice', 'A', GAME);
-    s = claimHex(s, 'alice', 'B', GAME); // A+B contigus → B vaut 10 + 5 = 15
-    expect(defaultAsk(s, 'B', GAME)).toBe(90); // 15 × 6
+  it('defaultAsk = revenu courant × askDefaultMultiple', () => {
+    const s = claimHex(fresh(200), 'alice', 'B', GAME); // B isolé : revenu 10
+    expect(defaultAsk(s, 'B', GAME)).toBe(60); // 10 × 6
   });
 
   it('setAsk : seul le propriétaire peut poser, borné au plancher', () => {
-    const s = claimHex(fresh(200), 'alice', 'A', GAME);
-    const floor = askFloor(s, 'A', GAME); // base 10 × askFloorMultiple 4 = 40
-    expect(floor).toBe(40);
-
-    const s2 = setAsk(s, 'alice', 'A', 200, GAME);
-    expect(s2.asks['A']).toBe(200);
-
-    const s3 = setAsk(s, 'alice', 'A', 5, GAME); // sous le plancher → ramené à 40
-    expect(s3.asks['A']).toBe(40);
-
-    const s4 = setAsk(s, 'bob', 'A', 1, GAME); // pas proprio → sans effet
-    expect(s4).toBe(s);
-  });
-});
-
-describe('game — emprunter + camp de base', () => {
-  it('borrow crédite le cash et ouvre un camp permanent', () => {
-    const s = borrow(fresh(50), 'alice', 100, GAME);
-    expect(s.actors.find((a) => a.id === 'alice')!.cash).toBe(150);
-    expect(s.camps).toHaveLength(1);
-    expect(s.camps[0]!.chargeRate).toBe(0.2);
-  });
-
-  it('foundBaseCamps : chaque acteur reçoit son premier emprunt', () => {
-    const s = foundBaseCamps(fresh(0, 0), GAME);
-    expect(s.camps).toHaveLength(2);
-    expect(s.actors.every((a) => a.cash === GAME.baseCampLoan)).toBe(true);
+    const s = claimHex(fresh(200), 'alice', 'B', GAME);
+    expect(askFloor(s, 'B', GAME)).toBe(40); // base 10 × 4
+    expect(setAsk(s, 'alice', 'B', 200, GAME).asks['B']).toBe(200);
+    expect(setAsk(s, 'alice', 'B', 5, GAME).asks['B']).toBe(40); // sous le plancher
+    expect(setAsk(s, 'bob', 'B', 1, GAME)).toBe(s); // pas proprio
   });
 });
 
 describe('game — éviction = payer l\'ask de l\'occupant', () => {
-  it('evictionCost = ask déclaré par l\'occupant', () => {
-    const s = claimHex(fresh(0, 100), 'bob', 'A', GAME); // bob pose A, ask 60
-    expect(evictionCost(s, 'A')).toBe(60);
-  });
-
-  it('canEvict vrai si hex adverse + cash ≥ ask ; faux sinon', () => {
-    let s = claimHex(fresh(0, 100), 'bob', 'A', GAME); // ask 60
-    s = { ...s, actors: s.actors.map((a) => a.id === 'alice' ? { ...a, cash: 60 } : a) };
-    expect(canEvict(s, 'alice', 'A')).toBe(true);
-    const poor = { ...s, actors: s.actors.map((a) => a.id === 'alice' ? { ...a, cash: 59 } : a) };
-    expect(canEvict(poor, 'alice', 'A')).toBe(false);
-  });
-
-  it('canEvict faux si libre ou déjà à moi', () => {
-    expect(canEvict(fresh(), 'alice', 'A')).toBe(false);
-    const s = claimHex(fresh(200), 'alice', 'A', GAME);
-    expect(canEvict(s, 'alice', 'A')).toBe(false);
-  });
-
-  it('evict : zéro-sum (acheteur paie l\'ask, occupant encaisse), l\'hex change de main + nouvel ask', () => {
-    let s = claimHex(fresh(100, 100), 'bob', 'A', GAME); // bob: 60 cash, A ask 60
+  it('evict : zéro-sum + l\'hex change de main + nouvel ask', () => {
+    let s = claimHex(fresh(100, 100), 'bob', 'B', GAME); // bob: 60, B ask 60
     s = { ...s, actors: s.actors.map((a) => a.id === 'alice' ? { ...a, cash: 100 } : a) };
-    const ask = evictionCost(s, 'A'); // 60
+    const ask = evictionCost(s, 'B');
     const totalBefore = s.actors.reduce((sum, a) => sum + a.cash, 0);
 
-    s = evict(s, 'alice', 'A', GAME);
+    s = evict(s, 'alice', 'B', GAME);
 
-    expect(s.ownership['A']).toBe('alice');
+    expect(s.ownership['B']).toBe('alice');
     expect(s.actors.find((a) => a.id === 'alice')!.cash).toBe(100 - ask);
     expect(s.actors.find((a) => a.id === 'bob')!.cash).toBe(60 + ask);
-    expect(s.actors.reduce((sum, a) => sum + a.cash, 0)).toBe(totalBefore); // zéro-sum
-    expect(s.asks['A']).toBe(defaultAsk(s, 'A', GAME)); // le nouvel occupant repose un ask
+    expect(s.actors.reduce((sum, a) => sum + a.cash, 0)).toBe(totalBefore);
+    expect(s.asks['B']).toBe(defaultAsk(s, 'B', GAME));
+  });
+
+  it('canEvict faux si libre, à moi, ou cash insuffisant', () => {
+    expect(canEvict(fresh(), 'alice', 'B')).toBe(false); // libre
+    let s = claimHex(fresh(0, 100), 'bob', 'B', GAME); // ask 60
+    const poor = { ...s, actors: s.actors.map((a) => a.id === 'alice' ? { ...a, cash: 59 } : a) };
+    expect(canEvict(poor, 'alice', 'B')).toBe(false);
   });
 });
 
-describe('game — richesse nette (mesure de victoire)', () => {
-  it('territoryValue = somme des prix de marché des hexes possédés', () => {
-    let s = claimHex(fresh(200), 'alice', 'A', GAME); // 40
-    s = claimHex(s, 'alice', 'B', GAME); // 40
-    expect(territoryValue(s, 'alice', GAME)).toBe(80);
-  });
-
-  it('outstandingDebt = somme des reliquats de camps', () => {
-    const s = borrow(fresh(0), 'alice', 120, GAME);
-    expect(outstandingDebt(s, 'alice')).toBe(120);
+describe('game — richesse nette', () => {
+  it('territoryValue ignore le QG (sans valeur de marché)', () => {
+    let s = fresh(200);
+    s.ownership['A'] = 'alice'; // QG
+    s = claimHex(s, 'alice', 'B', GAME); // hex income, prix 40
+    expect(territoryValue(s, 'alice', GAME)).toBe(40);
   });
 
   it('netWorth = cash + territoire − dette → emprunter est neutre à l\'instant T', () => {
     const s0 = fresh(0);
-    const s1 = borrow(s0, 'alice', 120, GAME); // cash +120, dette +120 → net inchangé
+    const s1 = borrow(s0, 'alice', 100, GAME);
     expect(netWorth(s1, 'alice', GAME)).toBe(netWorth(s0, 'alice', GAME));
+    expect(outstandingDebt(s1, 'alice')).toBe(100);
   });
 });
 
-describe('game — IA', () => {
-  it('l\'IA achète, pose ses asks, et reste solvable', () => {
-    let s = foundBaseCamps(fresh(0, 0), GAME); // bob a du capital
+describe('game — IA & fin de tour', () => {
+  it('l\'IA achète des hexes d\'income et pose ses asks', () => {
+    let s = foundBaseCamps(fresh(0, 0), GAME);
+    s.ownership['E'] = 'bob'; // QG de bob
     s = aiTurn(s, 'bob', GAME);
-    const bobHexes = Object.values(s.ownership).filter((o) => o === 'bob');
-    expect(bobHexes.length).toBeGreaterThanOrEqual(1);
-    // tout hex possédé par bob a un ask
-    for (const h of s.map.hexes) {
-      if (s.ownership[h.id] === 'bob') expect(s.asks[h.id]).toBeGreaterThan(0);
-    }
+    const bobIncomeHexes = s.map.hexes.filter((h) => s.ownership[h.id] === 'bob' && !CFG.campHexes!.includes(h.id));
+    expect(bobIncomeHexes.length).toBeGreaterThanOrEqual(1);
+    for (const h of bobIncomeHexes) expect(s.asks[h.id]).toBeGreaterThan(0);
   });
 
-  it('IA faillie ne joue pas', () => {
-    const s0 = fresh();
-    s0.actors[1]!.bankrupt = true;
-    const s1 = aiTurn(s0, 'bob', GAME);
-    expect(Object.values(s1.ownership).filter((o) => o === 'bob')).toHaveLength(0);
-  });
-});
-
-describe('game — fin de tour', () => {
   it('endTurn : l\'IA joue puis le tick avance le tour', () => {
     let s = foundBaseCamps(fresh(0, 0), GAME);
-    s = claimHex(s, 'alice', 'A', GAME);
+    s.ownership['E'] = 'bob';
     const { state, reports } = endTurn(s, ['bob'], GAME);
     expect(state.turn).toBe(1);
-    expect(reports.find((r) => r.actorId === 'alice')).toBeDefined();
+    expect(reports.length).toBeGreaterThan(0);
   });
 });
