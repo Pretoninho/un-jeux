@@ -23,25 +23,33 @@
   }
 
   let combat = $state<CombatState>(initial());
-  let moved = $state(false); // l'unité active a-t-elle déjà bougé ce tour ?
+  // Pile d'annulation : états AVANT chaque action de ce tour (vidée au passage de main).
+  let history = $state<CombatState[]>([]);
+  const acted = $derived(history.length > 0);
 
   const activeUnit = $derived(combat.units.find((u) => u.owner === combat.active)!);
-  const reach = $derived(moved ? new Map<string, number>() : reachable(combat, activeUnit.id, MOVE));
+  const reach = $derived(acted ? new Map<string, number>() : reachable(combat, activeUnit.id, MOVE));
 
   function onHex(hexId: string) {
-    if (moved || !reach.has(hexId)) return;
+    if (acted || !reach.has(hexId)) return;
+    history = [...history, combat]; // mémorise avant d'agir → annulable
     combat = moveUnit(combat, activeUnit.id, hexId, MOVE);
-    moved = true;
+  }
+
+  function undo() {
+    if (history.length === 0) return;
+    combat = history[history.length - 1]!; // restaure l'état d'avant la dernière action
+    history = history.slice(0, -1);
   }
 
   function finishTurn() {
     combat = endTurn(combat);
-    moved = false;
+    history = []; // l'annulation ne traverse pas les tours : finir le tour VALIDE
   }
 
   function restart() {
     combat = initial();
-    moved = false;
+    history = [];
   }
 
   // ── Layout pixel (géométrie fixe) ──────────────────────────────────────────────
@@ -56,8 +64,9 @@
     <div class="turn">Tour <b>{combat.turn}</b></div>
     <div class="active" style="--c:{COLORS[combat.active]}">
       Au tour de <b>{NAMES[combat.active]}</b>
-      <span class="muted small">{moved ? '· déplacement utilisé' : `· ${MOVE} cases`}</span>
+      <span class="muted small">{acted ? '· déplacement fait' : `· ${MOVE} cases`}</span>
     </div>
+    <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
   </div>
@@ -90,6 +99,7 @@
   <div class="hint muted small">
     Clique une case en surbrillance pour déplacer <b style="color:{COLORS[combat.active]}">{NAMES[combat.active]}</b>
     (jusqu'à {MOVE} cases, les pièces bloquent le passage), puis <b>Finir le tour</b>.
+    Tu peux <b>↩ Annuler</b> tant que le tour n'est pas fini.
   </div>
 </div>
 
@@ -100,7 +110,10 @@
   .turn b { color: #e6ebf5; font-size: 1.05rem; }
   .active { font-size: .85rem; color: #9aa3b5; border-left: 3px solid var(--c); padding-left: .55rem; }
   .active b { color: #e6ebf5; }
-  .end-turn { margin-left: auto; background: #1a2030; border: 1px solid #3a4060; color: #9ab0d0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .88rem; }
+  .undo { margin-left: auto; background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .undo:hover:not(:disabled) { border-color: #8a6075; }
+  .undo:disabled { opacity: .35; cursor: not-allowed; }
+  .end-turn { background: #1a2030; border: 1px solid #3a4060; color: #9ab0d0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .88rem; }
   .end-turn:hover { border-color: #5a70b0; }
   .restart { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; }
