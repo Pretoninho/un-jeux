@@ -22,6 +22,30 @@ npm install      # une seule fois (ou après un pull qui ajoute des deps)
 npm run dev      # démarre Vite → http://localhost:5173/
 ```
 
+## 🔄 Récupérer les changements dans le Codespace (sans PR)
+
+Pas besoin d'ouvrir une PR pour tester mes modifications — il suffit de **tirer la branche
+de travail**. La PR ne sert qu'à la fusion finale dans `main`.
+
+```bash
+# Une seule fois : passer sur la branche de dev
+git fetch origin && git checkout claude/repo-file-review-v06fdk
+
+# Ensuite, à chaque fois que je pousse :
+git pull
+```
+
+Pour ne plus y penser, lance l'**auto-pull** dans un terminal dédié — il tire chaque push
+automatiquement (fast-forward uniquement, jamais d'écrasement, ne touche à rien si tu as des
+modifs locales) :
+
+```bash
+bash scripts/watch-pull.sh        # surveille la branche courante, toutes les 5 s
+```
+
+Avec `npm run dev` à côté, Vite recharge la page tout seul → tu vois mes changements en direct,
+sans PR ni resynchronisation manuelle.
+
 ## 🧪 Commandes
 
 ```bash
