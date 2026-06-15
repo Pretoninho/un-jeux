@@ -1,7 +1,145 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.26
+> Dernière mise à jour : 2026-06-15 — v1.32
+>
+> 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
+> validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
+> isolée (`*Demo.svelte`, bouton dédié dans `App.svelte`, sans toucher l'ancienne boucle de jeu).
+>
+> | # | Brique | Moteur | Tests | Démo UI | État |
+> | --- | --- | --- | --- | --- | --- |
+> | 1 | **Carnet d'ordres** (éviction = rachat de parts) | `orderbook.ts` | 19 | 📒 `OrderBookDemo` | ✅ |
+> | 2 | **Revenu + agglomération** (income) | `revenue.ts` | 12 | 🏞️ `RevenueDemo` | ✅ |
+> | 3 | **Camp / emprunt** (charge, soldable/permanent) | `camp.ts` (à venir) | — | — | ⏳ suivant |
+> | 4 | **Tick économique** (income − charges → net, faillite) | à venir | — | — | ⏳ |
+> | 5 | **Possession** (un occupant/hex, lie carnet↔revenu) | à venir | — | — | ⏳ |
+>
+> **Carnet (`orderbook.ts`)** : 2 piles visibles bids/asks ; *SI achat ≥ meilleure vente → échange au prix de
+> l'ordre qui attendait ; SINON → entre au carnet ; prix affiché = dernier échange*. Transfert atomique
+> cash↔parts, long-only, parts/prix entiers, reliquat partiel, annulation. **Conservation de richesse testée =
+> zéro-sum.** Éviction = l'occupant peut résister (siège visible, pas transaction mécanique) ; l'assaillant
+> surpaie = son coût d'attaque + son risque.
+> **Revenu (`revenue.ts`)** : *possédé → +base ; voisin du même proprio → +bonus/voisin (agglomération) ;
+> libre → 0*. `actorIncome` = somme. Cluster contigu > hexes dispersés (testé). svelte-check 0 erreur.
+> ⚠️ Ces briques sont **autonomes** — pas encore câblées dans une boucle de jeu unifiée (brique 4/5).
+>
+> 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
+>
+> **Hexes = revenus.** Chaque hex possédé crache un revenu fixe par tour. Un seul occupant par hex (pas de
+> partage). Hexes adjacents sous le même propriétaire se bonifient mutuellement (prime d'agglomération spatiale).
+>
+> **Camps = emprunts à la banque (PNJ).** Le camp de base n'est pas une ville à construire — c'est une **dette
+> volontairement assumée**. Emprunter = avoir les moyens de conquérir + une charge fixe par tour à couvrir.
+> Camp 1 → emprunt 50 → charge 5/tour. Camp 2 → emprunt 100 → charge 10/tour supplémentaire. Avoir 2 camps =
+> porter 2 emprunts simultanément. Le camp peut évoluer (investissement choisi → bonus stratégique : réseau,
+> avant-poste, forteresse, comptoir…). La banque est une **règle, pas un personnage jouable** (PNJ simple).
+>
+> **Éviction = carnet d'ordres.** Un hex occupé change de main uniquement par rachat des parts via le carnet.
+> L'occupant peut résister (ne pas vendre) → l'éviction est un **siège visible**, pas une transaction mécanique.
+> L'assaillant surpaie → c'est son coût d'attaque → il parie que le contrôle + le revenu futur couvrent la prime.
+> Zéro-sum respecté : pur transfert cash ↔ parts.
+>
+> **Boucle complète :**
+> ```
+> Hexes → revenus
+> Revenus → couvrent les charges des camps
+> Camps → donnent les outils/bonus pour conquérir plus
+> Conquête → plus de revenus → finance des emprunts plus grands
+> Éviction → adversaire perd son revenu → doit réagir ou couler
+> ```
+>
+> **Moteur de guerre :** pas l'envie d'attaquer — la **nécessité économique**. Si quelqu'un t'évince d'un hex
+> pendant que tu portes deux emprunts → tu passes déficitaire → tu dois contre-attaquer ou réduire le camp.
+>
+> **Ce qui n'est PAS dans ce jeu :** Civ (trop militaire, mauvaise métaphore). Partage de hex (trop complexe,
+> supprimé). Charges cachées ou aléatoires (tout est calculable). Rôle de prêteur donné à un joueur (PNJ, simple).
+>
+> ⚖️ **AXE D'ÉQUILIBRE income / outcome (2026-06-15)** — le sujet de calibrage central, à tenir :
+> **Income (1 tour)** = revenu liquide, immédiat, sûr (les hexes crachent X/tour). **Outcome (étendu dans le
+> temps)** = paris longs qui coûtent maintenant et paient plus tard (2ᵉ camp, évolution de camp, agglomération).
+> L'équilibre visé : *le rentier qui maximise l'income ne doit pas écraser le conquérant qui investit dans
+> l'outcome, ni l'inverse*. Si l'income gagne toujours → personne n'emprunte, jeu plat. Si l'outcome gagne
+> toujours → course au tapis. → Fait coexister **deux stratégies valides**, qui correspondent pile aux deux
+> conditions de victoire (rentier = être le plus riche ; conquérant = faire couler les autres).
+>
+> 🌳 **DEUX TRONCS D'ARCHÉTYPES (2026-06-15)** — la dette (soldable/permanente) est un **tronc**, pas le
+> squelette complet. Chaque tronc contient plusieurs archétypes qui partagent le profil de dette mais se
+> différencient par leur ressource, compétence, bonus d'amélioration.
+>
+> ```
+> TRONC A — Dette Permanente
+> (gros capital, charge non soldable, style offensif → doit conquérir)
+>     ├── Archétype A1 : à définir
+>     ├── Archétype A2 : à définir
+>     └── …
+>
+> TRONC B — Dette Soldable
+> (capital modeste, charge libérable, style patient → peut se libérer)
+>     ├── Archétype B1 : à définir
+>     ├── Archétype B2 : à définir
+>     └── …
+> ```
+>
+> **Lecture plateau** : le tronc d'un joueur est **visible** (info publique) → *« il est sur le Tronc A, il
+> doit conquérir ou mourir »* — la surprise vient des **améliorations choisies en partie**, pas du profil de
+> base. Deux joueurs du même tronc = styles différents, concurrence interne. Troncs différents = courses
+> parallèles, affrontement sur le plateau. ⚠️ Archétypes non nommés ni définis encore — à développer un à
+> la fois.
+>
+> 🎭 **EMPRUNT PORTÉ PAR LES ARCHÉTYPES (2026-06-15)** — résout le point « rembourser ou loyer permanent ? »
+> sans trancher en général : **les deux modèles coexistent, incarnés par des archétypes**. Chaque archétype = un
+> profil de dette de départ → impose un style de jeu et penche vers une condition de victoire.
+>
+> | | **A — Le Conquérant** | **B — Le Rentier** |
+> |---|---|---|
+> | Capital de départ | élevé (frappe fort tôt) | modeste (départ lent) |
+> | Charge | lourde, **non soldable** (permanente) | douce, **soldable** (libérable) |
+> | Contrainte de style | *obligé* de conquérir pour survivre (s'il s'arrête, il saigne) | peut devenir **sans dette** → income = richesse pure |
+> | Vise | **la faillite des autres** (seule sortie) | **être le plus riche** (s'enrichit tranquille) |
+>
+> **Pourquoi l'équilibre tient** : les deux ne jouent pas le même jeu mais **sur le même plateau** → course à
+> deux vitesses. Le Conquérant doit éliminer *avant* que le Rentier ne devienne trop riche ; le Rentier doit
+> solder sa dette *avant* que le Conquérant ne l'étouffe. Les archétypes **incarnent les deux pôles de l'axe
+> income/outcome**. L'affinage se fera ensuite via les **améliorations** propres à chaque archétype (bonus qui
+> renforcent le style sans le rendre dominant — règle des pouvoirs §7 : friction, pas synergie).
+>
+> 🏁 **FIN & VICTOIRE TRANCHÉES (2026-06-15)** :
+> - ⏱️ **Fin par le TEMPS** — horloge fixe de tours, pas un volume atteint (colle au `horizonTurns` du moteur).
+> - 🏆 **Victoire** : le **plus riche à la fin** OU la **faillite de tous les autres** avant la fin.
+> - 💀 **Faillite** = ne plus pouvoir couvrir ses charges (l'emprunt coule le joueur) = condition d'élimination.
+>
+> ⚠️ **En suspens :** mécanisme de remboursement de l'emprunt (la charge tombe quand remboursé, ou loyer
+> permanent ? — fait partie de l'arbitrage income/outcome). Nombre de camps max par joueur (plus tard).
+> Calibrage des nombres (revenus, charges, prix d'emprunt) pour atteindre l'équilibre income/outcome.
+>
+> 📒 **PISTE COURANTE — CARNET D'ORDRES + MOTIVATION (2026-06-15)** : reprise d'une direction **4X + zéro-sum**
+> (camp de base donnant un revenu ; victoire par **domination du capital** ; acquérir des cases → immo → fait
+> croître le revenu). **Décision validée** : le **prix de TOUTES les cases-marché** passe par un **carnet d'ordres
+> visible** (remplace la formule de prix abstraite à terme). Le **zéro-sum** est posé comme **règle** (pas tout à
+> fait un primitif).
+>
+> ✅ **LIVRÉ — `src/engine/orderbook.ts` (module pur + 19 tests) + démo UI** : carnet par hexe, deux piles visibles
+> (bids/asks). **SI→ALORS** : *SI offre d'achat ≥ meilleure vente → échange au prix de l'ordre qui ATTENDAIT ;
+> SINON → l'ordre entre dans le carnet, visible de tous ; prix affiché = dernier échange.* Transfert atomique
+> cash↔parts, **long-only** (refus si vendeur sans parts / acheteur sans cash), parts/prix **entiers**, reliquat
+> partiel, tri (asks↑/bids↓), annulation. **Conservation de la richesse totale testée = zéro-sum prouvé.** Démo
+> jouable : bouton **📒 Carnet** (bas du panneau de contrôle) → `OrderBookDemo.svelte`, sandbox 2 acteurs/1 hexe,
+> sans toucher la boucle de jeu. Build OK, 19 tests verts. ⏭️ Câblage moteur (remplacer `resolveMarket`) = ensuite.
+>
+> 🍎 **MOTIVATION — l'analogie de la pomme (2026-06-15, EN COURS, non tranché)** : le concepteur pointe que le
+> carnet seul = **chaises musicales pures** (seule motivation d'achat = revendre au pigeon suivant / greater fool).
+> Pour une vraie motivation, deux ancres tirées d'un marché réel : **(1) coût de production = un PLANCHER sous le
+> prix** (la pomme coûte 5 → on ne vend pas durablement sous 5 ; mappe sur l'**ancre `A`** déjà dans le moteur,
+> à rendre visible/concrète) ; **(2) la demande = quelqu'un doit VOULOIR le bien** (point dur : en finance
+> l'acheteur **revend** au lieu de **consommer** → la seule demande native est l'espoir de revente). **Reco
+> posée** : empiler **socle PRODUCTIF** (posséder des cases qui crachent un **revenu**/tour → richesse ; prix
+> ancré sur le revenu, *A = revenu × multiple*) + **surcouche SPÉCULATIVE** (le prix s'envole au-dessus de la
+> juste valeur puis s'effondre dessus = la fête + le krach). Décision devient un fait calculable : *« produit
+> 8/t → juste valeur ≈ 80 ; coté 140 → je paie 60 d'air → krach me ramène à 80 → je vends. »* **EN SUSPENS** :
+> d'où vient le revenu (« qui mange les pommes ») — (a) injection contrôlée PNJ/marché [défaut raisonnable
+> proposé], (b) transfert entre joueurs = zéro-sum strict, (c) hybride prod injecte / krach détruit. Concepteur
+> a fermé la question sans trancher → **on continue à réfléchir**. ⚠️ Conflit revenu↔zéro-sum toujours ouvert.
 >
 > 🔒 **CLÔTURE — verrou de périmètre (2026-06-14, §9bis)** : FERMER (1 PA) + clôture partielle exigent d'être
 > SUR l'hexe / ADJACENT / MÊME CLUSTER pour agir (sinon 🔒 hors de portée). Asymétrie voulue vs ouverture
