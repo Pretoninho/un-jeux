@@ -3,6 +3,10 @@
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
 > Dernière mise à jour : 2026-06-15 — v1.39
 >
+> 📘 **RÈGLES DU NOUVEAU JEU (état réel) : `docs/nouveau-jeu.md`** — référence à jour des mécaniques qui tournent
+> (hexes/revenus, camp de base, carnet d'ordres = prix de sortie, éviction, valeur nette, réglages calibrés,
+> carte des fichiers). À tenir à jour avec le code, comme `docs/mecaniques.md` l'était pour l'ancien jeu.
+>
 > 📒 **CARNET D'ORDRES EFFECTIF + 1 TRONC + CALIBRAGE (2026-06-15, retour de partie)**. Quatre décisions appliquées,
 > toutes DANS le jeu (`game.ts` + `GameView.svelte`), validé par `npx vite-node scripts/balance.ts` :
 >
