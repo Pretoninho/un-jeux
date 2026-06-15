@@ -1,7 +1,41 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.27
+> Dernière mise à jour : 2026-06-15 — v1.28
+>
+> 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
+>
+> **Hexes = revenus.** Chaque hex possédé crache un revenu fixe par tour. Un seul occupant par hex (pas de
+> partage). Hexes adjacents sous le même propriétaire se bonifient mutuellement (prime d'agglomération spatiale).
+>
+> **Camps = emprunts à la banque (PNJ).** Le camp de base n'est pas une ville à construire — c'est une **dette
+> volontairement assumée**. Emprunter = avoir les moyens de conquérir + une charge fixe par tour à couvrir.
+> Camp 1 → emprunt 50 → charge 5/tour. Camp 2 → emprunt 100 → charge 10/tour supplémentaire. Avoir 2 camps =
+> porter 2 emprunts simultanément. Le camp peut évoluer (investissement choisi → bonus stratégique : réseau,
+> avant-poste, forteresse, comptoir…). La banque est une **règle, pas un personnage jouable** (PNJ simple).
+>
+> **Éviction = carnet d'ordres.** Un hex occupé change de main uniquement par rachat des parts via le carnet.
+> L'occupant peut résister (ne pas vendre) → l'éviction est un **siège visible**, pas une transaction mécanique.
+> L'assaillant surpaie → c'est son coût d'attaque → il parie que le contrôle + le revenu futur couvrent la prime.
+> Zéro-sum respecté : pur transfert cash ↔ parts.
+>
+> **Boucle complète :**
+> ```
+> Hexes → revenus
+> Revenus → couvrent les charges des camps
+> Camps → donnent les outils/bonus pour conquérir plus
+> Conquête → plus de revenus → finance des emprunts plus grands
+> Éviction → adversaire perd son revenu → doit réagir ou couler
+> ```
+>
+> **Moteur de guerre :** pas l'envie d'attaquer — la **nécessité économique**. Si quelqu'un t'évince d'un hex
+> pendant que tu portes deux emprunts → tu passes déficitaire → tu dois contre-attaquer ou réduire le camp.
+>
+> **Ce qui n'est PAS dans ce jeu :** Civ (trop militaire, mauvaise métaphore). Partage de hex (trop complexe,
+> supprimé). Charges cachées ou aléatoires (tout est calculable). Rôle de prêteur donné à un joueur (PNJ, simple).
+>
+> ⚠️ **En suspens :** mécanisme de remboursement de l'emprunt (la charge tombe quand remboursé, ou loyer permanent ?).
+> Conditions de victoire précises. Nombre de camps max par joueur.
 >
 > 📒 **PISTE COURANTE — CARNET D'ORDRES + MOTIVATION (2026-06-15)** : reprise d'une direction **4X + zéro-sum**
 > (camp de base donnant un revenu ; victoire par **domination du capital** ; acquérir des cases → immo → fait
