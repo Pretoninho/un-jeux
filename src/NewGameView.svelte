@@ -4,12 +4,13 @@
   import OrderBookDemo from './OrderBookDemo.svelte';
   import RevenueDemo from './RevenueDemo.svelte';
   import CampDemo from './CampDemo.svelte';
+  import TickDemo from './TickDemo.svelte';
 
   let { onShowLegacy }: { onShowLegacy: () => void } = $props();
 
   // Une brique visible à la fois : on ne montre que ce qu'on teste.
-  type Brick = 'revenue' | 'orderbook' | 'camp';
-  let brick = $state<Brick>('camp');
+  type Brick = 'tick' | 'revenue' | 'orderbook' | 'camp';
+  let brick = $state<Brick>('tick');
 </script>
 
 <main>
@@ -19,13 +20,16 @@
   </header>
 
   <nav class="bricks">
+    <button class:active={brick === 'tick'} onclick={() => (brick = 'tick')}>⏩ Tick (boucle)</button>
     <button class:active={brick === 'camp'} onclick={() => (brick = 'camp')}>🏕️ Camp / emprunt</button>
     <button class:active={brick === 'revenue'} onclick={() => (brick = 'revenue')}>🏞️ Revenu &amp; agglomération</button>
     <button class:active={brick === 'orderbook'} onclick={() => (brick = 'orderbook')}>📒 Carnet d'ordres</button>
   </nav>
 
   <section class="stage">
-    {#if brick === 'camp'}
+    {#if brick === 'tick'}
+      <TickDemo />
+    {:else if brick === 'camp'}
       <CampDemo />
     {:else if brick === 'revenue'}
       <RevenueDemo />
