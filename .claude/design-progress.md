@@ -1,7 +1,19 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.44
+> Dernière mise à jour : 2026-06-15 — v1.45
+>
+> 🗺️ **TRÈS GRANDE MAP + INCOME TRÈS RARE (2026-06-15, vision concepteur)** : décidé après simulation + consultation
+> (nouveau process : *simuler → montrer les chiffres → l'humain tranche → coder*). **Rayon 8 = 217 hexes**, mais
+> **`incomeFraction` ≈ 0.15** (~32 hexes à income seulement). Tout le reste (~185 cases stériles) = **canevas
+> réservé aux futurs HEXES SPÉCIAUX** (en préparation). Calibrage économique v1.44 **inchangé** (base 6, agglo 2,
+> upkeep 3, camp de base 70/charge 7, horizon 20). Sim (rayon 8 / 0.15) : 0 % faillite, **netT2 +2.1** (progression
+> réelle mais lente — tendu), ratio fin ~1.4, split **56/44** (le plus équilibré), ~49 % des hexes à income pris
+> (carte disputée, pas saturée). ⚠️ **Rendu** : 217 hexes = cases petites à l'écran → un **zoom/pan** sera à
+> prévoir avec les hexes spéciaux. 147 tests verts, svelte-check 0, build OK.
+>
+> 🛠️ **PROCESS SIMULATIONS (2026-06-15, demande concepteur)** : pour tout calibrage, **ne plus coder dans la
+> foulée** — lancer les sims, présenter les CHIFFRES, attendre l'avis du concepteur, décider ensemble, PUIS coder.
 >
 > 🔓 **DÉBLOCAGE DE LA PROGRESSION (2026-06-15, retour de partie : « bloqué au tour 2, ratio 1/1 »)** : la
 > calibration v1.43 était un **soft-lock** — charge de base 14 ≈ income de 2 hexes (16) → net ≈ 0, on n'accumule

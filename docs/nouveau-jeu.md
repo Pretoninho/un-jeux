@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.44.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.45.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -32,11 +32,11 @@ on accumule pour acheter plus). Le ratio est affiché en jeu.
 
 ### Hexes = revenus (rares, avec upkeep)
 - Un hex = **une place**, **un seul occupant** (pas de partage).
-- Carte = grand hexagone **rayon 5 = 91 hexes**. Les **hexes à income sont RARES** : seule une fraction
-  (`incomeFraction` ≈ **0.5**) produit un revenu (base 6) ; les autres sont **stériles** (0 revenu,
-  non achetables, cases grises). Placement **symétrique** (rotation 180°) → plateau équitable, **seedé**
-  (un plateau différent à chaque partie), avec **≥1 hex d'income garanti à côté de chaque QG** (départ
-  jouable). La rareté rend chaque hex à income **disputé** (éviction).
+- Carte = **très grand** hexagone **rayon 8 = 217 hexes**. Les **hexes à income sont TRÈS RARES** : une fraction
+  (`incomeFraction` ≈ **0.15**, soit ~32 hexes) produit un revenu (base 6) ; tout le reste (~185 cases) est
+  **stérile** (0 revenu, non achetable, gris) — **canevas réservé aux futurs HEXES SPÉCIAUX** (en préparation).
+  Placement **symétrique** (rotation 180°) → plateau équitable, **seedé** (différent à chaque partie), avec
+  **≥1 hex d'income garanti à côté de chaque QG** (départ jouable). La rareté rend chaque hex à income **disputé**.
 - **Agglomération** : chaque hex adjacent appartenant au **même** propriétaire ajoute une prime
   (`agglomerationBonus`, +2) → un cluster contigu rapporte plus que des hexes dispersés.
 - **Upkeep** : chaque hex d'income possédé coûte `hexUpkeep` (**3**) par tour. Il fait monter la charge avec le
@@ -99,7 +99,7 @@ charges. (Pas de ré-emprunt : comme le joueur, elle s'étend avec son capital d
 | `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (éviction viable mais non dominante) |
 | `askFloorMultiple` | 4 | plancher d'un ask = base × 4 |
 
-Revenu de base/hex à income = **6**, agglomération = **+2**/voisin, **incomeFraction ≈ 0.5** (rareté).
+Revenu de base/hex à income = **6**, agglomération = **+2**/voisin, **incomeFraction ≈ 0.15** (très rare, sur rayon 8 = 217 hexes ; le reste = canevas pour hexes spéciaux à venir).
 
 **Calibrage** : `npx vite-node scripts/balance.ts` (rayon 5, rareté 0.5, horizon 20, 8 placements seedés)
 mesure la **PROGRESSION** — net/tour au tour 2 (doit être > 0, sinon on est *bloqué*), nombre d'hexes en fin

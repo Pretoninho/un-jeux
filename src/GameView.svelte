@@ -16,9 +16,10 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Grand plateau rayon 5 = 91 hexes ; hexes à income RARES (≈ la moitié) ; 2 coins = QG ──
-  const RADIUS = 5;
-  const INCOME_FRACTION = 0.5;   // rareté : seule la moitié des cases produit un revenu
+  // ── Très grande map rayon 8 = 217 hexes ; hexes à income TRÈS RARES (~0.15) ──────
+  //    Le reste (~185 cases stériles) = canevas réservé aux futurs HEXES SPÉCIAUX.
+  const RADIUS = 8;
+  const INCOME_FRACTION = 0.15;  // income très rare : ~32 hexes à income sur 217
   const GEO = makeBoard(RADIUS, 6, 2, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
   const CFG: GameConfig = { ...DEFAULT_CONFIG }; // horizon 20 inclus dans DEFAULT_CONFIG
 

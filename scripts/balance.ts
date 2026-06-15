@@ -127,25 +127,24 @@ function evalConfig(cfg: GameConfig, frac: number, radius = RADIUS) {
   return { rWins, cWins, draws, bankrupts, ratioEnd: rEnd / n, hexes: hexes / n, hexesT2: hexesT2 / n, netT2: netT2 / n, n };
 }
 
-const FRAC = 0.5;     // rareté établie
-const RAD = 5;        // grand plateau établi
-const HZ = 20;        // horizon établi
-// On cherche la PROGRESSION : pouvoir continuer à acheter (pas bloqué à 2 hexes), net/tour positif tôt,
-// territoire conséquent en fin de partie (~8-15 hexes), tout en gardant le camp de base comme vraie charge.
-console.log(`Rayon ${RAD} (${makeBoard(RAD, FLAT_BASE, AGGLO, 1, 0).map.hexes.length} hexes), rareté ${FRAC}, horizon ${HZ}, base ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}`);
-console.log('PROGRESSION + TENSION : charge de base modérée × upkeep (qui plafonne la croissance). Cible : netT2 > 0, ratio fin ~1.5-2.\n');
-console.log(' loan | charge% | base | upkeep | rentier | conquér | faillite | hexT2 | netT2 | hex fin | ratio fin');
-console.log('------|---------|------|--------|---------|---------|----------|-------|-------|---------|----------');
-for (const loan of [50, 70]) {
-  for (const rate of [0.08, 0.10]) {
-    for (const upkeep of [2, 3, 4]) {
-      const cfg: GameConfig = { ...DEFAULT_CONFIG, baseCampLoan: loan, chargeRate: rate, hexUpkeep: upkeep, horizonTurns: HZ };
-      const r = evalConfig(cfg, FRAC, RAD);
-      const pct = (x: number) => `${Math.round((x / r.n) * 100)}%`;
-      console.log(
-        `${String(loan).padStart(5)} | ${(rate * 100).toFixed(0).padStart(6)}% | ${(loan * rate).toFixed(0).padStart(4)} | ${String(upkeep).padStart(6)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.bankrupts).padStart(8)} | ${r.hexesT2.toFixed(1).padStart(5)} | ${r.netT2.toFixed(1).padStart(5)} | ${r.hexes.toFixed(1).padStart(7)} | ${r.ratioEnd.toFixed(2).padStart(8)}`,
-      );
-    }
+const HZ = 20;
+// TRÈS GRANDE MAP + hexes à income RARES (le reste = canevas réservé aux futurs hexes spéciaux).
+// Ce qui pilote l'économie = le nombre ABSOLU d'hexes à income, pas la taille du plateau.
+console.log(`Proportions v1.44 : base ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}, loan ${DEFAULT_CONFIG.baseCampLoan}, charge ${(DEFAULT_CONFIG.baseCampLoan * DEFAULT_CONFIG.chargeRate).toFixed(0)}, horizon ${HZ}`);
+console.log('GRANDE MAP × RARETÉ : on balaie rayon (taille) × incomeFraction (rareté). Reste = futurs hexes spéciaux.\n');
+console.log(' rayon | hexes | frac | income | hex fin/j | % income pris | rentier | conquér | faillite | netT2 | ratio fin');
+console.log('-------|-------|------|--------|-----------|---------------|---------|---------|----------|-------|----------');
+for (const radius of [6, 8, 10]) {
+  for (const frac of [0.15, 0.25, 0.35]) {
+    const cfg: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: HZ };
+    const r = evalConfig(cfg, frac, radius);
+    const total = makeBoard(radius, FLAT_BASE, AGGLO, 1, 0).map.hexes.length;
+    const incomeHexes = Math.max(2, Math.round((total - 2) * frac));
+    const fill = `${Math.round((2 * r.hexes / incomeHexes) * 100)}%`;
+    const pct = (x: number) => `${Math.round((x / r.n) * 100)}%`;
+    console.log(
+      `${String(radius).padStart(6)} | ${String(total).padStart(5)} | ${frac.toFixed(2).padStart(4)} | ${String(incomeHexes).padStart(6)} | ${r.hexes.toFixed(1).padStart(9)} | ${fill.padStart(13)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.bankrupts).padStart(8)} | ${r.netT2.toFixed(1).padStart(5)} | ${r.ratioEnd.toFixed(2).padStart(8)}`,
+    );
   }
   console.log('');
 }
