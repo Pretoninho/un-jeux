@@ -1,38 +1,56 @@
-// Le JEU — actions jouables sur GameStateV2 (brique « assemblage »).
+// Le JEU — actions jouables sur GameStateV2.
 //
-// Fini les démos orphelines : il y a UN jeu, et chaque brique s'y branche.
-// Ce module porte les VERBES du joueur (et de l'IA) sur l'état unifié :
-//   - acquérir un hex LIBRE (achat au marché, prix ancré sur le revenu)
-//   - emprunter (camp = capital + charge, selon le tronc)
+// Il y a UN jeu, et chaque mécanique s'y branche. Verbes sur l'état unifié :
+//   - acquérir un hex LIBRE (achat au marché)
+//   - placer un ordre de vente (ASK) sur un hex possédé — OBLIGATOIRE à l'acquisition
+//   - emprunter (camp = capital + charge) ; camp de BASE posé au départ
+//   - évincer un hex adverse = PAYER son ask (le carnet d'ordres rend le siège visible)
 //   - finir le tour (l'IA joue, puis le tick économique avance tout le monde)
 //
-// L'éviction d'un hex OCCUPÉ (rachat via le carnet d'ordres) viendra brancher
-// `orderbook.ts` ICI même, brique suivante — pas dans une démo à part.
+// CARNET D'ORDRES (décision concepteur 2026-06-15) : le propriétaire d'un hex ne peut
+// poser QU'UN ordre de VENTE (son ask = son prix de sortie). L'éviction consiste à payer
+// cet ask. Le prix n'est plus une formule : c'est l'occupant qui le déclare publiquement.
+//
+// TRONC (décision concepteur 2026-06-15) : UN seul modèle de dette de base (camp de base
+// permanent, charge fixe) — la différenciation (branches de revenus/charges) viendra plus
+// tard, une à la fois (leçon §30 : primitives d'abord, spécificités par-dessus).
 //
 // Module PUR, immuable : chaque action rend un NOUVEAU GameStateV2.
 
 import type { GameStateV2 } from './state2';
-import { makeCamp, type Tronc } from './camp';
+import { makeCamp } from './camp';
 import { actorCharges } from './camp';
 import { hexRevenue } from './revenue';
 import { tick, type TickResult } from './tick';
 
 export interface GameConfig {
   horizonTurns: number;
-  /** Prix d'acquisition d'un hex libre = base × ce multiple (retour sur invest. en N tours). */
+  /** Prix d'acquisition d'un hex libre = base × ce multiple. */
   claimMultiple: number;
-  /** Prix d'ÉVICTION d'un hex occupé = revenu courant × ce multiple (> claim : l'assaillant surpaie). */
-  evictMultiple: number;
-  /** Charge d'un emprunt = ce taux × montant (Tronc A) ou × reliquat (Tronc B), par tour. */
+  /** Ask par défaut suggéré à l'acquisition = revenu courant × ce multiple. */
+  askDefaultMultiple: number;
+  /** Plancher d'un ask (on ne brade pas un hex sous son prix d'achat). */
+  askFloorMultiple: number;
+  /** Charge/tour d'un emprunt = ce taux × montant. */
   chargeRate: number;
+  /** Montant du camp de BASE posé au départ (le « facteur de pondération » income/charge). */
+  baseCampLoan: number;
 }
 
+// Calibré par scripts/balance.ts (rentier vs conquérant, ~50/50, aucun style ne domine) :
+// le charge (0.20) approche l'income que le capital emprunté génère (~0.25·L/tour) → le
+// levier n'est pas gratuit ; le prix de sortie par défaut (×12) rend l'éviction viable
+// mais non dominante (l'agression doit surpayer un territoire établi).
 export const DEFAULT_CONFIG: GameConfig = {
-  horizonTurns: 12,
+  horizonTurns: 14,
   claimMultiple: 4,
-  evictMultiple: 6,
-  chargeRate: 0.1,
+  askDefaultMultiple: 12,
+  askFloorMultiple: 4,
+  chargeRate: 0.2,
+  baseCampLoan: 120,
 };
+
+// ─────────────────────── Acquisition d'un hex libre ──────────────────────────
 
 /** Prix pour acquérir un hex LIBRE (ancré sur son revenu de base). */
 export function claimCost(state: GameStateV2, hexId: string, cfg: GameConfig): number {
@@ -43,32 +61,55 @@ export function claimCost(state: GameStateV2, hexId: string, cfg: GameConfig): n
 export function canClaim(state: GameStateV2, actorId: string, hexId: string, cfg: GameConfig): boolean {
   const actor = state.actors.find((a) => a.id === actorId);
   if (!actor || actor.bankrupt) return false;
-  if (state.ownership[hexId] !== null && state.ownership[hexId] !== undefined) return false;
+  if (state.ownership[hexId]) return false;
   return actor.cash >= claimCost(state, hexId, cfg);
 }
 
-/** Acquiert un hex libre : débite le cash, pose la propriété. Sans effet si interdit. */
+/**
+ * Acquiert un hex libre : débite le cash, pose la propriété ET un ask par défaut
+ * (le jeu force ensuite le joueur à confirmer/ajuster son prix de sortie). Sans effet si interdit.
+ */
 export function claimHex(state: GameStateV2, actorId: string, hexId: string, cfg: GameConfig): GameStateV2 {
   if (!canClaim(state, actorId, hexId, cfg)) return state;
   const cost = claimCost(state, hexId, cfg);
-  return {
+  const next: GameStateV2 = {
     ...state,
     actors: state.actors.map((a) => (a.id === actorId ? { ...a, cash: a.cash - cost } : a)),
     ownership: { ...state.ownership, [hexId]: actorId },
+    asks: { ...state.asks },
   };
+  next.asks[hexId] = defaultAsk(next, hexId, cfg);
+  return next;
 }
 
-/** Emprunte : ouvre un camp (capital + charge selon le tronc), crédite le cash. */
-export function borrow(
-  state: GameStateV2,
-  actorId: string,
-  amount: number,
-  tronc: Tronc,
-  cfg: GameConfig,
-): GameStateV2 {
+// ─────────────────────── Carnet d'ordres (ask = prix de sortie) ───────────────
+
+/** Ask par défaut suggéré pour un hex (revenu courant × askDefaultMultiple). */
+export function defaultAsk(state: GameStateV2, hexId: string, cfg: GameConfig): number {
+  const rev = hexRevenue(hexId, state.ownership, state.map, state.revenueCfg);
+  return Math.round(rev * cfg.askDefaultMultiple);
+}
+
+/** Plancher autorisé d'un ask (on ne vend pas sous une fraction du prix d'achat). */
+export function askFloor(state: GameStateV2, hexId: string, cfg: GameConfig): number {
+  const base = state.revenueCfg.baseByHex[hexId] ?? 0;
+  return Math.round(base * cfg.askFloorMultiple);
+}
+
+/** Pose/ajuste l'ordre de VENTE d'un hex. Seul le propriétaire le peut ; borné au plancher. */
+export function setAsk(state: GameStateV2, actorId: string, hexId: string, price: number, cfg: GameConfig): GameStateV2 {
+  if (state.ownership[hexId] !== actorId) return state;
+  const floor = askFloor(state, hexId, cfg);
+  return { ...state, asks: { ...state.asks, [hexId]: Math.max(floor, Math.round(price)) } };
+}
+
+// ─────────────────────── Emprunt (camp) ──────────────────────────────────────
+
+/** Emprunte : ouvre un camp (capital + charge permanente), crédite le cash. */
+export function borrow(state: GameStateV2, actorId: string, amount: number, cfg: GameConfig): GameStateV2 {
   const actor = state.actors.find((a) => a.id === actorId);
   if (!actor || actor.bankrupt || amount <= 0) return state;
-  const camp = makeCamp(actorId, amount, tronc, cfg.chargeRate);
+  const camp = makeCamp(actorId, amount, 'A', cfg.chargeRate); // un seul modèle : dette de base permanente
   return {
     ...state,
     actors: state.actors.map((a) => (a.id === actorId ? { ...a, cash: a.cash + amount } : a)),
@@ -76,36 +117,39 @@ export function borrow(
   };
 }
 
-// ─────────────────────── Éviction (brique 5 : possession) ─────────────────────
-//
-// Un hex OCCUPÉ ne s'acquiert pas au prix « libre » : il faut RACHETER la position de
-// l'occupant. Le prix est ancré sur le revenu COURANT de l'hex (agglomération comprise)
-// → un hex au cœur d'un cluster vaut plus cher à prendre = la « résistance » émerge des
-// données (le siège est visible : tu vois le prix qu'il faut mettre). Transfert ZÉRO-SUM :
-// l'assaillant paie, l'occupant encaisse, l'hex change de main. L'assaillant SURPAIE
-// (evictMultiple > claimMultiple) : c'est son coût d'attaque, il parie sur le revenu futur.
-
-/** Prix pour évincer l'occupant d'un hex (revenu courant × evictMultiple). */
-export function evictionCost(state: GameStateV2, hexId: string, cfg: GameConfig): number {
-  const rev = hexRevenue(hexId, state.ownership, state.map, state.revenueCfg);
-  return Math.round(rev * cfg.evictMultiple);
+/** Pose le camp de BASE de chaque acteur (premier emprunt déjà effectué au départ). */
+export function foundBaseCamps(state: GameStateV2, cfg: GameConfig): GameStateV2 {
+  let s = state;
+  for (const a of s.actors) s = borrow(s, a.id, cfg.baseCampLoan, cfg);
+  return s;
 }
 
-/** Peut-on évincer ? Hex occupé par un AUTRE acteur, assaillant vivant, cash suffisant. */
-export function canEvict(state: GameStateV2, buyerId: string, hexId: string, cfg: GameConfig): boolean {
+// ─────────────────────── Éviction = payer l'ask de l'occupant ─────────────────
+
+/** Prix pour évincer = l'ask déclaré par l'occupant (∞ si pas d'ask : pas à vendre). */
+export function evictionCost(state: GameStateV2, hexId: string): number {
+  return state.asks[hexId] ?? Infinity;
+}
+
+/** Peut-on évincer ? Hex occupé par un AUTRE, assaillant vivant, cash ≥ ask de l'occupant. */
+export function canEvict(state: GameStateV2, buyerId: string, hexId: string): boolean {
   const occ = state.ownership[hexId];
-  if (!occ || occ === buyerId) return false; // libre ou déjà à moi
+  if (!occ || occ === buyerId) return false;
   const buyer = state.actors.find((a) => a.id === buyerId);
   if (!buyer || buyer.bankrupt) return false;
-  return buyer.cash >= evictionCost(state, hexId, cfg);
+  return buyer.cash >= evictionCost(state, hexId);
 }
 
-/** Évince l'occupant : transfert zéro-sum (acheteur → occupant), l'hex change de main. */
+/**
+ * Évince l'occupant : transfert ZÉRO-SUM (acheteur paie l'ask, occupant encaisse),
+ * l'hex change de main. Le NOUVEAU propriétaire doit reposer un ask (mis au défaut ici ;
+ * l'UI force la confirmation). Sans effet si interdit.
+ */
 export function evict(state: GameStateV2, buyerId: string, hexId: string, cfg: GameConfig): GameStateV2 {
-  if (!canEvict(state, buyerId, hexId, cfg)) return state;
+  if (!canEvict(state, buyerId, hexId)) return state;
   const occ = state.ownership[hexId]!;
-  const cost = evictionCost(state, hexId, cfg);
-  return {
+  const cost = evictionCost(state, hexId);
+  const next: GameStateV2 = {
     ...state,
     actors: state.actors.map((a) => {
       if (a.id === buyerId) return { ...a, cash: a.cash - cost };
@@ -113,15 +157,44 @@ export function evict(state: GameStateV2, buyerId: string, hexId: string, cfg: G
       return a;
     }),
     ownership: { ...state.ownership, [hexId]: buyerId },
+    asks: { ...state.asks },
   };
+  next.asks[hexId] = defaultAsk(next, hexId, cfg); // nouvel occupant → nouvel ask
+  return next;
 }
 
-// ─────────────────────── IA simple (un adversaire vivant) ─────────────────────
+// ─────────────────────── Richesse nette (mesure de victoire) ──────────────────
+//
+// La victoire au temps va au plus riche en VALEUR NETTE — pas au plus de cash. Sinon
+// emprunter = argent gratuit. Net = cash + valeur du territoire (prix de marché des hexes
+// possédés) − dette restante (le principal du camp, jamais remboursé en modèle permanent).
 
-/** Liste des hexes libres, triés par meilleur retour sur investissement pour `actorId`. */
+/** Valeur de marché du territoire d'un acteur (somme des prix d'acquisition de ses hexes). */
+export function territoryValue(state: GameStateV2, actorId: string, cfg: GameConfig): number {
+  let v = 0;
+  for (const h of state.map.hexes) {
+    if (state.ownership[h.id] === actorId) v += claimCost(state, h.id, cfg);
+  }
+  return v;
+}
+
+/** Dette restante d'un acteur (somme des reliquats de ses camps). */
+export function outstandingDebt(state: GameStateV2, actorId: string): number {
+  return state.camps.filter((c) => c.ownerId === actorId).reduce((s, c) => s + c.debtRemaining, 0);
+}
+
+/** Valeur nette = cash + territoire − dette. C'est le score de richesse du jeu. */
+export function netWorth(state: GameStateV2, actorId: string, cfg: GameConfig): number {
+  const actor = state.actors.find((a) => a.id === actorId);
+  if (!actor) return 0;
+  return actor.cash + territoryValue(state, actorId, cfg) - outstandingDebt(state, actorId);
+}
+
+// ─────────────────────── IA (un adversaire vivant) ───────────────────────────
+
+/** Hexes libres triés par meilleur revenu potentiel (agglomération comprise) pour `actorId`. */
 function freeHexesByValue(state: GameStateV2, actorId: string): string[] {
   const free = state.map.hexes.filter((h) => !state.ownership[h.id]);
-  // Valeur = base + bonus d'agglomération potentiel (voisins déjà à moi).
   const score = (hexId: string) => {
     const base = state.revenueCfg.baseByHex[hexId] ?? 0;
     const hex = state.map.hexes.find((h) => h.id === hexId)!;
@@ -131,53 +204,67 @@ function freeHexesByValue(state: GameStateV2, actorId: string): string[] {
   return free.map((h) => h.id).sort((a, b) => score(b) - score(a));
 }
 
+/** Garantit que chaque hex possédé par `actorId` a un ask (au défaut si manquant). */
+function ensureAsks(state: GameStateV2, actorId: string, cfg: GameConfig): GameStateV2 {
+  let s = state;
+  for (const h of s.map.hexes) {
+    if (s.ownership[h.id] === actorId && s.asks[h.id] == null) {
+      s = { ...s, asks: { ...s.asks, [h.id]: defaultAsk(s, h.id, cfg) } };
+    }
+  }
+  return s;
+}
+
 /**
- * Tour d'IA « prudente » : garde une réserve pour couvrir ses charges, et achète
- * le meilleur hex abordable (priorité à l'agglomération). Achète tant qu'elle peut
- * en gardant une marge. Rend le nouvel état.
+ * Tour d'IA « prudente mais expansionniste » : se garde une réserve = 2 tours de charges.
+ *  1. emprunte si elle a de la marge de revenu et peu de cash pour s'étendre,
+ *  2. achète les meilleurs hexes abordables (priorité agglomération),
+ *  3. tente UNE éviction adjacente rentable (paie l'ask),
+ *  4. pose ses ordres de vente.
  */
 export function aiTurn(state: GameStateV2, actorId: string, cfg: GameConfig): GameStateV2 {
   let s = state;
-  const actor = s.actors.find((a) => a.id === actorId);
-  if (!actor || actor.bankrupt) return s;
+  const me0 = s.actors.find((a) => a.id === actorId);
+  if (!me0 || me0.bankrupt) return s;
 
-  // Achète en boucle tant qu'un hex est abordable en gardant 20 % de réserve.
-  let safety = 8; // garde-fou anti-boucle
+  const reserve = () => actorCharges(actorId, s.camps) * 2;
+  const cash = () => s.actors.find((a) => a.id === actorId)!.cash;
+
+  // 1. Emprunter si le cash est trop bas pour saisir une opportunité ET que le revenu
+  //    couvre confortablement les charges (marge pour servir la dette supplémentaire).
+  const cheapest = freeHexesByValue(s, actorId).map((id) => claimCost(s, id, cfg)).sort((a, b) => a - b)[0];
+  if (cheapest != null && cash() < cheapest && s.camps.filter((c) => c.ownerId === actorId).length < 3) {
+    s = borrow(s, actorId, cfg.baseCampLoan, cfg);
+  }
+
+  // 2. Acheter en boucle (garde la réserve).
+  let safety = 12;
   while (safety-- > 0) {
-    const me = s.actors.find((a) => a.id === actorId)!;
-    const candidates = freeHexesByValue(s, actorId);
-    const target = candidates.find((id) => {
-      const cost = claimCost(s, id, cfg);
-      return cost <= me.cash * 0.8; // garde une marge de cash
-    });
+    const target = freeHexesByValue(s, actorId).find((id) => claimCost(s, id, cfg) <= cash() - reserve());
     if (!target) break;
     s = claimHex(s, actorId, target, cfg);
   }
 
-  // Puis tente UNE éviction rentable : un hex adverse adjacent à mes positions
-  // (étend mon cluster), abordable en gardant de quoi couvrir 2 tours de charges.
-  const me = s.actors.find((a) => a.id === actorId)!;
-  const reserve = actorCharges(actorId, s.camps) * 2;
+  // 3. Une éviction rentable adjacente (paie l'ask de l'occupant).
   const targets = s.map.hexes
     .filter((h) => {
       const owner = s.ownership[h.id];
       return owner && owner !== actorId && h.neighbors.some((nb) => s.ownership[nb] === actorId);
     })
     .map((h) => h.id)
-    .filter((id) => canEvict(s, actorId, id, cfg) && me.cash - evictionCost(s, id, cfg) >= reserve)
-    .sort((a, b) => evictionCost(s, b, cfg) - evictionCost(s, a, cfg)); // le plus juteux d'abord
-  const evictTarget = targets[0];
-  if (evictTarget) s = evict(s, actorId, evictTarget, cfg);
+    .filter((id) => canEvict(s, actorId, id) && cash() - evictionCost(s, id) >= reserve())
+    // cible le moins cher (meilleur rapport) en premier
+    .sort((a, b) => evictionCost(s, a) - evictionCost(s, b));
+  if (targets[0]) s = evict(s, actorId, targets[0], cfg);
 
+  // 4. Ordres de vente sur tout ce que je possède.
+  s = ensureAsks(s, actorId, cfg);
   return s;
 }
 
 // ─────────────────────── Fin de tour ─────────────────────────────────────────
 
-/**
- * Clôt le tour : l'IA (tous les acteurs de `aiIds`) joue, PUIS le tick économique
- * avance tout le monde (income − charges → cash, faillites). Rend le résultat complet.
- */
+/** Clôt le tour : l'IA joue, PUIS le tick économique avance tout le monde. */
 export function endTurn(state: GameStateV2, aiIds: string[], cfg: GameConfig): TickResult {
   let s = state;
   for (const id of aiIds) s = aiTurn(s, id, cfg);
