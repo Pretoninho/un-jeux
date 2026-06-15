@@ -12,9 +12,8 @@ import {
   claimCost, canClaim, claimHex, borrow, foundBaseCamps,
   canEvict, evict, evictionCost, netWorth, defaultAsk, type GameConfig, DEFAULT_CONFIG,
 } from '../src/engine/game';
-import { tick, checkEnd } from '../src/engine/tick';
-import { actorCharges } from '../src/engine/camp';
-import { actorIncome, type RevenueConfig } from '../src/engine/revenue';
+import { tick, checkEnd, actorTotalCharges } from '../src/engine/tick';
+import { actorIncome } from '../src/engine/revenue';
 
 const RADIUS = 3;       // 37 hexes
 const FLAT_BASE = 6;
@@ -23,9 +22,10 @@ const AGGLO = 2;        // prime d'agglomération modérée (l'income reste proc
 type Policy = (s: GameStateV2, id: string, cfg: GameConfig) => GameStateV2;
 
 const cash = (s: GameStateV2, id: string) => s.actors.find((a) => a.id === id)!.cash;
-const reserve = (s: GameStateV2, id: string, m: number) => actorCharges(id, s.camps) * m;
 const income = (s: GameStateV2, id: string) => actorIncome(id, s.ownership, s.map, s.revenueCfg);
-const charges = (s: GameStateV2, id: string) => actorCharges(id, s.camps);
+const charges = (s: GameStateV2, id: string) => actorTotalCharges(s, id); // dette + upkeep
+// Réserve réaliste : seulement le DÉFICIT (si net négatif). Net positif → on peut tout dépenser.
+const deficit = (s: GameStateV2, id: string) => Math.max(0, charges(s, id) - income(s, id));
 
 function affordableFree(s: GameStateV2, id: string, cfg: GameConfig, keep: number): string | undefined {
   return s.map.hexes
@@ -41,20 +41,20 @@ function affordableFree(s: GameStateV2, id: string, cfg: GameConfig, keep: numbe
 }
 
 const rentier: Policy = (s, id, cfg) => {
-  let safety = 12;
+  let safety = 24;
   while (safety-- > 0) {
-    const t = affordableFree(s, id, cfg, reserve(s, id, 1));
+    const t = affordableFree(s, id, cfg, deficit(s, id));
     if (!t) break;
     s = claimHex(s, id, t, cfg);
   }
   return s;
 };
 
-// CONQUÉRANT : pas de ré-emprunt (supprimé) — s'étend avec son capital + évince agressivement.
+// CONQUÉRANT : pas de ré-emprunt — s'étend avec son capital + évince agressivement.
 const conquerant: Policy = (s, id, cfg) => {
-  let safety = 16;
+  let safety = 24;
   while (safety-- > 0) {
-    const t = affordableFree(s, id, cfg, reserve(s, id, 1));
+    const t = affordableFree(s, id, cfg, deficit(s, id));
     if (!t) break;
     s = claimHex(s, id, t, cfg);
   }
@@ -63,7 +63,7 @@ const conquerant: Policy = (s, id, cfg) => {
     const target = s.map.hexes
       .filter((h) => { const o = s.ownership[h.id]; return o && o !== id && h.neighbors.some((n) => s.ownership[n] === id); })
       .map((h) => h.id)
-      .filter((hid) => canEvict(s, id, hid) && cash(s, id) - evictionCost(s, hid) >= reserve(s, id, 1))
+      .filter((hid) => canEvict(s, id, hid) && cash(s, id) - evictionCost(s, hid) >= deficit(s, id))
       .sort((a, b) => evictionCost(s, a) - evictionCost(s, b))[0];
     if (!target) break;
     s = evict(s, id, target, cfg);
@@ -84,23 +84,27 @@ function setup(cfg: GameConfig, frac: number, seed: number, radius: number): Gam
 const ownedIncomeHexes = (s: GameStateV2, id: string) =>
   s.map.hexes.filter((h) => s.ownership[h.id] === id && (s.revenueCfg.baseByHex[h.id] ?? 0) > 0).length;
 
-interface GameOut { winner: string | null; reason: string | null; turn: number; ratioMid: number; ratioEnd: number; hexes: number; }
+interface GameOut { winner: string | null; reason: string | null; turn: number; ratioEnd: number; hexes: number; hexesT2: number; netT2: number; }
 
 function playGame(cfg: GameConfig, pA: Policy, pB: Policy, swap: boolean, frac: number, seed: number, radius: number): GameOut {
   let s = setup(cfg, frac, seed, radius);
-  let ratioMid = 0;
+  let hexesT2 = 0, netT2 = 0;
   const ratioOf = (id: string) => income(s, id) / Math.max(1, charges(s, id));
+  const netOf = (id: string) => income(s, id) - charges(s, id);
   const done = (): GameOut => {
     const end = checkEnd(s, cfg.horizonTurns, (id) => netWorth(s, id, cfg));
     const hexes = (ownedIncomeHexes(s, 'alice') + ownedIncomeHexes(s, 'bob')) / 2;
-    return { winner: end.winnerId, reason: end.reason, turn: s.turn, ratioMid, ratioEnd: (ratioOf('alice') + ratioOf('bob')) / 2, hexes };
+    return { winner: end.winnerId, reason: end.reason, turn: s.turn, ratioEnd: (ratioOf('alice') + ratioOf('bob')) / 2, hexes, hexesT2, netT2 };
   };
   for (let t = 0; t < cfg.horizonTurns; t++) {
     const order: Array<['alice' | 'bob', Policy]> = (t % 2 === 0) !== swap
       ? [['alice', pA], ['bob', pB]] : [['bob', pB], ['alice', pA]];
     for (const [id, pol] of order) s = pol(s, id, cfg);
     const res = tick(s); s = res.state;
-    if (t === Math.floor(cfg.horizonTurns / 2)) ratioMid = (ratioOf('alice') + ratioOf('bob')) / 2;
+    if (s.turn === 2) { // bilan « début de partie » : combien d'hexes et quel net après 2 tours
+      hexesT2 = (ownedIncomeHexes(s, 'alice') + ownedIncomeHexes(s, 'bob')) / 2;
+      netT2 = (netOf('alice') + netOf('bob')) / 2;
+    }
     if (checkEnd(s, cfg.horizonTurns, (id) => netWorth(s, id, cfg)).ended) return done();
   }
   return done();
@@ -109,33 +113,37 @@ function playGame(cfg: GameConfig, pA: Policy, pB: Policy, swap: boolean, frac: 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8]; // 8 placements différents
 
 function evalConfig(cfg: GameConfig, frac: number, radius = RADIUS) {
-  let rWins = 0, cWins = 0, draws = 0, bankrupts = 0, turns = 0, rMid = 0, rEnd = 0, hexes = 0, n = 0;
+  let rWins = 0, cWins = 0, draws = 0, bankrupts = 0, rEnd = 0, hexes = 0, hexesT2 = 0, netT2 = 0, n = 0;
   for (const seed of SEEDS) for (const swap of [false, true]) {
     let g = playGame(cfg, rentier, conquerant, swap, frac, seed, radius); n++;
-    turns += g.turn; rMid += g.ratioMid; rEnd += g.ratioEnd; hexes += g.hexes;
+    rEnd += g.ratioEnd; hexes += g.hexes; hexesT2 += g.hexesT2; netT2 += g.netT2;
     if (g.winner === 'alice') rWins++; else if (g.winner === 'bob') cWins++; else draws++;
     if (g.reason === 'last_standing') bankrupts++;
     g = playGame(cfg, conquerant, rentier, swap, frac, seed, radius); n++;
-    turns += g.turn; rMid += g.ratioMid; rEnd += g.ratioEnd; hexes += g.hexes;
+    rEnd += g.ratioEnd; hexes += g.hexes; hexesT2 += g.hexesT2; netT2 += g.netT2;
     if (g.winner === 'bob') rWins++; else if (g.winner === 'alice') cWins++; else draws++;
     if (g.reason === 'last_standing') bankrupts++;
   }
-  return { rWins, cWins, draws, bankrupts, avgTurns: turns / n, ratioMid: rMid / n, ratioEnd: rEnd / n, hexes: hexes / n, n };
+  return { rWins, cWins, draws, bankrupts, ratioEnd: rEnd / n, hexes: hexes / n, hexesT2: hexesT2 / n, netT2: netT2 / n, n };
 }
 
-const FRAC = 0.5; // rareté établie
-const hexCount = (radius: number) => makeBoard(radius, FLAT_BASE, AGGLO, 1, 0).map.hexes.length;
-console.log(`Proportions établies : base ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}, loan ${DEFAULT_CONFIG.baseCampLoan}, rareté ${FRAC}`);
-console.log('AGRANDISSEMENT : on balaie le RAYON × HORIZON (proportions fixées).\n');
-console.log(' rayon | hexes | horizon | rentier | conquér | nuls | faillite | tours | ratio mi | ratio fin | hex/joueur');
-console.log('-------|-------|---------|---------|---------|------|----------|-------|----------|-----------|-----------');
-for (const radius of [3, 4, 5, 6]) {
-  for (const horizon of [14, 20, 28]) {
-    const cfg: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: horizon };
-    const r = evalConfig(cfg, FRAC, radius);
+const HZ = 20;
+// TRÈS GRANDE MAP + hexes à income RARES (le reste = canevas réservé aux futurs hexes spéciaux).
+// Ce qui pilote l'économie = le nombre ABSOLU d'hexes à income, pas la taille du plateau.
+console.log(`Proportions v1.44 : base ${FLAT_BASE}, agglo ${AGGLO}, upkeep ${DEFAULT_CONFIG.hexUpkeep}, loan ${DEFAULT_CONFIG.baseCampLoan}, charge ${(DEFAULT_CONFIG.baseCampLoan * DEFAULT_CONFIG.chargeRate).toFixed(0)}, horizon ${HZ}`);
+console.log('GRANDE MAP × RARETÉ : on balaie rayon (taille) × incomeFraction (rareté). Reste = futurs hexes spéciaux.\n');
+console.log(' rayon | hexes | frac | income | hex fin/j | % income pris | rentier | conquér | faillite | netT2 | ratio fin');
+console.log('-------|-------|------|--------|-----------|---------------|---------|---------|----------|-------|----------');
+for (const radius of [6, 8, 10]) {
+  for (const frac of [0.15, 0.25, 0.35]) {
+    const cfg: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: HZ };
+    const r = evalConfig(cfg, frac, radius);
+    const total = makeBoard(radius, FLAT_BASE, AGGLO, 1, 0).map.hexes.length;
+    const incomeHexes = Math.max(2, Math.round((total - 2) * frac));
+    const fill = `${Math.round((2 * r.hexes / incomeHexes) * 100)}%`;
     const pct = (x: number) => `${Math.round((x / r.n) * 100)}%`;
     console.log(
-      `${String(radius).padStart(6)} | ${String(hexCount(radius)).padStart(5)} | ${String(horizon).padStart(7)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.draws).padStart(4)} | ${pct(r.bankrupts).padStart(8)} | ${r.avgTurns.toFixed(0).padStart(5)} | ${r.ratioMid.toFixed(2).padStart(8)} | ${r.ratioEnd.toFixed(2).padStart(9)} | ${r.hexes.toFixed(1).padStart(9)}`,
+      `${String(radius).padStart(6)} | ${String(total).padStart(5)} | ${frac.toFixed(2).padStart(4)} | ${String(incomeHexes).padStart(6)} | ${r.hexes.toFixed(1).padStart(9)} | ${fill.padStart(13)} | ${pct(r.rWins).padStart(7)} | ${pct(r.cWins).padStart(7)} | ${pct(r.bankrupts).padStart(8)} | ${r.netT2.toFixed(1).padStart(5)} | ${r.ratioEnd.toFixed(2).padStart(8)}`,
     );
   }
   console.log('');
