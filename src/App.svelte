@@ -13,6 +13,9 @@
   import { openCouponPosition, type CouponMaturity } from './engine/credit';
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
+  import OrderBookDemo from './OrderBookDemo.svelte';
+
+  let showOrderBookDemo = $state(false);
   import type { GameState, SignalReading } from './engine/state';
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
@@ -818,9 +821,14 @@
           <input type="number" bind:value={seed} min="1" />
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
           <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
+          <button class:active={showOrderBookDemo} onclick={() => (showOrderBookDemo = !showOrderBookDemo)} title="Tester le carnet d'ordres">📒 Carnet</button>
         </section>
       </aside>
     </div>
+
+    {#if showOrderBookDemo}
+      <OrderBookDemo />
+    {/if}
   {/if}
 </main>
 
