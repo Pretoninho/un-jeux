@@ -3,12 +3,13 @@
   // L'ancien jeu (référence) reste accessible via un bouton, sans parasiter cette vue.
   import OrderBookDemo from './OrderBookDemo.svelte';
   import RevenueDemo from './RevenueDemo.svelte';
+  import CampDemo from './CampDemo.svelte';
 
   let { onShowLegacy }: { onShowLegacy: () => void } = $props();
 
   // Une brique visible à la fois : on ne montre que ce qu'on teste.
-  type Brick = 'revenue' | 'orderbook';
-  let brick = $state<Brick>('revenue');
+  type Brick = 'revenue' | 'orderbook' | 'camp';
+  let brick = $state<Brick>('camp');
 </script>
 
 <main>
@@ -18,12 +19,15 @@
   </header>
 
   <nav class="bricks">
+    <button class:active={brick === 'camp'} onclick={() => (brick = 'camp')}>🏕️ Camp / emprunt</button>
     <button class:active={brick === 'revenue'} onclick={() => (brick = 'revenue')}>🏞️ Revenu &amp; agglomération</button>
     <button class:active={brick === 'orderbook'} onclick={() => (brick = 'orderbook')}>📒 Carnet d'ordres</button>
   </nav>
 
   <section class="stage">
-    {#if brick === 'revenue'}
+    {#if brick === 'camp'}
+      <CampDemo />
+    {:else if brick === 'revenue'}
       <RevenueDemo />
     {:else if brick === 'orderbook'}
       <OrderBookDemo />

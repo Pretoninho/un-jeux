@@ -1,23 +1,23 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.34
+> Dernière mise à jour : 2026-06-15 — v1.35
 >
 > 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
 > validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
 > isolée (`*Demo.svelte`).
 >
 > 🖥️ **UI PROPRE — `NewGameView.svelte` est la vue PAR DÉFAUT (2026-06-15)** : aucune interférence de l'ancien
-> jeu. Sélecteur de briques (une à la fois : 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien jeu reste
+> jeu. Sélecteur de briques (une à la fois : 🏕️ Camp / 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien jeu reste
 > accessible via le lien discret *« ancien jeu (référence) → »* (`App.svelte` garde un `mode` 'new'/'legacy',
-> default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 158 tests verts.
+> default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 178 tests verts.
 >
 > | # | Brique | Moteur | Tests | Démo UI | État |
 > | --- | --- | --- | --- | --- | --- |
 > | 1 | **Carnet d'ordres** (éviction = rachat de parts) | `orderbook.ts` | 19 | 📒 `OrderBookDemo` | ✅ |
 > | 2 | **Revenu + agglomération** (income) | `revenue.ts` | 12 | 🏞️ `RevenueDemo` | ✅ |
-> | 3 | **Camp / emprunt** (charge, soldable/permanent) | `camp.ts` (à venir) | — | — | ⏳ suivant |
-> | 4 | **Tick économique** (income − charges → net, faillite) | à venir | — | — | ⏳ |
+> | 3 | **Camp / emprunt** (Tronc A permanent / Tronc B soldable) | `camp.ts` | 20 | 🏕️ `CampDemo` | ✅ |
+> | 4 | **Tick économique** (income − charges → net, faillite) | à venir | — | — | ⏳ suivant |
 > | 5 | **Possession** (un occupant/hex, lie carnet↔revenu) | à venir | — | — | ⏳ |
 >
 > **Carnet (`orderbook.ts`)** : 2 piles visibles bids/asks ; *SI achat ≥ meilleure vente → échange au prix de
@@ -27,6 +27,10 @@
 > surpaie = son coût d'attaque + son risque.
 > **Revenu (`revenue.ts`)** : *possédé → +base ; voisin du même proprio → +bonus/voisin (agglomération) ;
 > libre → 0*. `actorIncome` = somme. Cluster contigu > hexes dispersés (testé). svelte-check 0 erreur.
+> **Camp (`camp.ts`)** : *Tronc A = dette permanente (charge fixe = rate × loanAmount, jamais soldable) ;
+> Tronc B = dette soldable (charge ∝ reliquat, éteinte quand reliquat = 0)*. `campCharge`, `actorCharges`,
+> `repayDebt`, `canRepay`. 20 tests. Démo : alice (Tronc A) / bob (Tronc B), bouton ⏩ Tour +1 déduit les
+> charges, bob peut rembourser et voir sa charge baisser en temps réel.
 > ⚠️ Ces briques sont **autonomes** — pas encore câblées dans une boucle de jeu unifiée (brique 4/5).
 >
 > ✂️ **DÉBRANCHEMENT DE L'ANCIEN MOTEUR — COUPE NETTE À LA BRIQUE 5 (décision 2026-06-15)** : on **ne supprime
