@@ -1,7 +1,7 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.28
+> Dernière mise à jour : 2026-06-15 — v1.29
 >
 > 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
 >
@@ -34,8 +34,22 @@
 > **Ce qui n'est PAS dans ce jeu :** Civ (trop militaire, mauvaise métaphore). Partage de hex (trop complexe,
 > supprimé). Charges cachées ou aléatoires (tout est calculable). Rôle de prêteur donné à un joueur (PNJ, simple).
 >
-> ⚠️ **En suspens :** mécanisme de remboursement de l'emprunt (la charge tombe quand remboursé, ou loyer permanent ?).
-> Conditions de victoire précises. Nombre de camps max par joueur.
+> ⚖️ **AXE D'ÉQUILIBRE income / outcome (2026-06-15)** — le sujet de calibrage central, à tenir :
+> **Income (1 tour)** = revenu liquide, immédiat, sûr (les hexes crachent X/tour). **Outcome (étendu dans le
+> temps)** = paris longs qui coûtent maintenant et paient plus tard (2ᵉ camp, évolution de camp, agglomération).
+> L'équilibre visé : *le rentier qui maximise l'income ne doit pas écraser le conquérant qui investit dans
+> l'outcome, ni l'inverse*. Si l'income gagne toujours → personne n'emprunte, jeu plat. Si l'outcome gagne
+> toujours → course au tapis. → Fait coexister **deux stratégies valides**, qui correspondent pile aux deux
+> conditions de victoire (rentier = être le plus riche ; conquérant = faire couler les autres).
+>
+> 🏁 **FIN & VICTOIRE TRANCHÉES (2026-06-15)** :
+> - ⏱️ **Fin par le TEMPS** — horloge fixe de tours, pas un volume atteint (colle au `horizonTurns` du moteur).
+> - 🏆 **Victoire** : le **plus riche à la fin** OU la **faillite de tous les autres** avant la fin.
+> - 💀 **Faillite** = ne plus pouvoir couvrir ses charges (l'emprunt coule le joueur) = condition d'élimination.
+>
+> ⚠️ **En suspens :** mécanisme de remboursement de l'emprunt (la charge tombe quand remboursé, ou loyer
+> permanent ? — fait partie de l'arbitrage income/outcome). Nombre de camps max par joueur (plus tard).
+> Calibrage des nombres (revenus, charges, prix d'emprunt) pour atteindre l'équilibre income/outcome.
 >
 > 📒 **PISTE COURANTE — CARNET D'ORDRES + MOTIVATION (2026-06-15)** : reprise d'une direction **4X + zéro-sum**
 > (camp de base donnant un revenu ; victoire par **domination du capital** ; acquérir des cases → immo → fait
