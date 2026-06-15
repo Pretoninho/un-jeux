@@ -1,7 +1,19 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.37
+> Dernière mise à jour : 2026-06-15 — v1.38
+>
+> ⚔️ **BRIQUE 5 LIVRÉE — ÉVICTION + GRANDE CARTE (2026-06-15)**, branchée DIRECTEMENT dans le jeu (pas de démo).
+> **Carte agrandie : hexagone rayon 2 = 19 hexes** (cœur à 12, anneau 1 à 9, anneau 2 à 6). Alice et Bob démarrent
+> aux deux bouts opposés et grandissent l'un vers l'autre → vraie frontière contestée. **Éviction (`game.ts`)** :
+> un hex OCCUPÉ se prend en **rachetant la position** de l'occupant. Prix = **revenu courant × evictMultiple (6)**,
+> donc > prix « libre » (×4) : *l'assaillant surpaie* (coût d'attaque, pari sur le revenu futur). Le prix inclut
+> la **prime d'agglomération** → un hex au cœur d'un cluster coûte plus cher à prendre = **résistance visible**
+> (le « siège » est le prix affiché ⚔ sur l'hex adverse). Transfert **zéro-sum** (acheteur paie, occupant encaisse,
+> l'hex change de main — testé : conservation du cash total). **L'IA évince aussi** (un hex adverse adjacent
+> rentable/tour, en gardant 2 tours de charges en réserve). Clic UI : hex 🟢 libre → acheter ; hex 🔴 adverse →
+> évincer ; le mien → rien. `orderbook.ts` (carnet multi-parts) reste en réserve si on veut un jour une enchère
+> fine ; l'éviction one-occupant suffit au modèle « un hex = une place ». `game.test.ts` : 20 tests. 147 verts, check 0.
 >
 > 🎮 **VIRAGE — UN SEUL JEU, PAS DES BRIQUES ISOLÉES (2026-06-15, retour concepteur)**. Erreur corrigée : j'avais
 > fabriqué 4 démos-bacs-à-sable (`*Demo.svelte`) qui ne se parlaient pas, câblées seulement à la fin. Le

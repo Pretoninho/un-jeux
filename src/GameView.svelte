@@ -8,6 +8,7 @@
   import { actorCharges } from './engine/camp';
   import {
     claimCost, canClaim, claimHex, borrow, endTurn, DEFAULT_CONFIG, type GameConfig,
+    evictionCost, canEvict, evict,
   } from './engine/game';
   import { axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
   import type { GameMap, Hex } from './engine/types';
@@ -17,16 +18,24 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Carte : grappe de 7 hexes (centre A + 6 voisins) ──────────────────────────
-  const AXIAL: Array<{ id: string; q: number; r: number; base: number }> = [
-    { id: 'A', q: 0, r: 0, base: 12 },
-    { id: 'B', q: 1, r: 0, base: 8 },
-    { id: 'C', q: 0, r: 1, base: 8 },
-    { id: 'D', q: -1, r: 1, base: 8 },
-    { id: 'E', q: -1, r: 0, base: 8 },
-    { id: 'F', q: 0, r: -1, base: 8 },
-    { id: 'G', q: 1, r: -1, base: 8 },
-  ];
+  // ── Carte : hexagone de rayon 2 = 19 hexes (centre cher, anneaux décroissants) ─
+  const RADIUS = 2;
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const ringDist = (q: number, r: number) => (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
+
+  const AXIAL: Array<{ id: string; q: number; r: number; base: number }> = (() => {
+    const cells: Array<{ id: string; q: number; r: number; base: number }> = [];
+    let i = 0;
+    for (let q = -RADIUS; q <= RADIUS; q++) {
+      for (let r = Math.max(-RADIUS, -q - RADIUS); r <= Math.min(RADIUS, -q + RADIUS); r++) {
+        const d = ringDist(q, r);
+        const base = d === 0 ? 12 : d === 1 ? 9 : 6; // cœur = prix convoité
+        cells.push({ id: LETTERS[i++]!, q, r, base });
+      }
+    }
+    return cells;
+  })();
+
   const DIRS: Array<[number, number]> = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
   function neighborsOf(q: number, r: number): string[] {
     const ids: string[] = [];
@@ -37,7 +46,7 @@
     return ids;
   }
   const MAP: GameMap = {
-    id: 'game7',
+    id: 'game19',
     hexes: AXIAL.map<Hex>((a) => ({
       id: a.id, label: a.id, kind: 'marche',
       neighbors: neighborsOf(a.q, a.r), coord: { q: a.q, r: a.r },
@@ -49,11 +58,18 @@
   };
   const CFG: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: 12 };
 
+  // Bases de départ aux deux bouts opposés → les joueurs grandissent l'un vers l'autre.
+  const ALICE_START = AXIAL.find((a) => a.q === -RADIUS && a.r === 0)!.id;
+  const BOB_START = AXIAL.find((a) => a.q === RADIUS && a.r === 0)!.id;
+
   function initial(): GameStateV2 {
-    return makeGameStateV2(MAP, REV, [
-      makeActorV2('alice', 'Alice (toi)', 50),
-      makeActorV2('bob', 'Bob (IA)', 50),
+    const s = makeGameStateV2(MAP, REV, [
+      makeActorV2('alice', 'Alice (toi)', 70),
+      makeActorV2('bob', 'Bob (IA)', 70),
     ]);
+    s.ownership[ALICE_START] = 'alice';
+    s.ownership[BOB_START] = 'bob';
+    return s;
   }
   let game = $state<GameStateV2>(initial());
   let reports = $state<ActorTickReport[]>([]);
@@ -65,16 +81,23 @@
   function label(id: string) { return game.actors.find((a) => a.id === id)?.label ?? id; }
   const income = (id: string) => actorIncome(id, game.ownership, game.map, game.revenueCfg);
   const hexRev = (hexId: string) => hexRevenue(hexId, game.ownership, game.map, game.revenueCfg);
+  const hexCount = (id: string) => Object.values(game.ownership).filter((o) => o === id).length;
   const charges = (id: string) => actorCharges(id, game.camps);
   const net = (id: string) => actorNet(game, id);
   const human = $derived(game.actors.find((a) => a.id === HUMAN)!);
 
+  const evictCost = (hexId: string) => evictionCost(game, hexId, CFG);
+
   // ── Actions du joueur ─────────────────────────────────────────────────────────
-  function tryClaim(hexId: string) {
+  // Clic sur un hex : LIBRE → l'acheter ; ADVERSE → l'évincer (rachat zéro-sum) ; à moi → rien.
+  function onHex(hexId: string) {
     if (ended) return;
-    if (game.ownership[hexId]) return; // occupé → éviction (brique suivante : carnet)
-    if (!canClaim(game, HUMAN, hexId, CFG)) return;
-    game = claimHex(game, HUMAN, hexId, CFG);
+    const owner = game.ownership[hexId];
+    if (!owner) {
+      if (canClaim(game, HUMAN, hexId, CFG)) game = claimHex(game, HUMAN, hexId, CFG);
+    } else if (owner !== HUMAN) {
+      if (canEvict(game, HUMAN, hexId, CFG)) game = evict(game, HUMAN, hexId, CFG);
+    }
   }
 
   function takeLoan(amount: number) {
@@ -113,6 +136,7 @@
         <span class="score" class:dead={a.bankrupt} style="--c:{COLORS[a.id]}">
           {a.label} <b>💰{a.cash}</b>
           <i class:bad={net(a.id) < 0}>{net(a.id) >= 0 ? '+' : ''}{net(a.id)}/t</i>
+          <i class="hc">⬡{hexCount(a.id)}</i>
         </span>
       {/each}
     </div>
@@ -132,22 +156,27 @@
       {#each game.map.hexes as h (h.id)}
         {@const c = centers[h.id]!}
         {@const owner = game.ownership[h.id]}
-        {@const cost = claimCost(game, h.id, CFG)}
+        {@const isMine = owner === HUMAN}
+        {@const isEnemy = !!owner && owner !== HUMAN}
         {@const claimable = !owner && canClaim(game, HUMAN, h.id, CFG) && !ended}
-        <g class="hex" class:claimable role="button" tabindex="0"
-           onclick={() => tryClaim(h.id)}
-           onkeydown={(e) => e.key === 'Enter' && tryClaim(h.id)}>
+        {@const evictable = isEnemy && canEvict(game, HUMAN, h.id, CFG) && !ended}
+        <g class="hex" class:claimable class:evictable role="button" tabindex="0"
+           onclick={() => onHex(h.id)}
+           onkeydown={(e) => e.key === 'Enter' && onHex(h.id)}>
           <polygon
             points={hexPointsPointy(c[0], c[1])}
             fill={owner ? COLORS[owner] : '#1c2029'}
-            stroke={claimable ? '#5ab0a0' : owner ? '#0e1015' : '#2a2f3a'}
-            stroke-width={claimable ? 3 : 2} />
-          {#if owner}
+            stroke={claimable ? '#5ab0a0' : evictable ? '#e0604a' : owner ? '#0e1015' : '#2a2f3a'}
+            stroke-width={claimable || evictable ? 3 : 2} />
+          {#if isMine}
             <text x={c[0]} y={c[1] - 4} class="hid">{h.id}</text>
             <text x={c[0]} y={c[1] + 10} class="rev">+{hexRev(h.id)}</text>
+          {:else if isEnemy}
+            <text x={c[0]} y={c[1] - 4} class="hid">{h.id}</text>
+            <text x={c[0]} y={c[1] + 10} class="evictc">⚔{evictCost(h.id)}</text>
           {:else}
             <text x={c[0]} y={c[1] - 4} class="hid muted">{h.id}</text>
-            <text x={c[0]} y={c[1] + 10} class="cost">🪙{cost}</text>
+            <text x={c[0]} y={c[1] + 10} class="cost">🪙{claimCost(game, h.id, CFG)}</text>
           {/if}
         </g>
       {/each}
@@ -179,11 +208,12 @@
 
       <div class="hint-box muted small">
         <b>Comment jouer :</b>
-        <div>• Clic sur un hex libre <span style="color:#5ab0a0">vert</span> → l'acheter (coût 🪙)</div>
-        <div>• Emprunte pour avoir le capital de conquérir — mais la charge te suit</div>
-        <div>• <b>Finir le tour</b> → Bob joue, puis chacun encaisse income − charges</div>
+        <div>• Hex libre <span style="color:#5ab0a0">vert</span> 🪙 → l'acheter</div>
+        <div>• Hex de Bob <span style="color:#e0604a">rouge</span> ⚔ → l'<b>évincer</b> (rachat zéro-sum : tu paies, il encaisse, l'hex passe à toi)</div>
+        <div>• Emprunte pour le capital de conquête — mais la charge te suit</div>
+        <div>• <b>Finir le tour</b> → Bob joue (il évince aussi !), puis income − charges</div>
         <div>• Gagne : le plus riche au tour {CFG.horizonTurns}, ou fais couler Bob</div>
-        <div class="warn">⚠️ Emprunte trop sans hexes → charges &gt; income → faillite</div>
+        <div class="warn">⚠️ Un hex au cœur d'un cluster coûte plus cher à prendre (sa prime d'agglo gonfle le prix = résistance visible)</div>
       </div>
 
       {#if reports.length > 0}
@@ -225,12 +255,14 @@
   .layout { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; align-items: start; }
   .map { width: 100%; background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; }
   .hex { cursor: default; }
-  .hex.claimable { cursor: pointer; }
+  .hex.claimable, .hex.evictable { cursor: pointer; }
   .hex.claimable:hover polygon { stroke: #b9f5cf; stroke-width: 4; }
-  .hid { fill: #e6ebf5; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .hex.evictable:hover polygon { stroke: #ff8a6a; stroke-width: 4; }
+  .hid { fill: #e6ebf5; font-size: 11px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .hid.muted { fill: #7a8294; }
-  .rev { fill: #fff; font-size: 11px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-  .cost { fill: #c2a04a; font-size: 10px; text-anchor: middle; pointer-events: none; }
+  .rev { fill: #fff; font-size: 10px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .cost { fill: #c2a04a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .evictc { fill: #ffd0c4; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
 
   .panel { display: flex; flex-direction: column; gap: .8rem; }
   .you { background: #14161c; border: 1px solid #2a2f3a; border-top: 3px solid var(--c); border-radius: 8px; padding: .7rem .8rem; }
