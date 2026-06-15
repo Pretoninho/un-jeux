@@ -2,7 +2,7 @@
 
 > Référence des mécaniques qui **tournent réellement** dans le nouveau jeu (`src/engine/` +
 > `src/GameView.svelte`). À tenir à jour avec le code. Le journal de conception détaillé est dans
-> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.45.
+> `.claude/design-progress.md`. Dernière mise à jour : 2026-06-15 — v1.46.
 >
 > ⚠️ L'ancien jeu (cadre finance : fragility/crisis/regime/credit) reste **runnable comme référence**
 > (lien « ancien jeu → » dans l'UI) mais n'a **rien à voir** avec ce nouveau jeu, bâti sur `GameStateV2`.
@@ -24,9 +24,11 @@ cash < 0 après le tour → FAILLITE (hexes libérés, dette effacée)
 ```
 
 **Tension income/charge** : chaque hex d'income rapporte 6 et coûte un **upkeep** de 3 → ratio unitaire **2:1**
-(l'upkeep plafonne la croissance et tient la tension tout du long). Le **camp de base** (QG sans income, charge 7)
-te met **sous l'eau au départ** → il faut acquérir ~2 hexes pour le couvrir, puis on **progresse** (net positif,
-on accumule pour acheter plus). Le ratio est affiché en jeu.
+(l'upkeep plafonne la croissance et tient la tension tout du long). Le **camp de base** (QG sans income, charge 5)
+te met **sous l'eau au départ** → il faut acquérir ~2 hexes pour le couvrir, puis on **progresse** (net positif
+dès le tour 2, on accumule pour acheter plus). La charge du camp est **adoucie à 5** (au lieu de 7) parce que
+l'income est rare : à 7, deux hexes dispersés (sans agglo) laissaient le net négatif trop longtemps. Le ratio
+est affiché en jeu.
 
 ## Les pièces
 
@@ -50,7 +52,7 @@ on accumule pour acheter plus). Le ratio est affiché en jeu.
 ### Camp de base = QG sans income + dette de départ (fixe)
 - **Posé au départ pour tous** (`foundBaseCamps`). C'est **le 1ᵉʳ et SEUL emprunt** : il donne le **capital de
   lancement** (cash = `baseCampLoan` **70**) **ET** impose sa **charge permanente** (`chargeRate × montant`
-  = 0.10 × 70 = **7/tour**) — surmontable dès ~2 hexes d'income, mais réelle.
+  = 5/70 × 70 = **5/tour**) — surmontable dès ~2 hexes d'income, mais réelle.
 - Son **hex (le QG)** ne rapporte **aucun income** et ne s'agglomère pas → tu démarres avec du cash mais
   une charge qui saigne, sur une case stérile : tu **dois** acquérir des hexes d'income pour la couvrir.
 - Le QG **ne peut pas être évincé** (pas d'ask) et ne paie pas d'upkeep (il porte déjà sa dette).
@@ -93,21 +95,23 @@ charges. (Pas de ré-emprunt : comme le joueur, elle s'étend avec son capital d
 | --- | --- | --- |
 | `horizonTurns` | 20 | durée de partie (allongée pour le grand plateau) |
 | `claimMultiple` | 4 | prix d'un hex libre = base × 4 |
-| `chargeRate` | 0.10 | charge/tour de la dette = taux × emprunt (camp de base = 7/tour) |
-| `baseCampLoan` | 70 | camp de base = 1ᵉʳ emprunt (capital 70 + charge 7/tour) |
+| `chargeRate` | 5/70 | charge/tour de la dette = taux × emprunt (camp de base = 5/tour, rond) |
+| `baseCampLoan` | 70 | camp de base = 1ᵉʳ emprunt (capital 70 + charge 5/tour) |
 | `hexUpkeep` | 3 | upkeep/tour par hex d'income → plafonne la croissance, ratio fin ~2:1 |
 | `askDefaultMultiple` | 12 | ask suggéré = revenu × 12 (éviction viable mais non dominante) |
 | `askFloorMultiple` | 4 | plancher d'un ask = base × 4 |
 
 Revenu de base/hex à income = **6**, agglomération = **+2**/voisin, **incomeFraction ≈ 0.15** (très rare, sur rayon 8 = 217 hexes ; le reste = canevas pour hexes spéciaux à venir).
 
-**Calibrage** : `npx vite-node scripts/balance.ts` (rayon 5, rareté 0.5, horizon 20, 8 placements seedés)
-mesure la **PROGRESSION** — net/tour au tour 2 (doit être > 0, sinon on est *bloqué*), nombre d'hexes en fin
-de partie, ratio income/charge final, faillites. Réglage retenu (`loan 70 / chargeRate 0.10 / upkeep 3`) :
-**netT2 ≈ +10** (on accumule et on continue d'acheter), **~20 hexes** en fin, **ratio fin ≈ 2:1**, **0 % de
-faillite**. Leçon : une charge de base trop forte (×0.20 = 14) **bloque** la progression (net ≈ 0 après 2 hexes) ;
-0.10 (charge 7) la débloque, et l'**upkeep 3** maintient la tension à 2:1 sans laisser le territoire devenir
-gratuit. ⚠️ Bots crus → à valider au playtest.
+**Calibrage** : `npx vite-node scripts/balance.ts` (balaie rayon 6/8/10 × rareté 0.15/0.25/0.35, horizon 20,
+8 placements seedés) mesure la **PROGRESSION** — net/tour au tour 2 (doit être > 0) **et le % de parties
+réellement net-négatives à T2** (la moyenne seule trompe : les bots qui clusterisent la tirent vers le haut).
+Réglage retenu (`loan 70 / chargeRate 5/70 (charge 5) / upkeep 3`, sur **rayon 8 / rareté 0.15**) : **netT2 ≈
++4**, **0 %** de parties net-négatives à T2, **~14 hexes** d'income en fin, **ratio fin ≈ 2:1 (2.07)**, équilibre
+**63/37**, **0 % de faillite**. Leçon : avec l'income **rare**, les hexes sont **dispersés** → pas d'agglo au
+départ → une charge de camp à **7** laissait **63 % des parties net-négatives au tour 2** (blocage ressenti en
+partie). L'adoucir à **5** débloque le début sans casser la tension : chaque hex net = 6 − 3 = +3, deux hexes
+couvrent la charge 5 avec marge. ⚠️ Bots crus → à valider au playtest.
 
 ## Carte des fichiers
 

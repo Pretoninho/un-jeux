@@ -1,7 +1,16 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.45
+> Dernière mise à jour : 2026-06-15 — v1.46
+>
+> 🩹 **DÉBUT NÉGATIF CORRIGÉ (2026-06-15, retour de partie : « income/charge négatif dès le tour 2 »)** : la
+> moyenne netT2 +2.1 du sim était **trompeuse** — les bots qui clusterisent (agglo) la tiraient vers le haut.
+> Ajout au sim de la colonne **% de parties réellement net-négatives à T2** : la config v1.45 (camp charge 7)
+> en donnait **63 %**. Cause : income **rare** (0.15) → hexes **dispersés** → pas d'agglo au départ → 2 hexes
+> (income 12, charge 7+6=13) = net **−1**. Correctif (Option A, choix concepteur, chiffres ronds) : **charge du
+> camp 7 → 5** via `chargeRate 0.10 → 5/70` (capital 70 et upkeep 3 inchangés ; charge affichée = **5** exact).
+> Sim rayon 8 / 0.15 : **netT2 +4.1**, **0 %** net<0 à T2, ratio fin **2.07 (~2:1)**, équilibre 63/37, 0 faillite.
+> Leçon : avec income rare, calibrer sur le **% de parties négatives**, pas la moyenne. 147 tests verts.
 >
 > 🗺️ **TRÈS GRANDE MAP + INCOME TRÈS RARE (2026-06-15, vision concepteur)** : décidé après simulation + consultation
 > (nouveau process : *simuler → montrer les chiffres → l'humain tranche → coder*). **Rayon 8 = 217 hexes**, mais

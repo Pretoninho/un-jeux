@@ -53,7 +53,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   claimMultiple: 4,
   askDefaultMultiple: 12,
   askFloorMultiple: 4,
-  chargeRate: 0.1,
+  chargeRate: 5 / 70, // charge camp = loan(70) × 5/70 = 5/tour (rond). Income rare → camp adouci 7→5
   baseCampLoan: 70,
   hexUpkeep: 3,
 };
