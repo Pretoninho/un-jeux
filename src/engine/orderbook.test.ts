@@ -71,10 +71,10 @@ describe('orderbook — appariement immédiat', () => {
     const { trades } = postOrder(book, order('bob', 'buy', 12, 3), [alice, bob]);
 
     expect(trades).toHaveLength(1);
-    expect(trades[0].price).toBe(10);
-    expect(trades[0].shares).toBe(3);
-    expect(trades[0].buyerId).toBe('bob');
-    expect(trades[0].sellerId).toBe('alice');
+    expect(trades[0]!.price).toBe(10);
+    expect(trades[0]!.shares).toBe(3);
+    expect(trades[0]!.buyerId).toBe('bob');
+    expect(trades[0]!.sellerId).toBe('alice');
   });
 
   it('après échange : lastPrice = prix du trade', () => {
@@ -110,7 +110,7 @@ describe('orderbook — appariement immédiat', () => {
     expect(trades).toHaveLength(0);
     expect(remainder).not.toBeNull();
     expect(book.bids).toHaveLength(1);
-    expect(book.bids[0].price).toBe(10);
+    expect(book.bids[0]!.price).toBe(10);
   });
 });
 
@@ -128,9 +128,9 @@ describe('orderbook — appariement depuis l\'autre sens', () => {
     const { trades } = postOrder(book, order('alice', 'sell', 10, 3), [alice, bob]);
 
     expect(trades).toHaveLength(1);
-    expect(trades[0].price).toBe(12); // prix de l'ordre qui attendait
-    expect(trades[0].buyerId).toBe('bob');
-    expect(trades[0].sellerId).toBe('alice');
+    expect(trades[0]!.price).toBe(12); // prix de l'ordre qui attendait
+    expect(trades[0]!.buyerId).toBe('bob');
+    expect(trades[0]!.sellerId).toBe('alice');
   });
 });
 
@@ -147,10 +147,10 @@ describe('orderbook — remplissage partiel', () => {
     const { trades, remainder } = postOrder(book, order('bob', 'buy', 10, 3), [alice, bob]);
 
     expect(trades).toHaveLength(1);
-    expect(trades[0].shares).toBe(3);
+    expect(trades[0]!.shares).toBe(3);
     expect(remainder).toBeNull(); // l'acheteur est rempli
     expect(book.asks).toHaveLength(1);
-    expect(book.asks[0].shares).toBe(2); // reliquat côté vendeur
+    expect(book.asks[0]!.shares).toBe(2); // reliquat côté vendeur
   });
 
   it('acheteur partiellement rempli : reliquat dans les bids', () => {
@@ -165,11 +165,11 @@ describe('orderbook — remplissage partiel', () => {
     const { trades, remainder } = postOrder(book, order('bob', 'buy', 10, 5), [alice, bob]);
 
     expect(trades).toHaveLength(1);
-    expect(trades[0].shares).toBe(2);
+    expect(trades[0]!.shares).toBe(2);
     expect(remainder).not.toBeNull();
     expect(remainder!.shares).toBe(3);
     expect(book.bids).toHaveLength(1);
-    expect(book.bids[0].shares).toBe(3);
+    expect(book.bids[0]!.shares).toBe(3);
   });
 });
 
@@ -209,9 +209,9 @@ describe('orderbook — ordres multiples et tri du carnet', () => {
     const { trades } = postOrder(book, order('bob', 'buy', 20, 2), [alice, bob]);
 
     expect(trades).toHaveLength(1);
-    expect(trades[0].price).toBe(10);
+    expect(trades[0]!.price).toBe(10);
     expect(book.asks).toHaveLength(1);
-    expect(book.asks[0].price).toBe(15); // l'autre reste
+    expect(book.asks[0]!.price).toBe(15); // l'autre reste
   });
 });
 

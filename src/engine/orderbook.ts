@@ -144,7 +144,7 @@ export function postOrder(
 
     // Appariement : parcourt les asks du moins cher au plus cher
     while (remaining > 0 && book.asks.length > 0) {
-      const bestAsk = book.asks[0];
+      const bestAsk = book.asks[0]!;
       if (bestAsk.price > order.price) break; // plus de croisement possible
 
       const fill = Math.min(remaining, bestAsk.shares);
@@ -172,7 +172,7 @@ export function postOrder(
 
     // Appariement : parcourt les bids du plus cher au moins cher
     while (remaining > 0 && book.bids.length > 0) {
-      const bestBid = book.bids[0];
+      const bestBid = book.bids[0]!;
       if (bestBid.price < order.price) break;
 
       const fill = Math.min(remaining, bestBid.shares);
@@ -224,7 +224,7 @@ export function cancelOrder(book: OrderBook, orderId: string): boolean {
 /** Prix affiché : dernier échange, ou meilleure offre disponible, ou null. */
 export function displayPrice(book: OrderBook): number | null {
   if (book.lastPrice !== null) return book.lastPrice;
-  if (book.asks.length > 0) return book.asks[0].price;
-  if (book.bids.length > 0) return book.bids[0].price;
+  if (book.asks.length > 0) return book.asks[0]!.price;
+  if (book.bids.length > 0) return book.bids[0]!.price;
   return null;
 }

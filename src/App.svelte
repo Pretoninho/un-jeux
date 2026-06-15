@@ -14,8 +14,10 @@
   import { trackRecord } from './engine/score';
   import { makeRng, type Rng } from './engine/rng';
   import OrderBookDemo from './OrderBookDemo.svelte';
+  import RevenueDemo from './RevenueDemo.svelte';
 
   let showOrderBookDemo = $state(false);
+  let showRevenueDemo = $state(false);
   import type { GameState, SignalReading } from './engine/state';
   import type { Hex } from './engine/types';
   import type { Policy } from './engine/policy';
@@ -822,12 +824,16 @@
           <button onclick={() => newGame(seed)}>Nouvelle partie</button>
           <button class:active={debug} title="Révéler l'état caché (F, ancres)" onclick={() => (debug = !debug)}>🐞</button>
           <button class:active={showOrderBookDemo} onclick={() => (showOrderBookDemo = !showOrderBookDemo)} title="Tester le carnet d'ordres">📒 Carnet</button>
+          <button class:active={showRevenueDemo} onclick={() => (showRevenueDemo = !showRevenueDemo)} title="Tester le revenu + agglomération">🏞️ Revenu</button>
         </section>
       </aside>
     </div>
 
     {#if showOrderBookDemo}
       <OrderBookDemo />
+    {/if}
+    {#if showRevenueDemo}
+      <RevenueDemo />
     {/if}
   {/if}
 </main>

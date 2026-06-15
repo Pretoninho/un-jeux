@@ -160,7 +160,7 @@
         {/if}
         <div class="spread muted small">
           {#if book.asks.length > 0 && book.bids.length > 0}
-            spread : {book.asks[0].price - book.bids[0].price}
+            spread : {book.asks[0]!.price - book.bids[0]!.price}
           {/if}
         </div>
       </div>
