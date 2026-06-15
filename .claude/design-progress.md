@@ -1,7 +1,35 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-14 — v1.26
+> Dernière mise à jour : 2026-06-15 — v1.27
+>
+> 📒 **PISTE COURANTE — CARNET D'ORDRES + MOTIVATION (2026-06-15)** : reprise d'une direction **4X + zéro-sum**
+> (camp de base donnant un revenu ; victoire par **domination du capital** ; acquérir des cases → immo → fait
+> croître le revenu). **Décision validée** : le **prix de TOUTES les cases-marché** passe par un **carnet d'ordres
+> visible** (remplace la formule de prix abstraite à terme). Le **zéro-sum** est posé comme **règle** (pas tout à
+> fait un primitif).
+>
+> ✅ **LIVRÉ — `src/engine/orderbook.ts` (module pur + 19 tests) + démo UI** : carnet par hexe, deux piles visibles
+> (bids/asks). **SI→ALORS** : *SI offre d'achat ≥ meilleure vente → échange au prix de l'ordre qui ATTENDAIT ;
+> SINON → l'ordre entre dans le carnet, visible de tous ; prix affiché = dernier échange.* Transfert atomique
+> cash↔parts, **long-only** (refus si vendeur sans parts / acheteur sans cash), parts/prix **entiers**, reliquat
+> partiel, tri (asks↑/bids↓), annulation. **Conservation de la richesse totale testée = zéro-sum prouvé.** Démo
+> jouable : bouton **📒 Carnet** (bas du panneau de contrôle) → `OrderBookDemo.svelte`, sandbox 2 acteurs/1 hexe,
+> sans toucher la boucle de jeu. Build OK, 19 tests verts. ⏭️ Câblage moteur (remplacer `resolveMarket`) = ensuite.
+>
+> 🍎 **MOTIVATION — l'analogie de la pomme (2026-06-15, EN COURS, non tranché)** : le concepteur pointe que le
+> carnet seul = **chaises musicales pures** (seule motivation d'achat = revendre au pigeon suivant / greater fool).
+> Pour une vraie motivation, deux ancres tirées d'un marché réel : **(1) coût de production = un PLANCHER sous le
+> prix** (la pomme coûte 5 → on ne vend pas durablement sous 5 ; mappe sur l'**ancre `A`** déjà dans le moteur,
+> à rendre visible/concrète) ; **(2) la demande = quelqu'un doit VOULOIR le bien** (point dur : en finance
+> l'acheteur **revend** au lieu de **consommer** → la seule demande native est l'espoir de revente). **Reco
+> posée** : empiler **socle PRODUCTIF** (posséder des cases qui crachent un **revenu**/tour → richesse ; prix
+> ancré sur le revenu, *A = revenu × multiple*) + **surcouche SPÉCULATIVE** (le prix s'envole au-dessus de la
+> juste valeur puis s'effondre dessus = la fête + le krach). Décision devient un fait calculable : *« produit
+> 8/t → juste valeur ≈ 80 ; coté 140 → je paie 60 d'air → krach me ramène à 80 → je vends. »* **EN SUSPENS** :
+> d'où vient le revenu (« qui mange les pommes ») — (a) injection contrôlée PNJ/marché [défaut raisonnable
+> proposé], (b) transfert entre joueurs = zéro-sum strict, (c) hybride prod injecte / krach détruit. Concepteur
+> a fermé la question sans trancher → **on continue à réfléchir**. ⚠️ Conflit revenu↔zéro-sum toujours ouvert.
 >
 > 🔒 **CLÔTURE — verrou de périmètre (2026-06-14, §9bis)** : FERMER (1 PA) + clôture partielle exigent d'être
 > SUR l'hexe / ADJACENT / MÊME CLUSTER pour agir (sinon 🔒 hors de portée). Asymétrie voulue vs ouverture
