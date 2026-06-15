@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { makeGameStateV2, makeActorV2, type GameStateV2 } from './state2';
-import { claimCost, canClaim, claimHex, borrow, aiTurn, endTurn, type GameConfig } from './game';
+import {
+  claimCost, canClaim, claimHex, borrow, aiTurn, endTurn,
+  evictionCost, canEvict, evict, type GameConfig,
+} from './game';
 import type { GameMap } from './types';
 import type { RevenueConfig } from './revenue';
 
@@ -13,7 +16,7 @@ const MAP: GameMap = {
   ],
 };
 const CFG: RevenueConfig = { baseByHex: { A: 10, B: 10, C: 10 }, agglomerationBonus: 5 };
-const GAME: GameConfig = { horizonTurns: 12, claimMultiple: 4, chargeRate: 0.1 };
+const GAME: GameConfig = { horizonTurns: 12, claimMultiple: 4, evictMultiple: 6, chargeRate: 0.1 };
 
 function fresh(aliceCash = 100, bobCash = 100): GameStateV2 {
   return makeGameStateV2(MAP, CFG, [
@@ -65,6 +68,53 @@ describe('game — emprunter', () => {
   it('borrow sans effet si montant ≤ 0', () => {
     const s0 = fresh();
     expect(borrow(s0, 'alice', 0, 'A', GAME)).toBe(s0);
+  });
+});
+
+describe('game — éviction (brique 5)', () => {
+  it('coût d\'éviction = revenu courant × evictMultiple (agglomération comprise)', () => {
+    let s = claimHex(fresh(200, 0), 'alice', 'A', GAME);
+    s = claimHex(s, 'alice', 'B', GAME); // A et B contigus → B vaut 10 + 5 = 15
+    expect(evictionCost(s, 'B', GAME)).toBe(90); // 15 × 6
+  });
+
+  it('canEvict faux si hex libre', () => {
+    expect(canEvict(fresh(), 'alice', 'A', GAME)).toBe(false);
+  });
+
+  it('canEvict faux si hex déjà à moi', () => {
+    const s = claimHex(fresh(200), 'alice', 'A', GAME);
+    expect(canEvict(s, 'alice', 'A', GAME)).toBe(false);
+  });
+
+  it('canEvict vrai si hex adverse + cash suffisant', () => {
+    const s = claimHex(fresh(0, 100), 'bob', 'A', GAME); // bob possède A (revenu 10 → coût 60)
+    const s2 = { ...s, actors: s.actors.map((a) => a.id === 'alice' ? { ...a, cash: 100 } : a) };
+    expect(canEvict(s2, 'alice', 'A', GAME)).toBe(true);
+  });
+
+  it('canEvict faux si cash insuffisant', () => {
+    const s = claimHex(fresh(30, 100), 'bob', 'A', GAME); // coût 60, alice n'a que 30
+    expect(canEvict(s, 'alice', 'A', GAME)).toBe(false);
+  });
+
+  it('evict : zéro-sum (acheteur paie, occupant encaisse) + l\'hex change de main', () => {
+    let s = claimHex(fresh(100, 100), 'bob', 'A', GAME); // bob: 100−40=60, possède A
+    const cost = evictionCost(s, 'A', GAME); // 10 × 6 = 60
+    const totalBefore = s.actors.reduce((sum, a) => sum + a.cash, 0);
+
+    s = evict(s, 'alice', 'A', GAME);
+
+    expect(s.ownership['A']).toBe('alice');
+    expect(s.actors.find((a) => a.id === 'alice')!.cash).toBe(100 - cost);
+    expect(s.actors.find((a) => a.id === 'bob')!.cash).toBe(60 + cost);
+    const totalAfter = s.actors.reduce((sum, a) => sum + a.cash, 0);
+    expect(totalAfter).toBe(totalBefore); // conservation = zéro-sum
+  });
+
+  it('evict sans effet si interdit (immuable)', () => {
+    const s0 = fresh(); // A libre
+    expect(evict(s0, 'alice', 'A', GAME)).toBe(s0);
   });
 });
 
