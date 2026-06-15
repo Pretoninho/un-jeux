@@ -1,12 +1,12 @@
 <script lang="ts">
   // LE JEU — vue unique jouable, sur GameStateV2. Carte plate 37 hexes, camp de base
   // posé au départ, carnet d'ordres (chaque achat force un ordre de vente), éviction = payer l'ask.
-  import { makeFlatBoard } from './engine/board';
+  import { makeBoard } from './engine/board';
   import { makeGameStateV2, makeActorV2, type GameStateV2 } from './engine/state2';
   import { actorNet, actorTotalCharges, checkEnd, type ActorTickReport } from './engine/tick';
-  import { actorIncome, hexRevenue, isCampHex, type RevenueConfig } from './engine/revenue';
+  import { actorIncome, hexRevenue, isCampHex } from './engine/revenue';
   import {
-    claimCost, canClaim, claimHex, borrow, foundBaseCamps,
+    claimCost, canClaim, claimHex, foundBaseCamps,
     defaultAsk, askFloor, setAsk, evictionCost, canEvict, evict, netWorth, endTurn,
     DEFAULT_CONFIG, type GameConfig,
   } from './engine/game';
@@ -16,24 +16,23 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Plateau plat 37 hexes (rayon 3), revenu de base = 6 ; 2 coins = QG (0 income) ──
-  const RADIUS = 3;
-  const BOARD = makeFlatBoard(RADIUS, 6, 2);
-  const CFG: GameConfig = { ...DEFAULT_CONFIG };
-  // Les deux coins deviennent les QG : aucun income, pas d'agglomération.
-  const REV: RevenueConfig = {
-    ...BOARD.rev,
-    baseByHex: { ...BOARD.rev.baseByHex, [BOARD.corners[0]]: 0, [BOARD.corners[1]]: 0 },
-    campHexes: [BOARD.corners[0], BOARD.corners[1]],
-  };
+  // ── Grand plateau rayon 5 = 91 hexes ; hexes à income RARES (≈ la moitié) ; 2 coins = QG ──
+  const RADIUS = 5;
+  const INCOME_FRACTION = 0.5;   // rareté : seule la moitié des cases produit un revenu
+  const GEO = makeBoard(RADIUS, 6, 2, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
+  // Mêmes proportions économiques ; horizon allongé pour remplir le plus grand plateau.
+  const CFG: GameConfig = { ...DEFAULT_CONFIG, horizonTurns: 20 };
+
+  let seed = $state(Math.floor(Math.random() * 1e9)); // un plateau différent à chaque partie
 
   function initial(): GameStateV2 {
-    let s = makeGameStateV2(BOARD.map, REV, [
+    const board = makeBoard(RADIUS, 6, 2, INCOME_FRACTION, seed);
+    let s = makeGameStateV2(board.map, board.rev, [
       makeActorV2('alice', 'Alice (toi)', 0),
       makeActorV2('bob', 'Bob (IA)', 0),
     ], CFG.hexUpkeep);
-    s.ownership[BOARD.corners[0]] = 'alice'; // QG d'Alice
-    s.ownership[BOARD.corners[1]] = 'bob';   // QG de Bob
+    s.ownership[board.corners[0]] = 'alice'; // QG d'Alice
+    s.ownership[board.corners[1]] = 'bob';   // QG de Bob
     s = foundBaseCamps(s, CFG); // camp de base = 1ᵉʳ emprunt (capital + charge), QG sans income
     return s;
   }
@@ -101,12 +100,6 @@
     pending = { hexId, price: game.asks[hexId] ?? defaultAsk(game, hexId, CFG) };
   }
 
-  function takeLoan(amount: number) {
-    if (ended || blocked) return;
-    game = borrow(game, HUMAN, amount, CFG);
-    log(`🏦 Emprunt +${amount} (charge +${Math.round(amount * CFG.chargeRate)}/tour)`);
-  }
-
   function finishTurn() {
     if (ended || blocked) return;
     const res = endTurn(game, [AI], CFG);
@@ -119,12 +112,15 @@
   }
 
   function restart() {
+    seed = Math.floor(Math.random() * 1e9); // nouveau plateau
     game = initial(); reports = []; journal = []; pending = null;
   }
 
-  // ── Layout pixel ──────────────────────────────────────────────────────────────
+  const baseOf = (id: string) => game.revenueCfg.baseByHex[id] ?? 0;
+
+  // ── Layout pixel (géométrie fixe) ──────────────────────────────────────────────
   const centers: Record<string, [number, number]> = {};
-  for (const h of BOARD.map.hexes) centers[h.id] = axialToPixel(h.coord!.q, h.coord!.r);
+  for (const h of GEO.map.hexes) centers[h.id] = axialToPixel(h.coord!.q, h.coord!.r);
   const bnds = genBounds(Object.values(centers));
   const viewBox = `${bnds.minX.toFixed(1)} ${bnds.minY.toFixed(1)} ${bnds.w.toFixed(1)} ${bnds.h.toFixed(1)}`;
 
@@ -165,6 +161,7 @@
         {@const camp = isCamp(h.id)}
         {@const isMine = owner === HUMAN}
         {@const isEnemy = !!owner && owner !== HUMAN}
+        {@const barren = !owner && !camp && baseOf(h.id) === 0}
         {@const claimable = !owner && canClaim(game, HUMAN, h.id, CFG) && !ended && !blocked}
         {@const evictable = isEnemy && canEvict(game, HUMAN, h.id) && !ended && !blocked}
         {@const editable = isMine && !camp && !ended && !blocked}
@@ -174,7 +171,7 @@
            onkeydown={(e) => e.key === 'Enter' && onHex(h.id)}>
           <polygon
             points={hexPointsPointy(c[0], c[1], 26)}
-            fill={owner ? COLORS[owner] : '#171a22'}
+            fill={owner ? COLORS[owner] : barren ? '#0e1014' : '#1d2330'}
             stroke={isPending ? '#ffd479' : claimable ? '#5ab0a0' : evictable ? '#e0604a' : owner ? '#0e1015' : '#262b36'}
             stroke-width={isPending || claimable || evictable ? 3 : 1.5} />
           {#if camp && owner}
@@ -186,6 +183,8 @@
           {:else if isEnemy}
             <text x={c[0]} y={c[1] + 2} class="rev">+{hexRev(h.id)}</text>
             <text x={c[0]} y={c[1] + 13} class="evictc">⚔{evictionCost(game, h.id)}</text>
+          {:else if barren}
+            <text x={c[0]} y={c[1] + 4} class="barren">·</text>
           {:else}
             <text x={c[0]} y={c[1] + 4} class="cost">🪙{claimCost(game, h.id, CFG)}</text>
           {/if}
@@ -206,21 +205,17 @@
           <div><span>Ratio I/C</span><b class:bad={ratio(HUMAN) < 1}>{ratio(HUMAN).toFixed(2)}:1</b></div>
           <div><span>Net / tour</span><b class:bad={net(HUMAN) < 0}>{net(HUMAN) >= 0 ? '+' : ''}{net(HUMAN)}</b></div>
         </div>
-        <div class="muted small tip2">⬡ {hexCount(HUMAN)} hex d'income · upkeep {CFG.hexUpkeep}/hex · tension visée ~2:1</div>
+        <div class="muted small tip2">⬡ {hexCount(HUMAN)} hex d'income (rares !) · upkeep {CFG.hexUpkeep}/hex · cases grises = stériles (0 revenu)</div>
       </section>
 
       <!-- CAMPS -->
       <section class="card">
         <h3>Camp de base (dette)</h3>
         <div class="muted small">
-          {game.camps.filter((c) => c.ownerId === HUMAN).length} camp(s) ·
           dette {game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.debtRemaining, 0)} ·
-          charge dette −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
+          charge −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
         </div>
-        <div class="loan-btns">
-          <button onclick={() => takeLoan(80)} disabled={ended || blocked}>Emprunter +80 <i>(−{Math.round(80 * CFG.chargeRate)}/t)</i></button>
-          <button onclick={() => takeLoan(150)} disabled={ended || blocked}>+150 <i>(−{Math.round(150 * CFG.chargeRate)}/t)</i></button>
-        </div>
+        <div class="muted small tip2">Dette fixe : pas de ré-emprunt. Ton seul levier est d'acquérir des hexes d'income pour couvrir cette charge.</div>
       </section>
 
       <!-- CARNET D'ORDRES -->
@@ -307,6 +302,7 @@
   .ask { fill: #cfe0ff; font-size: 8px; text-anchor: middle; pointer-events: none; }
   .evictc { fill: #ffd0c4; font-size: 8px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .cost { fill: #c2a04a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .barren { fill: #3a4150; font-size: 12px; text-anchor: middle; pointer-events: none; }
   .qg { font-size: 13px; text-anchor: middle; pointer-events: none; }
   .qgl { fill: #fff; font-size: 8px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .tip2 { margin-top: .4rem; }
@@ -324,11 +320,6 @@
   .neg { color: #e07a3a; }
   .bad { color: #e05050; }
 
-  .loan-btns { display: flex; gap: .4rem; margin-top: .5rem; }
-  .loan-btns button { flex: 1; background: #1a1e28; border: 1px solid #3a4050; color: #cdd3df; border-radius: 5px; padding: .35rem; cursor: pointer; font-size: .78rem; }
-  .loan-btns button i { font-style: normal; color: #e08a5a; font-size: .68rem; }
-  .loan-btns button:hover:not(:disabled) { border-color: #5a8090; }
-  .loan-btns button:disabled { opacity: .4; cursor: not-allowed; }
 
   .asks { display: flex; flex-direction: column; gap: .25rem; max-height: 160px; overflow: auto; }
   .ask-row { display: flex; align-items: baseline; gap: .5rem; background: #1a1e28; border: 1px solid #2a2f3a; border-radius: 5px; padding: .3rem .5rem; cursor: pointer; text-align: left; color: #cdd3df; font-size: .8rem; }
