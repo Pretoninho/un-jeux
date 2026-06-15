@@ -25,15 +25,13 @@ function hexId(q: number, r: number): string {
 
 /**
  * Plateau hexagonal de rayon `radius`.
- *  - `base`             : revenu d'un hex à income.
- *  - `agglomerationBonus` : prime par voisin du même propriétaire.
- *  - `incomeFraction`   : part des cases (hors QG) qui produisent un revenu (rareté).
- *  - `seed`             : graine du placement (reproductible).
+ *  - `base`           : revenu d'un hex à income.
+ *  - `incomeFraction` : part des cases (hors QG) qui produisent un revenu (rareté).
+ *  - `seed`           : graine du placement (reproductible).
  */
 export function makeBoard(
   radius: number,
   base: number,
-  agglomerationBonus: number,
   incomeFraction: number,
   seed: number,
 ): Board {
@@ -94,13 +92,13 @@ export function makeBoard(
 
   return {
     map: { id: `board-r${radius}`, hexes },
-    rev: { baseByHex, agglomerationBonus, campHexes: corners },
+    rev: { baseByHex, campHexes: corners },
     corners,
     incomeHexes: [...incomeSet],
   };
 }
 
-/** Plateau « tout income » (rétro-compat / cas dégénéré incomeFraction = 1). */
-export function makeFlatBoard(radius: number, base: number, agglomerationBonus: number): Board {
-  return makeBoard(radius, base, agglomerationBonus, 1, 0);
+/** Plateau « tout income » (cas dégénéré incomeFraction = 1). */
+export function makeFlatBoard(radius: number, base: number): Board {
+  return makeBoard(radius, base, 1, 0);
 }

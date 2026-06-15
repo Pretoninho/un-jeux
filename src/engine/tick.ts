@@ -1,31 +1,21 @@
-// Tick économique (brique 4) — la PREMIÈRE boucle qui relie les briques entre elles.
+// Tick économique — la boucle qui relie revenu et charges.
 //
-// C'est ici que revenu (brique 2) et charges des camps (brique 3) se rencontrent :
-//   net/tour = income(hexes + agglomération) − charges(camps)
+//   net/tour = income(hexes possédés) − charges(camps)
 //
 // SI→ALORS du tour :
 //   1. chaque acteur encaisse son income, paie ses charges → cash += net
 //   2. SI cash < 0 après le tour → FAILLITE (éliminé, ses hexes redeviennent libres)
 //
-// Module PUR : prend un GameStateV2, rend un NOUVEAU GameStateV2 (immuable) + un rapport
+// Module PUR : prend un GameState, rend un NOUVEAU GameState (immuable) + un rapport
 // par acteur. Aucune mutation en place → testable, rejouable, déterministe.
 
-import type { GameStateV2, ActorV2 } from './state2';
-import { actorIncome, isCampHex } from './revenue';
+import type { GameState, Actor } from './state';
+import { actorIncome } from './revenue';
 import { actorCharges } from './camp';
 
-/** Nombre d'hexes d'INCOME (hors QG) possédés par un acteur — base de l'upkeep. */
-function incomeHexCount(state: GameStateV2, actorId: string): number {
-  let n = 0;
-  for (const h of state.map.hexes) {
-    if (state.ownership[h.id] === actorId && !isCampHex(h.id, state.revenueCfg)) n++;
-  }
-  return n;
-}
-
-/** Charge totale d'un acteur/tour = charges des camps (dette) + upkeep × hexes d'income. */
-export function actorTotalCharges(state: GameStateV2, actorId: string): number {
-  return actorCharges(actorId, state.camps) + state.hexUpkeep * incomeHexCount(state, actorId);
+/** Charge totale d'un acteur/tour = charges des camps (dette permanente). */
+export function actorTotalCharges(state: GameState, actorId: string): number {
+  return actorCharges(actorId, state.camps);
 }
 
 /** Bilan d'un acteur pour un tour. */
@@ -41,12 +31,12 @@ export interface ActorTickReport {
 }
 
 export interface TickResult {
-  state: GameStateV2;
+  state: GameState;
   reports: ActorTickReport[];
 }
 
-/** Income net d'un acteur ce tour = revenu des hexes − charges totales (camps + upkeep). */
-export function actorNet(state: GameStateV2, actorId: string): number {
+/** Income net d'un acteur ce tour = revenu des hexes − charges totales. */
+export function actorNet(state: GameState, actorId: string): number {
   const income = actorIncome(actorId, state.ownership, state.map, state.revenueCfg);
   return income - actorTotalCharges(state, actorId);
 }
@@ -56,11 +46,11 @@ export function actorNet(state: GameStateV2, actorId: string): number {
  * Un acteur dont le cash devient négatif fait faillite : il est marqué `bankrupt`,
  * ses hexes redeviennent libres, ses camps sont retirés (la dette meurt avec lui).
  */
-export function tick(state: GameStateV2): TickResult {
+export function tick(state: GameState): TickResult {
   const reports: ActorTickReport[] = [];
   const newlyBankrupt = new Set<string>();
 
-  const actors: ActorV2[] = state.actors.map((a) => {
+  const actors: Actor[] = state.actors.map((a) => {
     if (a.bankrupt) {
       // Déjà éliminé : on le laisse tel quel, pas de rapport.
       return a;
@@ -88,14 +78,12 @@ export function tick(state: GameStateV2): TickResult {
     return { ...a, cash: cashAfter };
   });
 
-  // Libère les hexes (+ leurs ordres de vente) et purge les camps des acteurs coulés.
+  // Libère les hexes et purge les camps des acteurs coulés.
   const ownership = { ...state.ownership };
-  const asks = { ...state.asks };
   if (newlyBankrupt.size > 0) {
     for (const id of Object.keys(ownership)) {
       if (ownership[id] && newlyBankrupt.has(ownership[id]!)) {
         ownership[id] = null;
-        delete asks[id];
       }
     }
   }
@@ -104,13 +92,13 @@ export function tick(state: GameStateV2): TickResult {
     : state.camps;
 
   return {
-    state: { ...state, turn: state.turn + 1, actors, ownership, camps, asks },
+    state: { ...state, turn: state.turn + 1, actors, ownership, camps },
     reports,
   };
 }
 
 /**
- * Conditions de fin (brique 4, version minimale) :
+ * Conditions de fin :
  *   - 'last_standing' : un seul acteur encore en vie → il gagne.
  *   - 'time'          : l'horloge a atteint `horizonTurns` → le plus riche gagne.
  *   - null            : la partie continue.
@@ -127,7 +115,7 @@ export interface EndStatus {
  * pour que l'emprunt ne soit pas de l'argent gratuit (cf. game.ts `netWorth`).
  */
 export function checkEnd(
-  state: GameStateV2,
+  state: GameState,
   horizonTurns: number,
   wealthOf: (actorId: string) => number = (id) => state.actors.find((a) => a.id === id)?.cash ?? 0,
 ): EndStatus {

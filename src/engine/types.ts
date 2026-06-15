@@ -1,193 +1,21 @@
-// Types du domaine — traduction de la spec §11bis (« tout est données »).
-// Aucun import DOM/Svelte ici : ce module doit rester testable sans navigateur.
-
-// ───────────────────────── Carte (memo §11, spec §4) ─────────────────────────
+// Types du domaine — la carte. Aucun import DOM/Svelte : testable sans navigateur.
 
 export type HexId = string;
 
-/** Cluster de corrélation (facteur C, memo §25.1). */
-export type Cluster = 'credit' | 'actions' | 'alternatifs';
-
+/** Nature d'une case (le canevas stérile servira au futur champ de bataille). */
 export type HexKind = 'marche' | 'noeud' | 'frontiere';
-
-/** Type de nœud stratégique (non-investissable, memo §11). */
-export type NodeType = 'reglementaire' | 'liquidite' | 'information';
 
 export interface Hex {
   id: HexId;
   label: string;
   kind: HexKind;
-  /** Présent pour les hexes marché et frontière. */
-  cluster?: Cluster;
-  /** Présent pour les nœuds. */
-  nodeType?: NodeType;
-  /**
-   * Charges factorielles (memo §25.1). Ce sont des CONNAISSANCES STRUCTURELLES :
-   * le joueur les connaît (§4.4) ; ce sont les réalisations de M/C/F qui sont cachées.
-   */
-  beta?: number; // exposition au facteur marché M
-  gamma?: number; // exposition au facteur cluster C
-  /** Portage par tour (memo §25.5). */
-  carry?: number;
-  /**
-   * Contraintes d'illiquidité (spec immobilier) — données, posées sur l'hexe :
-   *  - `longOnly` : interdit le short (on ne short pas un immeuble).
-   *  - `illiquid` : la sortie de position est bloquée pendant `lockupTurns` (param tiré
-   *    par instance). Couple naturellement avec un carry élevé = prime d'illiquidité.
-   * Un archétype avec `ignoreLockup` échappe au verrou. Pas de levier sur ces hexes.
-   */
-  longOnly?: boolean;
-  illiquid?: boolean;
-  /** Adjacence = corrélation (memo §11). Doit être symétrique (testé). */
+  /** Adjacence. Doit être symétrique. */
   neighbors: HexId[];
-  /** Coordonnées axiales (q, r) — présentes pour les cartes générées (géométrie =
-   * adjacence). Ignorées par le moteur, utilisées par l'UI pour le pavage. */
+  /** Coordonnées axiales (q, r) — géométrie = adjacence, utilisées par l'UI pour le pavage. */
   coord?: { q: number; r: number };
 }
 
 export interface GameMap {
   id: string;
   hexes: Hex[];
-}
-
-// ──────────────────── Profils : pool unifié humain/IA (memo §16) ─────────────
-
-/** Un archétype jouable. Données pures — aucun comportement câblé dans le moteur. */
-export interface Archetype {
-  id: string;
-  /** Référence de développement interne (Buffett, Soros…) — jamais affichée en jeu. */
-  refDev: string;
-  /** Nom in-game. */
-  label: string;
-  resource: { id: string; label: string };
-  /** Part du capital placée en réserve sèche au départ (0..1). */
-  startingReserveRatio: number;
-  startingHex: HexId;
-  /** Pouvoir d'archétype : échappe au verrou d'illiquidité (sortie immédiate, spec immo). */
-  ignoreLockup?: boolean;
-  /**
-   * Pouvoir d'archétype : fait SAUTER le verrou de PÉRIMÈTRE de clôture (memo §9bis). Par défaut,
-   * agir sur une position détenue (FERMER / clôture partielle) exige d'être « assez proche » : SUR
-   * l'hexe, ADJACENT, ou dans le MÊME CLUSTER — au-delà, on est trop loin pour piloter la sortie.
-   * Un acteur porteur de ce trait clôture N'IMPORTE OÙ sur la carte (desk de trading à distance).
-   * Latent pour l'instant : aucun archétype ne l'a → c'est le HOOK qu'une compétence fera sauter.
-   */
-  ignoreClosePerimeter?: boolean;
-  /**
-   * Compétence active « Récolte » (Vautour) : coûte `paCost` PA, multiplie le carry encaissé
-   * (positions V + coupons) par `factor` pendant `duration` tours, puis indisponible `cooldown`
-   * tours (réutilisable au tour activation + duration + cooldown). Mesuré équilibré à
-   * factor 2 / duration 2 / cooldown 12 (top1 ~40 %). Donnée pure — pas codé en dur.
-   */
-  carrySkill?: { factor: number; duration: number; cooldown: number; paCost: number };
-  /**
-   * Compétence défensive « Couverture » (Vautour, armer + auto-tir) : coûte `paCost` PA pour
-   * ARMER ; reste armée `window` tours ; tant qu'armée, les coupons de l'acteur ne défaillent
-   * pas (l'auto-tir « consomme » la fenêtre quand une crise frappe). Puis cooldown. La fenêtre
-   * `window` est le pari : trop courte = il faut viser le krach, trop longue = assurance trop sûre.
-   */
-  coverSkill?: { window: number; cooldown: number; paCost: number };
-  /**
-   * Contrainte permanente de cadre (Vautour, §6) : capital patient → JAMAIS de levier. Friction :
-   * il ne peut pas amplifier le boom comme le fonds leveragé → sous-performe les marchés haussiers.
-   */
-  noLeverage?: boolean;
-  /**
-   * Ressource « Réserve sèche » (Vautour, §10) : +1 par tour PATIENT (sans ouvrir de position-V),
-   * plafonnée à `max`. Dépensée à l'ouverture en HAUTE FRAGILITÉ (F > `fThreshold`) pour une DÉCOTE
-   * d'entrée (`discountPerPowder`/unité, plafond `maxDiscount`) → « déploiement massif dans le krach »
-   * (achat décoté au creux). La contrainte `noLeverage` paie le pouvoir de cette ressource (net neutre).
-   */
-  dryPowder?: { max: number; discountPerPowder: number; maxDiscount: number; fThreshold: number };
-  /**
-   * Pouvoir du Sismographe (§6, macro) : voit la FRAGILITÉ `F` cachée (jauge sismique innée) —
-   * exclusif (les autres n'ont que les signaux bruités). Lentille sur la physique neutre (§26).
-   */
-  fragilityGauge?: boolean;
-  /**
-   * Contrainte du Sismographe : « fragile au calme » = thêta de couverture. Ponction de richesse
-   * par tour TANT QU'AUCUNE crise n'est active (les couvertures permanentes décaient dans le boom,
-   * paient au krach). Fraction de la richesse/tour. Paie l'edge de la jauge (mesuré neutre à ~0.005).
-   */
-  calmTheta?: number;
-}
-
-/**
- * Fonction de réaction d'une IA (memo §16) — PARAMÈTRES en données, interprétés
- * par une politique générique (engine/ai.ts). Ajouter une IA = un jeu de params.
- */
-export interface AIBehavior {
-  /** Ce qui déclenche un achat : suivre la hausse, ou acheter la décote. */
-  entrySignal: 'momentum' | 'value';
-  /** Levier maximal utilisé (0 = jamais de levier). */
-  leverageAppetite: number;
-  /** Seuil de risque PERÇU (volatilité bruitée) au-delà duquel l'IA cesse/réduit. */
-  riskTolerance: number;
-  /** Vitesse de désengagement quand le risque perçu est haut (bas = « trop tard »). */
-  deRiskRate: number;
-  /** Fraction du cash déployée par action. */
-  sizing: number;
-  /** Décote minimale (V sous l'ancre estimée) pour acheter — entrée 'value'. */
-  decoteThreshold: number;
-  /**
-   * Reach-for-yield (spec crédit-coupons §8) : propension/tour, en période calme, à
-   * chasser le coupon le plus juteux (HY long). 0 ou absent = ignore le crédit. Sa
-   * contribution à la fragilité ÉMERGE du crowding crédit (portfolio.ts), pas codée en dur.
-   */
-  couponAppetite?: number;
-}
-
-/**
- * Un profil d'adversaire IA. `kind: 'archetype'` = version IA d'un archétype
- * jouable ; `kind: 'pur'` = acteur de marché sans condition de victoire (memo §16).
- */
-export interface ProfilIA {
-  id: string;
-  label: string;
-  kind: 'archetype' | 'pur';
-  /** Paramètres de la fonction de réaction (memo §16). Absent = reste en réserve. */
-  behavior?: AIBehavior;
-}
-
-// ───────────────────── Configuration d'une partie (spec §11bis) ──────────────
-
-/**
- * Toute partie — jouée ou simulée — se décrit par cet objet. La partie MVP
- * auto-configurée n'est qu'un preset par défaut (spec §3). Le `seed` rend chaque
- * partie reproductible : prérequis des tests anti-script de J7.
- */
-export interface ConfigPartie {
-  archetype: Archetype;
-  adversaires: ProfilIA[];
-  carte: GameMap;
-  seed: number;
-  /**
-   * Surcharge optionnelle de paramètres d'instance, appliquée APRÈS le tirage seedé.
-   * Sert au calibrage/expérience (ex. fixer `bcMeetingEvery`) sans perturber le flux
-   * du monde ni la reproductibilité. Absent = partie 100 % tirée du seed.
-   */
-  paramsOverride?: Partial<import('./params').InstanceParams>;
-}
-
-// ──────────────────── Catalogue d'actions (memo §9, §9bis) ───────────────────
-
-/** Verbes du MVP (les 5 du jeu complet moins CONSTRUIRE/NÉGOCIER). */
-export type Verbe = 'LIRE' | 'POSITIONNER' | 'RESERVER';
-
-/** Opérations de POSITIONNER (memo §9bis). */
-export type PositionOp = 'ouvrir' | 'renforcer' | 'cloture_partielle' | 'fermer';
-
-/**
- * Définition d'une action. Le coût est un intervalle [paMin, paMax] : fixe quand
- * paMin === paMax, variable selon l'impact-prix sinon (memo §9bis). C'est de la
- * donnée — les coûts se règlent sans toucher au moteur (calibrage J7).
- */
-export interface ActionDef {
-  id: string;
-  verbe: Verbe;
-  /** Présent uniquement pour POSITIONNER. */
-  op?: PositionOp;
-  label: string;
-  paMin: number;
-  paMax: number;
 }

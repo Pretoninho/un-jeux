@@ -1,63 +1,54 @@
 # un-jeux
 
-4X économique atemporel : le joueur incarne un allocateur de capital. Jeu web,
-solo-first. La conception vit dans `docs/`, le suivi dans `.claude/design-progress.md`.
+Jeu web tour par tour, solo-first. **Cœur actuel** : une économie territoriale minimale
+sur grille hexagonale — on acquiert des hexes d'income, on couvre la charge de sa dette de
+base, et le plus riche en valeur nette à l'horizon gagne.
 
-## ▶️ Lancer le jeu (frontend)
+**Direction** : fusionner cette base économique avec une couche de **combat tactique au tour
+par tour** (inspiration *Divinity: Original Sin* — points d'action, surfaces élémentaires,
+combos). La prise d'un hex adverse se fera par le combat, pas par l'économie — c'est pourquoi
+le cœur a été ramené à l'essentiel (voir l'historique dans `.claude/design-progress.md`).
 
-**Prérequis** : Node.js 18+ et npm (déjà présents dans le Codespace).
+> ⚠️ Le précédent prototype (4X financier : fragilité/crises/crédit) a été retiré du code lors
+> de la simplification — il reste dans l'historique git. Les docs `docs/*` antérieures à ce
+> virage sont conservées comme **référence historique**.
+
+## ▶️ Lancer le jeu
+
+**Prérequis** : Node.js 18+ et npm.
 
 ```bash
-# 1. Installer les dépendances (une seule fois, ou après un git pull qui en ajoute)
-npm install
-
-# 2. Lancer le frontend en mode développement
-npm run dev
+npm install      # une seule fois (ou après un pull qui ajoute des deps)
+npm run dev      # démarre Vite → http://localhost:5173/
 ```
 
-`npm run dev` démarre **Vite** et affiche une URL dans le terminal, du type :
-
-```
-  ➜  Local:   http://localhost:5173/
-```
-
-- **En local** : ouvre cette URL dans ton navigateur.
-- **En Codespace GitHub** : un bandeau « Port 5173 » apparaît → clique **« Ouvrir dans le navigateur »** (ou onglet *Ports* → ouvre le port 5173). Le jeu s'ouvre dans un onglet.
-
-Le serveur **recharge à chaud** : à chaque sauvegarde de fichier, la page se met à jour toute seule. Après un `git pull`, si l'affichage semble figé, **arrête (`Ctrl+C`) et relance** `npm run dev`, puis recharge la page (`Ctrl+Shift+R`).
-
-> ⚠️ Lance toujours `npm run dev` **depuis le dossier du repo** (`/workspaces/un-jeux` en Codespace). En cas de doute : `cd /workspaces/un-jeux` d'abord.
-
-## 🧪 Autres commandes
+## 🧪 Commandes
 
 ```bash
 npm test         # suite de tests du moteur (engine) — doit rester verte
 npm run build    # build de production (vérifie que tout compile)
-npm run check    # vérification de types Svelte/TS (optionnel)
+npm run check    # vérification de types Svelte/TS
 ```
-
-## État du projet
-
-- **Design** : cœur économique complet et audité (memo `docs/game-design-memo.md`).
-- **Code** : moteur jouable (J1→J4) + UI (J5). Un **prototype d'exploration** est à
-  l'essai (carte générée, brouillard, CHAIN, profil neutre, long/short). Voir §30 du memo.
 
 ## Principes portés par le code
 
-- **Moteur découplé** : `src/engine/` est du TS pur (aucun DOM) → testable headless, simulable.
-- **Tout est données** : archétypes, profils IA et cartes vivent dans `src/data/` (interchangeables).
-- **Anti-script structurel** : RNG seedé + paramètres en plages tirées par instance →
-  les phénomènes émergent, rien n'est câblé ni scénarisé.
+- **Moteur découplé** : `src/engine/` est du TS pur (aucun DOM) → testable headless.
+- **Modules purs et immuables** : chaque action rend un nouvel état (rejouable, déterministe).
 
 ## Structure
 
 ```
 src/
-├── engine/   # TS pur : état, moteur de prix, jauge, cascade, signaux, IA, score, harness (+ tests)
-├── data/     # cartes (fixe + générateur), profils (neutre, archétypes), IA, presets
-└── App.svelte + lib/   # UI (le joueur humain est une Policy alimentée par l'UI)
+├── engine/   # TS pur
+│   ├── types.ts     # la carte (Hex, GameMap)
+│   ├── rng.ts       # générateur seedé
+│   ├── board.ts     # génération du plateau hexagonal (income rare, symétrique)
+│   ├── revenue.ts   # income par hex
+│   ├── camp.ts      # dette de base (charge permanente)
+│   ├── state.ts     # état de partie
+│   ├── tick.ts      # boucle économique (income − charges, faillite, fin de partie)
+│   └── game.ts      # actions jouables (acquérir, emprunter, IA, valeur nette)
+├── lib/      # helpers UI (layout hexagonal)
+├── GameView.svelte  # LE jeu (carte + panneaux)
+└── App.svelte + main.ts  # coquille
 ```
-
-## Jalons (voir `docs/mvp-spec.md` §12)
-
-J1 squelette ✅ · J2 moteur + harness ✅ · J3 cascade ✅ · J4 IA ✅ · J5 UI ✅ · J6 post-mortem · J7 calibrage.

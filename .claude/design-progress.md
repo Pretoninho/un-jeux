@@ -1,5 +1,29 @@
 # Suivi de conception — Jeu 4X Investissement
 
+> 🔀 **VIRAGE DE DIRECTION + GRANDE SIMPLIFICATION (2026-06-15) — lire en premier.**
+> Décision concepteur : viser un **MOBA tour par tour**, par **fusion** de l'économie
+> territoriale existante avec une couche de **combat tactique** (inspiration *Divinity:
+> Original Sin* — points d'action, surfaces élémentaires, combos). Avant de greffer le combat,
+> on a **simplifié à fond** :
+> - 🗑️ **Ancien jeu finance SUPPRIMÉ du code** (moteur fragilité/crises/régime/crédit/signaux/
+>   score/IA/simulate + données archétypes/profils/cartes + ~1 731 lignes de scripts de
+>   calibrage + branche legacy d'`App.svelte` + démos). Tout reste dans l'historique git.
+> - ✂️ **Cœur éco ramené à l'essentiel** (« trim maximal ») : retirés l'**éviction par carnet
+>   d'ordres** (asks/ask par défaut/plancher — le combat remplacera la prise d'un hex adverse),
+>   l'**upkeep par hex** et le **bonus d'agglomération**. Reste : possession d'hexes → income,
+>   **camp de base = dette permanente**, **valeur nette** = victoire, faillite si charges non
+>   couvertes. Un hex occupé n'est plus achetable (placeholder du combat à venir).
+> - 🧹 **Polish structurel** : `state2.ts → state.ts` (types `GameStateV2→GameState`,
+>   `ActorV2→Actor`), passe-plat `NewGameView` fusionné dans `App.svelte`, `orderbook`/
+>   `map-utils` retirés, `types.ts` réduit au domaine carte.
+> - ✅ **État après coupe** : `src/` = 14 fichiers (vs ~50), **19 tests verts**, svelte-check 0,
+>   build OK. Moteur vivant : `board · revenue · camp · state · tick · game · rng · types`.
+> - 📌 Les notes finance ci-dessous + `docs/*` (hors `nouveau-jeu.md`) sont **historiques**.
+>
+> ---
+>
+> # (Historique finance ci-dessous — conservé pour référence)
+>
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
 > Dernière mise à jour : 2026-06-15 — v1.46
 >

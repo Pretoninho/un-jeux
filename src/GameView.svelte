@@ -1,13 +1,16 @@
 <script lang="ts">
-  // LE JEU — vue unique jouable, sur GameStateV2. Carte plate 37 hexes, camp de base
-  // posé au départ, carnet d'ordres (chaque achat force un ordre de vente), éviction = payer l'ask.
+  // LE JEU — vue unique jouable, sur GameState. Carte hexagonale, camp de base posé au
+  // départ. Cœur économique nu : on acquiert des hexes d'income LIBRES, on couvre la charge
+  // de sa dette de base, et le plus riche en valeur nette à l'horizon gagne.
+  //
+  // La prise d'un hex ADVERSE se fera par le COMBAT (couche à venir) — pas d'éviction
+  // économique ici. Les ~185 cases stériles sont le canevas réservé au champ de bataille.
   import { makeBoard } from './engine/board';
-  import { makeGameStateV2, makeActorV2, type GameStateV2 } from './engine/state2';
+  import { makeGameState, makeActor, type GameState } from './engine/state';
   import { actorNet, actorTotalCharges, checkEnd, type ActorTickReport } from './engine/tick';
   import { actorIncome, hexRevenue, isCampHex } from './engine/revenue';
   import {
-    claimCost, canClaim, claimHex, foundBaseCamps,
-    defaultAsk, askFloor, setAsk, evictionCost, canEvict, evict, netWorth, endTurn,
+    claimCost, canClaim, claimHex, foundBaseCamps, netWorth, endTurn,
     DEFAULT_CONFIG, type GameConfig,
   } from './engine/game';
   import { axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
@@ -16,36 +19,33 @@
   const AI = 'bob';
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
 
-  // ── Très grande map rayon 8 = 217 hexes ; hexes à income TRÈS RARES (~0.15) ──────
-  //    Le reste (~185 cases stériles) = canevas réservé aux futurs HEXES SPÉCIAUX.
+  // ── Grande map rayon 8 = 217 hexes ; hexes à income TRÈS RARES (~0.15) ──────────
+  //    Le reste (~185 cases stériles) = canevas réservé au futur champ de bataille.
   const RADIUS = 8;
   const INCOME_FRACTION = 0.15;  // income très rare : ~32 hexes à income sur 217
-  const GEO = makeBoard(RADIUS, 6, 2, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
+  const GEO = makeBoard(RADIUS, 6, 1, 0); // géométrie fixe (mêmes coords quel que soit le seed)
   const CFG: GameConfig = { ...DEFAULT_CONFIG }; // horizon 20 inclus dans DEFAULT_CONFIG
 
   let seed = $state(Math.floor(Math.random() * 1e9)); // un plateau différent à chaque partie
 
-  function initial(): GameStateV2 {
-    const board = makeBoard(RADIUS, 6, 2, INCOME_FRACTION, seed);
-    let s = makeGameStateV2(board.map, board.rev, [
-      makeActorV2('alice', 'Alice (toi)', 0),
-      makeActorV2('bob', 'Bob (IA)', 0),
-    ], CFG.hexUpkeep);
+  function initial(): GameState {
+    const board = makeBoard(RADIUS, 6, INCOME_FRACTION, seed);
+    let s = makeGameState(board.map, board.rev, [
+      makeActor('alice', 'Alice (toi)', 0),
+      makeActor('bob', 'Bob (IA)', 0),
+    ]);
     s.ownership[board.corners[0]] = 'alice'; // QG d'Alice
     s.ownership[board.corners[1]] = 'bob';   // QG de Bob
     s = foundBaseCamps(s, CFG); // camp de base = 1ᵉʳ emprunt (capital + charge), QG sans income
     return s;
   }
 
-  let game = $state<GameStateV2>(initial());
+  let game = $state<GameState>(initial());
   let reports = $state<ActorTickReport[]>([]);
   let journal = $state<string[]>([]);
-  // Ordre de vente en attente de validation (carnet) : { hexId, prix saisi }.
-  let pending = $state<{ hexId: string; price: number } | null>(null);
 
   const end = $derived(checkEnd(game, CFG.horizonTurns, (id) => netWorth(game, id, CFG)));
   const ended = $derived(end.ended);
-  const blocked = $derived(pending !== null); // tant qu'un ordre n'est pas validé, on bloque
 
   function label(id: string) { return game.actors.find((a) => a.id === id)?.label ?? id; }
   const income = (id: string) => actorIncome(id, game.ownership, game.map, game.revenueCfg);
@@ -57,51 +57,21 @@
   const hexRev = (hexId: string) => hexRevenue(hexId, game.ownership, game.map, game.revenueCfg);
   const isCamp = (hexId: string) => isCampHex(hexId, game.revenueCfg);
   const human = $derived(game.actors.find((a) => a.id === HUMAN)!);
-  // hexes d'income possédés (le QG est exclu du carnet : il n'a pas d'ask)
-  const myHexes = $derived(game.map.hexes.filter((h) => game.ownership[h.id] === HUMAN && !isCamp(h.id)));
 
   function log(msg: string) { journal = [msg, ...journal].slice(0, 8); }
 
-  // ── Clic sur un hex : libre → acheter ; adverse → évincer ; puis ordre de vente ─
+  // ── Clic sur un hex : libre → acheter. Adverse/mien → rien (le combat viendra). ─
   function onHex(hexId: string) {
-    if (ended || blocked) return;
-    const owner = game.ownership[hexId];
-    if (!owner) {
-      if (!canClaim(game, HUMAN, hexId, CFG)) return;
-      const cost = claimCost(game, hexId, CFG);
-      game = claimHex(game, HUMAN, hexId, CFG);
-      log(`🪙 Achat de ${hexId} (−${cost})`);
-      openOrder(hexId);
-    } else if (owner === HUMAN) {
-      // mon hex d'income → ajuster son ordre de vente (le QG n'a pas d'ask)
-      if (!isCamp(hexId)) editOrder(hexId);
-    } else {
-      if (!canEvict(game, HUMAN, hexId)) return;
-      const cost = evictionCost(game, hexId);
-      game = evict(game, HUMAN, hexId, CFG);
-      log(`⚔ Éviction de ${hexId} (−${cost} à ${label(owner)})`);
-      openOrder(hexId);
-    }
-  }
-
-  // Ouvre la demande d'ordre de vente OBLIGATOIRE (le moteur a déjà mis un défaut).
-  function openOrder(hexId: string) {
-    pending = { hexId, price: game.asks[hexId] ?? defaultAsk(game, hexId, CFG) };
-  }
-  function validateOrder() {
-    if (!pending) return;
-    game = setAsk(game, HUMAN, pending.hexId, pending.price, CFG);
-    log(`📒 Ordre de vente ${pending.hexId} à ${game.asks[pending.hexId]}`);
-    pending = null;
-  }
-  // Réajuster l'ask d'un hex déjà possédé (depuis le carnet).
-  function editOrder(hexId: string) {
-    if (ended || blocked) return;
-    pending = { hexId, price: game.asks[hexId] ?? defaultAsk(game, hexId, CFG) };
+    if (ended) return;
+    if (game.ownership[hexId]) return; // occupé : pas de prise économique (combat à venir)
+    if (!canClaim(game, HUMAN, hexId, CFG)) return;
+    const cost = claimCost(game, hexId, CFG);
+    game = claimHex(game, HUMAN, hexId, CFG);
+    log(`🪙 Achat de ${hexId} (−${cost})`);
   }
 
   function finishTurn() {
-    if (ended || blocked) return;
+    if (ended) return;
     const res = endTurn(game, [AI], CFG);
     game = res.state;
     reports = res.reports;
@@ -113,7 +83,7 @@
 
   function restart() {
     seed = Math.floor(Math.random() * 1e9); // nouveau plateau
-    game = initial(); reports = []; journal = []; pending = null;
+    game = initial(); reports = []; journal = [];
   }
 
   const baseOf = (id: string) => game.revenueCfg.baseByHex[id] ?? 0;
@@ -123,11 +93,9 @@
   for (const h of GEO.map.hexes) centers[h.id] = axialToPixel(h.coord!.q, h.coord!.r);
   const bnds = genBounds(Object.values(centers));
   const viewBox = `${bnds.minX.toFixed(1)} ${bnds.minY.toFixed(1)} ${bnds.w.toFixed(1)} ${bnds.h.toFixed(1)}`;
-
-  const floor = $derived(pending ? askFloor(game, pending.hexId, CFG) : 0);
 </script>
 
-<div class="game" class:blocked>
+<div class="game">
   <!-- Bandeau : tour + valeur nette des joueurs -->
   <div class="topbar">
     <div class="turn">Tour <b>{game.turn}</b>/{CFG.horizonTurns}</div>
@@ -141,7 +109,7 @@
         </span>
       {/each}
     </div>
-    <button class="end-turn" onclick={finishTurn} disabled={ended || blocked}>Finir le tour ⏩</button>
+    <button class="end-turn" onclick={finishTurn} disabled={ended}>Finir le tour ⏩</button>
   </div>
 
   {#if ended}
@@ -162,27 +130,22 @@
         {@const isMine = owner === HUMAN}
         {@const isEnemy = !!owner && owner !== HUMAN}
         {@const barren = !owner && !camp && baseOf(h.id) === 0}
-        {@const claimable = !owner && canClaim(game, HUMAN, h.id, CFG) && !ended && !blocked}
-        {@const evictable = isEnemy && canEvict(game, HUMAN, h.id) && !ended && !blocked}
-        {@const editable = isMine && !camp && !ended && !blocked}
-        {@const isPending = pending?.hexId === h.id}
-        <g class="hex" class:claimable class:evictable class:editable role="button" tabindex="0"
+        {@const claimable = !owner && canClaim(game, HUMAN, h.id, CFG) && !ended}
+        <g class="hex" class:claimable role="button" tabindex="0"
            onclick={() => onHex(h.id)}
            onkeydown={(e) => e.key === 'Enter' && onHex(h.id)}>
           <polygon
             points={hexPointsPointy(c[0], c[1], 26)}
             fill={owner ? COLORS[owner] : barren ? '#0e1014' : '#1d2330'}
-            stroke={isPending ? '#ffd479' : claimable ? '#5ab0a0' : evictable ? '#e0604a' : owner ? '#0e1015' : '#262b36'}
-            stroke-width={isPending || claimable || evictable ? 3 : 1.5} />
+            stroke={claimable ? '#5ab0a0' : owner ? '#0e1015' : '#262b36'}
+            stroke-width={claimable ? 3 : 1.5} />
           {#if camp && owner}
             <text x={c[0]} y={c[1] - 1} class="qg">🏕</text>
             <text x={c[0]} y={c[1] + 12} class="qgl">QG</text>
           {:else if isMine}
-            <text x={c[0]} y={c[1] + 2} class="rev">+{hexRev(h.id)}</text>
-            <text x={c[0]} y={c[1] + 13} class="ask">📒{game.asks[h.id]}</text>
+            <text x={c[0]} y={c[1] + 4} class="rev">+{hexRev(h.id)}</text>
           {:else if isEnemy}
-            <text x={c[0]} y={c[1] + 2} class="rev">+{hexRev(h.id)}</text>
-            <text x={c[0]} y={c[1] + 13} class="evictc">⚔{evictionCost(game, h.id)}</text>
+            <text x={c[0]} y={c[1] + 4} class="rev">+{hexRev(h.id)}</text>
           {:else if barren}
             <text x={c[0]} y={c[1] + 4} class="barren">·</text>
           {:else}
@@ -192,7 +155,7 @@
       {/each}
     </svg>
 
-    <!-- Panneaux (façon ancien jeu : sections denses) -->
+    <!-- Panneaux -->
     <aside class="panel">
       <!-- TOI -->
       <section class="card" style="--c:{COLORS[HUMAN]}">
@@ -205,68 +168,30 @@
           <div><span>Ratio I/C</span><b class:bad={ratio(HUMAN) < 1}>{ratio(HUMAN).toFixed(2)}:1</b></div>
           <div><span>Net / tour</span><b class:bad={net(HUMAN) < 0}>{net(HUMAN) >= 0 ? '+' : ''}{net(HUMAN)}</b></div>
         </div>
-        <div class="muted small tip2">⬡ {hexCount(HUMAN)} hex d'income (rares !) · upkeep {CFG.hexUpkeep}/hex · cases grises = stériles (0 revenu)</div>
+        <div class="muted small tip2">⬡ {hexCount(HUMAN)} hex d'income (rares !) · cases grises = stériles (canevas du futur champ de bataille)</div>
       </section>
 
-      <!-- CAMPS -->
+      <!-- CAMP -->
       <section class="card">
         <h3>Camp de base (dette)</h3>
         <div class="muted small">
-          dette {game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.debtRemaining, 0)} ·
-          charge −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + (c.chargePerTurn ?? c.chargeRate * c.loanAmount), 0)}/tour
+          dette {game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.loanAmount, 0)} ·
+          charge −{game.camps.filter((c) => c.ownerId === HUMAN).reduce((s, c) => s + c.chargeRate * c.loanAmount, 0)}/tour
         </div>
-        <div class="muted small tip2">Dette fixe : pas de ré-emprunt. Ton seul levier est d'acquérir des hexes d'income pour couvrir cette charge.</div>
-      </section>
-
-      <!-- CARNET D'ORDRES -->
-      <section class="card">
-        <h3>📒 Carnet d'ordres (tes prix de sortie)</h3>
-        {#if myHexes.length === 0}
-          <div class="muted small">Aucun hex. Achète une case sur la carte.</div>
-        {:else}
-          <div class="asks">
-            {#each myHexes as h (h.id)}
-              <button class="ask-row" onclick={() => editOrder(h.id)} disabled={ended || blocked}>
-                <span class="hid">{h.id}</span>
-                <span class="muted small">rev +{hexRev(h.id)}</span>
-                <b>📒 {game.asks[h.id]}</b>
-              </button>
-            {/each}
-          </div>
-          <div class="muted small tip">Clic (ici ou sur la carte) = ajuster ton prix de sortie, à tout moment. Plus l'ask est haut, plus tu résistes — mais l'éviction reste possible si l'adversaire paie.</div>
-        {/if}
+        <div class="muted small tip2">Dette fixe : ton seul levier est d'acquérir des hexes d'income pour couvrir cette charge.</div>
       </section>
 
       <!-- JOURNAL -->
       <section class="card">
         <h3>Journal</h3>
         {#if journal.length === 0}
-          <div class="muted small">Achète une case, emprunte, puis finis le tour.</div>
+          <div class="muted small">Achète une case d'income (libre, en vert), puis finis le tour.</div>
         {:else}
           {#each journal as j}<div class="jrow small">{j}</div>{/each}
         {/if}
       </section>
     </aside>
   </div>
-
-  <!-- Modale OBLIGATOIRE : poser l'ordre de vente après un achat / une éviction -->
-  {#if pending}
-    {@const hid = pending.hexId}
-    <div class="modal-bg">
-      <div class="modal">
-        <h3>📒 Place ton ordre de vente — {hid}</h3>
-        <p class="muted small">
-          Tu viens de prendre <b>{hid}</b> (revenu +{hexRev(hid)}/tour). Déclare ton <b>prix de sortie</b> :
-          c'est ce que l'adversaire devra payer pour t'évincer. Plancher {floor}.
-        </p>
-        <div class="modal-input">
-          <input type="number" min={floor} bind:value={pending.price} />
-          <span class="muted small">défaut suggéré : {defaultAsk(game, hid, CFG)}</span>
-        </div>
-        <button class="validate" onclick={validateOrder}>Valider l'ordre ✓</button>
-      </div>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -294,13 +219,9 @@
   .layout { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; align-items: start; }
   .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; }
   .hex { cursor: default; }
-  .hex.claimable, .hex.evictable, .hex.editable { cursor: pointer; }
+  .hex.claimable { cursor: pointer; }
   .hex.claimable:hover polygon { stroke: #b9f5cf; stroke-width: 4; }
-  .hex.evictable:hover polygon { stroke: #ff8a6a; stroke-width: 4; }
-  .hex.editable:hover polygon { stroke: #cfe0ff; stroke-width: 3; }
   .rev { fill: #fff; font-size: 10px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-  .ask { fill: #cfe0ff; font-size: 8px; text-anchor: middle; pointer-events: none; }
-  .evictc { fill: #ffd0c4; font-size: 8px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .cost { fill: #c2a04a; font-size: 9px; text-anchor: middle; pointer-events: none; }
   .barren { fill: #3a4150; font-size: 12px; text-anchor: middle; pointer-events: none; }
   .qg { font-size: 13px; text-anchor: middle; pointer-events: none; }
@@ -320,26 +241,8 @@
   .neg { color: #e07a3a; }
   .bad { color: #e05050; }
 
-
-  .asks { display: flex; flex-direction: column; gap: .25rem; max-height: 160px; overflow: auto; }
-  .ask-row { display: flex; align-items: baseline; gap: .5rem; background: #1a1e28; border: 1px solid #2a2f3a; border-radius: 5px; padding: .3rem .5rem; cursor: pointer; text-align: left; color: #cdd3df; font-size: .8rem; }
-  .ask-row:hover:not(:disabled) { border-color: #5a8090; }
-  .ask-row:disabled { opacity: .5; cursor: not-allowed; }
-  .ask-row .hid { font-weight: 700; min-width: 34px; }
-  .ask-row b { margin-left: auto; color: #cfe0ff; }
-  .tip { margin-top: .4rem; }
-
   .jrow { padding: .12rem 0; border-bottom: 1px solid #1a1e28; color: #9aa3b5; }
 
   .muted { color: #7a8294; }
   .small { font-size: .76rem; }
-
-  .modal-bg { position: fixed; inset: 0; background: rgba(8,9,12,.72); display: flex; align-items: center; justify-content: center; z-index: 10; }
-  .modal { background: #161922; border: 1px solid #ffd479; border-radius: 10px; padding: 1.2rem 1.4rem; max-width: 380px; }
-  .modal h3 { margin: 0 0 .5rem; font-size: 1rem; }
-  .modal p { margin: 0 0 .8rem; line-height: 1.5; }
-  .modal-input { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; }
-  .modal-input input { background: #0f1117; border: 1px solid #3a4050; color: #e6ebf5; border-radius: 5px; padding: .45rem .6rem; width: 110px; font-size: 1rem; }
-  .validate { background: #1f3a2e; border: 1px solid #5ab0a0; color: #b9f5cf; border-radius: 6px; padding: .5rem 1rem; cursor: pointer; font-weight: 600; width: 100%; }
-  .validate:hover { background: #244538; }
 </style>
