@@ -14,20 +14,22 @@
 
 import type { GameMap, HexId } from './types';
 
-/** Une pièce : à qui elle est, où elle est, ses PV, ses PA du tour. */
+/**
+ * Une pièce : à qui elle est, où elle est, ses PV/PA, et son PROFIL d'attaque
+ * (portée/dégâts/coût). Le profil vit sur la pièce — voir engine/pieces.ts pour
+ * la dérivation depuis le palier de portée (calibrage « portée + robustesse = 5 »).
+ */
 export interface Unit {
   id: string;
   owner: string;
   hex: HexId;
   hp: number;
+  maxHp: number;
   ap: number;
-}
-
-/** Réglages d'attaque (données → réglables sans toucher la logique). */
-export interface AttackConfig {
-  range: number;  // portée (1 = corps-à-corps / adjacent)
-  cost: number;   // coût en PA
-  damage: number; // dégâts infligés
+  range: number;      // portée d'attaque (1 = adjacent)
+  damage: number;     // dégâts par coup
+  attackCost: number; // coût en PA d'une attaque
+  kind: string;       // clé d'archétype (affichage)
 }
 
 export interface CombatState {
@@ -134,26 +136,30 @@ export function graphDistance(map: GameMap, from: HexId, to: HexId): number {
   return Infinity;
 }
 
-/** `attackerId` (du camp actif) peut-il attaquer `targetId` (adverse, à portée, assez de PA) ? */
-export function canAttack(state: CombatState, attackerId: string, targetId: string, cfg: AttackConfig): boolean {
+/**
+ * `attackerId` (du camp actif) peut-il attaquer `targetId` ? Cible adverse, dans la portée
+ * DE L'ATTAQUANT, et assez de PA pour son coût d'attaque.
+ */
+export function canAttack(state: CombatState, attackerId: string, targetId: string): boolean {
   const attacker = unitById(state, attackerId);
   const target = unitById(state, targetId);
   if (!attacker || attacker.owner !== state.active) return false;
   if (!target || target.owner === state.active) return false;
-  if (attacker.ap < cfg.cost) return false;
-  return graphDistance(state.map, attacker.hex, target.hex) <= cfg.range;
+  if (attacker.ap < attacker.attackCost) return false;
+  return graphDistance(state.map, attacker.hex, target.hex) <= attacker.range;
 }
 
 /**
- * `attackerId` attaque `targetId` : inflige `cfg.damage`, dépense `cfg.cost` PA de l'attaquant.
+ * `attackerId` attaque `targetId` : inflige les dégâts de l'attaquant, dépense son coût en PA.
  * Une cible à 0 PV ou moins quitte le plateau. Sans effet si l'attaque est illégale.
  */
-export function attack(state: CombatState, attackerId: string, targetId: string, cfg: AttackConfig): CombatState {
-  if (!canAttack(state, attackerId, targetId, cfg)) return state;
+export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
+  if (!canAttack(state, attackerId, targetId)) return state;
+  const attacker = unitById(state, attackerId)!;
   const units = state.units
     .map((u) => {
-      if (u.id === attackerId) return { ...u, ap: u.ap - cfg.cost };
-      if (u.id === targetId) return { ...u, hp: u.hp - cfg.damage };
+      if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
+      if (u.id === targetId) return { ...u, hp: u.hp - attacker.damage };
       return u;
     })
     .filter((u) => u.hp > 0);

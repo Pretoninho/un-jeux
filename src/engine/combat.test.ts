@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeCombatState, reachable, moveUnit, attack, canAttack, endTurn, winner,
-  unitAt, unitById, graphDistance, activeUnits, type CombatState, type AttackConfig,
+  unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
 
@@ -16,13 +16,20 @@ const LINE: GameMap = {
     { id: 'E', label: 'E', kind: 'marche', neighbors: ['D'] },
   ],
 };
-const ATK: AttackConfig = { range: 1, cost: 2, damage: 4 };
+
+// Fabrique une pièce de test. Défauts : portée 1, dégâts 4, attaque à 2 PA.
+function u(partial: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit {
+  return {
+    hp: 10, maxHp: 10, ap: 10, range: 1, damage: 4, attackCost: 2, kind: 'test',
+    ...partial,
+  };
+}
 
 // 1v1 par défaut (alice 'a' vs bob 'b').
 function fresh(aliceHex = 'A', bobHex = 'E', ap = 10, hp = 10): CombatState {
   return makeCombatState(LINE, [
-    { id: 'a', owner: 'alice', hex: aliceHex, hp, ap },
-    { id: 'b', owner: 'bob', hex: bobHex, hp, ap },
+    u({ id: 'a', owner: 'alice', hex: aliceHex, hp, ap }),
+    u({ id: 'b', owner: 'bob', hex: bobHex, hp, ap }),
   ], 'alice');
 }
 
@@ -68,9 +75,9 @@ describe('combat/déplacement — appliquer + coût en PA', () => {
 
   it('les pièces ont des PA indépendants', () => {
     const s0 = makeCombatState(LINE, [
-      { id: 'a1', owner: 'alice', hex: 'A', hp: 10, ap: 4 },
-      { id: 'a2', owner: 'alice', hex: 'C', hp: 10, ap: 4 },
-      { id: 'b', owner: 'bob', hex: 'E', hp: 10, ap: 4 },
+      u({ id: 'a1', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'a2', owner: 'alice', hex: 'C', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
     ], 'alice');
     const s1 = moveUnit(s0, 'a1', 'B'); // a1 dépense 1
     expect(unitById(s1, 'a1')!.ap).toBe(3);
@@ -85,25 +92,34 @@ describe('combat/attaque', () => {
     expect(graphDistance(LINE, 'A', 'C')).toBe(2);
   });
 
-  it('attaque une cible adjacente : inflige des dégâts, dépense les PA de l\'attaquant', () => {
-    const s = attack(fresh('A', 'B', 4, 10), 'a', 'b', ATK);
+  it('attaque une cible à portée : dégâts de l\'attaquant, dépense ses PA', () => {
+    const s = attack(fresh('A', 'B', 4, 10), 'a', 'b');
     expect(unitById(s, 'b')!.hp).toBe(6); // 10 − 4
     expect(unitById(s, 'a')!.ap).toBe(2); // 4 − 2
   });
 
+  it('la portée provient de l\'attaquant (un tireur frappe de loin)', () => {
+    const s0 = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'A', range: 4, damage: 2, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }), // distance 4
+    ], 'alice');
+    expect(canAttack(s0, 'a', 'b')).toBe(true);
+    expect(unitById(attack(s0, 'a', 'b'), 'b')!.hp).toBe(8); // 10 − 2
+  });
+
   it('pas d\'attaque hors de portée', () => {
     const s0 = fresh('A', 'C', 4, 10); // distance 2 > portée 1
-    expect(canAttack(s0, 'a', 'b', ATK)).toBe(false);
-    expect(attack(s0, 'a', 'b', ATK)).toBe(s0);
+    expect(canAttack(s0, 'a', 'b')).toBe(false);
+    expect(attack(s0, 'a', 'b')).toBe(s0);
   });
 
   it('pas d\'attaque sans assez de PA', () => {
     const s0 = fresh('A', 'B', 1, 10); // 1 PA < coût 2
-    expect(attack(s0, 'a', 'b', ATK)).toBe(s0);
+    expect(attack(s0, 'a', 'b')).toBe(s0);
   });
 
   it('coup létal : la cible quitte le plateau, le survivant gagne', () => {
-    const s = attack(fresh('A', 'B', 4, 4), 'a', 'b', ATK); // bob à 4 PV
+    const s = attack(fresh('A', 'B', 4, 4), 'a', 'b'); // bob à 4 PV, dégâts 4
     expect(unitById(s, 'b')).toBeUndefined();
     expect(winner(s)).toBe('alice');
   });
@@ -116,8 +132,8 @@ describe('combat/attaque', () => {
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [
-      { id: 'a', owner: 'alice', hex: 'A', hp: 10, ap: 0 },
-      { id: 'b', owner: 'bob', hex: 'E', hp: 10, ap: 0 },
+      u({ id: 'a', owner: 'alice', hex: 'A', ap: 0 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 0 }),
     ], 'alice');
     const s1 = endTurn(depleted, 4);
     expect(s1.active).toBe('bob');

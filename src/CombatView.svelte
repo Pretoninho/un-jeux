@@ -6,29 +6,30 @@
   import { makeBoard } from './engine/board';
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, endTurn, winner,
-    unitAt, unitById, type CombatState, type AttackConfig,
+    unitAt, type CombatState,
   } from './engine/combat';
+  import { makeUnit, ARCHETYPES } from './engine/pieces';
   import { axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
 
   const RADIUS = 4;
   const AP_PER_TURN = 4;
-  const MAX_HP = 10;
-  const ATTACK: AttackConfig = { range: 1, cost: 2, damage: 4 };
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
   const NAMES: Record<string, string> = { alice: 'Alice', bob: 'Bob' };
+  const KIND_NAME: Record<string, string> = { lourde: 'Lourde', tireur: 'Tireur' };
 
   const GEO = makeBoard(RADIUS, 6, 0, 0); // on ne garde que la géométrie
   const hexOf = (id: string) => GEO.map.hexes.find((h) => h.id === id)!;
 
+  // Chaque camp aligne la paire polaire : une Lourde (mêlée-tank) + un Tireur (distance-verre).
   function initial(): CombatState {
     const [c0, c1] = GEO.corners;
-    const n0 = hexOf(c0).neighbors[0]!; // 2ᵉ pièce à côté du QG
+    const n0 = hexOf(c0).neighbors[0]!;
     const n1 = hexOf(c1).neighbors[0]!;
     return makeCombatState(GEO.map, [
-      { id: 'a1', owner: 'alice', hex: c0, hp: MAX_HP, ap: AP_PER_TURN },
-      { id: 'a2', owner: 'alice', hex: n0, hp: MAX_HP, ap: AP_PER_TURN },
-      { id: 'b1', owner: 'bob', hex: c1, hp: MAX_HP, ap: AP_PER_TURN },
-      { id: 'b2', owner: 'bob', hex: n1, hp: MAX_HP, ap: AP_PER_TURN },
+      makeUnit('a1', 'alice', c0, ARCHETYPES.lourde!, AP_PER_TURN),
+      makeUnit('a2', 'alice', n0, ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('b1', 'bob', c1, ARCHETYPES.lourde!, AP_PER_TURN),
+      makeUnit('b2', 'bob', n1, ARCHETYPES.tireur!, AP_PER_TURN),
     ], 'alice');
   }
 
@@ -44,7 +45,7 @@
 
   const isAttackable = (hexId: string) => {
     const t = unitAt(combat, hexId);
-    return !!t && !!selected && t.owner !== combat.active && canAttack(combat, selected.id, t.id, ATTACK);
+    return !!t && !!selected && t.owner !== combat.active && canAttack(combat, selected.id, t.id);
   };
 
   function selectDefault() {
@@ -59,9 +60,9 @@
     if (!selected) return;
     // Clic sur un adverse à portée → l'attaquer avec la pièce sélectionnée.
     if (occ && occ.owner !== combat.active) {
-      if (!canAttack(combat, selected.id, occ.id, ATTACK)) return;
+      if (!canAttack(combat, selected.id, occ.id)) return;
       history = [...history, combat];
-      combat = attack(combat, selected.id, occ.id, ATTACK);
+      combat = attack(combat, selected.id, occ.id);
       return;
     }
     // Clic sur une case atteignable → s'y déplacer.
@@ -103,7 +104,7 @@
     {#if !over}
       <div class="active" style="--c:{COLORS[combat.active]}">
         Au tour de <b>{NAMES[combat.active]}</b>
-        {#if selected}<span class="ap">pièce · PA <b>{selected.ap}</b>/{AP_PER_TURN}</span>{/if}
+        {#if selected}<span class="ap"><b>{KIND_NAME[selected.kind]}</b> · portée {selected.range} · PA <b>{selected.ap}</b>/{AP_PER_TURN}</span>{/if}
       </div>
     {/if}
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
@@ -136,11 +137,12 @@
           stroke-width={attackable ? 3.5 : inReach ? 2.5 : 1.5} />
         {#if occ}
           {@const isSel = occ.id === selectedId && occ.owner === combat.active && !over}
+          {@const frac = occ.hp / occ.maxHp}
           <circle cx={c[0]} cy={c[1] - 3} r="12" fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
-          <text x={c[0]} y={c[1] + 1} class="utxt">{NAMES[occ.owner]![0]}</text>
-          <!-- barre de PV -->
+          <text x={c[0]} y={c[1] + 1} class="utxt">{occ.kind === 'lourde' ? 'L' : 'T'}</text>
+          <!-- barre de PV (couleur = joueur, lettre = archétype) -->
           <rect x={c[0] - 11} y={c[1] + 12} width="22" height="3.5" rx="1.5" fill="#0e1015" />
-          <rect x={c[0] - 11} y={c[1] + 12} width={22 * occ.hp / MAX_HP} height="3.5" rx="1.5" fill={occ.hp / MAX_HP > 0.4 ? '#5ab0a0' : '#e0604a'} />
+          <rect x={c[0] - 11} y={c[1] + 12} width={22 * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={c[0] + 13} y={c[1] - 9} class="apbadge">{occ.ap}</text>{/if}
           {#if attackable}<text x={c[0]} y={c[1] - 15} class="atkmark">⚔</text>{/if}
@@ -154,9 +156,10 @@
   <div class="hint muted small">
     {#if over}
       Clique <b>Revanche</b> pour rejouer.
-    {:else}
-      Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b> pour la choisir, puis une case
-      verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse adjacente</b> pour <b>frapper</b>.
+      Couleur = joueur. <b>L</b> = Lourde (mêlée, robuste, gros dégâts, portée 1) ·
+      <b>T</b> = Tireur (distance, fragile, dégâts faibles, portée 4).
+      Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b>, puis une case
+      verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse à portée</b> pour <b>frapper</b>.
       Joue tes deux pièces, puis <b>Finir le tour</b>. <b>↩ Annuler</b> revient en arrière.
     {/if}
   </div>
