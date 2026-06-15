@@ -13,6 +13,19 @@
 > finance, ce memo). L'esthétique reste **parquée** (DA = chantier séparé) ; le moteur de rendu est tranché (SVG).
 > Toute l'énergie va sur les **mécaniques du jeu de base**.
 >
+> 🎯 **CAP ALIGNÉ — DÉCISIONS = FAITS CALCULABLES (2026-06-14, soir, point d'alignement fort)** : raffinage de
+> l'étoile polaire. Le concepteur a tranché : le vrai problème n'était **PAS le nombre de mécaniques**, mais (1) **le
+> jargon finance** et (2) **le manque de NETTETÉ du moment de décision**. Exigence montée d'un cran : pas seulement
+> *net* (visible) mais **LOGIQUE** = la décision se **DÉDUIT** de faits, réponse prouvable (« danger 0.58 + 0.12/tour
+> = 0.70 → krach au prochain tour → je sors »). **Geste moteur, sans une ligne neuve** : rapprocher les deux seuils
+> existants `crisisDeadZone` = `crisisCeiling` (params.ts) → `crisisProbability` devient une **marche d'escalier**
+> (sous le seuil = jamais ; au-dessus = toujours) → **le dé du déclenchement disparaît**. Plus : **révéler la jauge**
+> (déjà calculée, le debug la montre) ; la jauge **monte déjà de façon déterministe** (`fragilityDelta` = entassement +
+> mises à crédit − calme). Hasard résiduel (forme du krach, bruit de prix) **fermable** par min=max sur les plages.
+> **Seul inconnu qui survit = les autres joueurs** (bonne incertitude : on déjoue des gens, jamais un dé). C'est
+> cohérent avec « se découpler de la réalité ». **Ajouter des mécaniques reste permis** (le monstre = jargon+flou, pas
+> la quantité) MAIS base d'abord, nette/logique, puis 1 ajout à la fois. ⚠️ Renverse l'anti-script (RNG/plages) — assumé.
+>
 > ⭐ **ÉTOILE POLAIRE — SIMPLICITÉ / PEAU LUDIQUE (2026-06-14, détail `docs/refonte-chaises-demineur.md` en tête)** :
 > diagnostic franc du concepteur — **le moteur est 100 % validé**, mais **« la peau » est trop complexe** et **le fun
 > ne se sent pas**. Cause : le jeu de base est bâti sur la **prise de décision en info cachée/latente** (façon quant),
