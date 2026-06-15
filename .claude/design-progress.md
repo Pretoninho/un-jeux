@@ -1,24 +1,32 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.35
+> Dernière mise à jour : 2026-06-15 — v1.36
 >
 > 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
 > validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
 > isolée (`*Demo.svelte`).
 >
 > 🖥️ **UI PROPRE — `NewGameView.svelte` est la vue PAR DÉFAUT (2026-06-15)** : aucune interférence de l'ancien
-> jeu. Sélecteur de briques (une à la fois : 🏕️ Camp / 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien jeu reste
-> accessible via le lien discret *« ancien jeu (référence) → »* (`App.svelte` garde un `mode` 'new'/'legacy',
-> default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 178 tests verts.
+> jeu. Sélecteur de briques (une à la fois : ⏩ Tick / 🏕️ Camp / 🏞️ Revenu / 📒 Carnet), header minimal. L'ancien
+> jeu reste accessible via le lien discret *« ancien jeu (référence) → »* (`App.svelte` garde un `mode`
+> 'new'/'legacy', default 'new'). On n'affiche que ce qu'on teste. svelte-check 0 erreur, 195 tests verts.
 >
 > | # | Brique | Moteur | Tests | Démo UI | État |
 > | --- | --- | --- | --- | --- | --- |
 > | 1 | **Carnet d'ordres** (éviction = rachat de parts) | `orderbook.ts` | 19 | 📒 `OrderBookDemo` | ✅ |
 > | 2 | **Revenu + agglomération** (income) | `revenue.ts` | 12 | 🏞️ `RevenueDemo` | ✅ |
 > | 3 | **Camp / emprunt** (Tronc A permanent / Tronc B soldable) | `camp.ts` | 20 | 🏕️ `CampDemo` | ✅ |
-> | 4 | **Tick économique** (income − charges → net, faillite) | à venir | — | — | ⏳ suivant |
-> | 5 | **Possession** (un occupant/hex, lie carnet↔revenu) | à venir | — | — | ⏳ |
+> | 4 | **Tick économique** (income − charges → net, faillite + `GameStateV2`) | `tick.ts` + `state2.ts` | 17 | ⏩ `TickDemo` | ✅ |
+> | 5 | **Possession** (un occupant/hex, lie carnet↔revenu) | à venir | — | — | ⏳ suivant |
+>
+> 🔗 **BRIQUE 4 = PREMIER CÂBLAGE (2026-06-15)** — fin des modules orphelins. `state2.ts` introduit **`GameStateV2`**
+> (le state PROPRE promis : `turn`, `map`, `revenueCfg`, `actors` {cash, bankrupt}, `ownership`, `camps` — rien
+> de l'ancien moteur). `tick.ts` fait la **première boucle** : *income (brique 2) − charges (brique 3) → cash ;
+> SI cash < 0 → 💀 faillite* (hexes libérés, camps purgés = la dette meurt avec le failli). `checkEnd` :
+> last_standing (1 survivant) OU time (horizon → le plus riche). **Immuable** (rend un nouveau state, ne mute
+> pas l'entrée → testé). 17 tests. Démo ⏩ `TickDemo` = carte 7 hexes cliquable + emprunts + Tour +1 : on VOIT
+> la boucle complète (income − charges = net/tour, et on peut se faire couler en empruntant trop sans hexes).
 >
 > **Carnet (`orderbook.ts`)** : 2 piles visibles bids/asks ; *SI achat ≥ meilleure vente → échange au prix de
 > l'ordre qui attendait ; SINON → entre au carnet ; prix affiché = dernier échange*. Transfert atomique
