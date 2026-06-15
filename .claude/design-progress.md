@@ -1,7 +1,28 @@
 # Suivi de conception — Jeu 4X Investissement
 
 > Fichier de navigation rapide. Le détail complet est dans `docs/game-design-memo.md`.
-> Dernière mise à jour : 2026-06-15 — v1.31
+> Dernière mise à jour : 2026-06-15 — v1.32
+>
+> 🧱 **CHANTIER NOUVEAU JEU — briques moteur + UI (2026-06-15, en cours)**. Cycle : *construction → test →
+> validation → doc → au suivant*. Chaque brique = module PUR autonome (`src/engine/`) + tests + démo UI
+> isolée (`*Demo.svelte`, bouton dédié dans `App.svelte`, sans toucher l'ancienne boucle de jeu).
+>
+> | # | Brique | Moteur | Tests | Démo UI | État |
+> | --- | --- | --- | --- | --- | --- |
+> | 1 | **Carnet d'ordres** (éviction = rachat de parts) | `orderbook.ts` | 19 | 📒 `OrderBookDemo` | ✅ |
+> | 2 | **Revenu + agglomération** (income) | `revenue.ts` | 12 | 🏞️ `RevenueDemo` | ✅ |
+> | 3 | **Camp / emprunt** (charge, soldable/permanent) | `camp.ts` (à venir) | — | — | ⏳ suivant |
+> | 4 | **Tick économique** (income − charges → net, faillite) | à venir | — | — | ⏳ |
+> | 5 | **Possession** (un occupant/hex, lie carnet↔revenu) | à venir | — | — | ⏳ |
+>
+> **Carnet (`orderbook.ts`)** : 2 piles visibles bids/asks ; *SI achat ≥ meilleure vente → échange au prix de
+> l'ordre qui attendait ; SINON → entre au carnet ; prix affiché = dernier échange*. Transfert atomique
+> cash↔parts, long-only, parts/prix entiers, reliquat partiel, annulation. **Conservation de richesse testée =
+> zéro-sum.** Éviction = l'occupant peut résister (siège visible, pas transaction mécanique) ; l'assaillant
+> surpaie = son coût d'attaque + son risque.
+> **Revenu (`revenue.ts`)** : *possédé → +base ; voisin du même proprio → +bonus/voisin (agglomération) ;
+> libre → 0*. `actorIncome` = somme. Cluster contigu > hexes dispersés (testé). svelte-check 0 erreur.
+> ⚠️ Ces briques sont **autonomes** — pas encore câblées dans une boucle de jeu unifiée (brique 4/5).
 >
 > 🏗️ **STRUCTURE FONDAMENTALE TRANCHÉE (2026-06-15, session matin)** — boucle centrale posée, simple et complète :
 >
