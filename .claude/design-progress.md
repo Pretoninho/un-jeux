@@ -20,6 +20,12 @@
 >   build OK. Moteur vivant : `board · revenue · camp · state · tick · game · rng · types`.
 > - 📌 Les notes finance ci-dessous + `docs/*` (hors `nouveau-jeu.md`) sont **historiques**.
 >
+> 🧭 **FONDATIONS DU JEU TACTIQUE : `docs/jeu-tactique-fondations.md`** — cadrage des règles de
+> base (4 atomes + victoire), les 3 questions (comment jouer / quoi faire / comment gagner),
+> l'ordre de construction (noyau 1v1 « bouger + frapper » → une chose à la fois) et les forks
+> gardés OUVERTS (victoire, nb de pièces, budget). Rien n'y est tranché. À lire avant de coder
+> le combat.
+>
 > ---
 >
 > # (Historique finance ci-dessous — conservé pour référence)
