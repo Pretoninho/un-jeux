@@ -54,20 +54,29 @@ export function genBounds(centers: Array<[number, number]>): { minX: number; min
 
 // ─────────── Pavage 4.8.8 (octogones + carrés) ───────────
 // `s` = espacement des centres d'octogones (= largeur plat-à-plat de l'octogone).
+//
+// `straightFrac` = demi-longueur du côté DROIT de l'octogone, en fraction de `s`. C'est le
+// seul curseur du pavage : il fixe d'un coup la taille des octogones ET des carrés, le tout
+// restant uniforme et sans trou pour toute valeur dans ]0 ; 0,5[.
+//   - = OCTA_REGULAR → octogone régulier (8 côtés égaux), carrés minimaux ;
+//   - plus PETIT     → côtés droits raccourcis, biseaux allongés → carrés plus GROS.
 
-/** Points d'un octogone régulier (côtés droits alignés sur les axes) centré en (cx, cy). */
-export function octagonPoints(cx: number, cy: number, s: number): string {
-  const h = s / 2;                       // demi plat-à-plat
-  const a = (s * (Math.SQRT2 - 1)) / 2;  // demi-côté (coins biseautés)
+/** Demi-côté droit d'un octogone *régulier* (≈ 0,207·s) : tous les côtés sont alors égaux. */
+export const OCTA_REGULAR = (Math.SQRT2 - 1) / 2;
+
+/** Points d'un octogone (côtés droits alignés sur les axes) centré en (cx, cy). */
+export function octagonPoints(cx: number, cy: number, s: number, straightFrac = OCTA_REGULAR): string {
+  const h = s / 2;            // demi plat-à-plat (imposé par l'espacement)
+  const t = s * straightFrac; // demi-côté droit (coins d'autant plus biseautés que t est petit)
   const pts: [number, number][] = [
-    [-a, -h], [a, -h], [h, -a], [h, a], [a, h], [-a, h], [-h, a], [-h, -a],
+    [-t, -h], [t, -h], [h, -t], [h, t], [t, h], [-t, h], [-h, t], [-h, -t],
   ];
   return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
 }
 
 /** Points du petit carré (losange) qui comble un creux, calé sur les coins des octogones. */
-export function diamondPoints(cx: number, cy: number, s: number): string {
-  const d = s * (1 - 1 / Math.SQRT2); // demi-diagonale → arêtes coïncidant avec les biseaux
+export function diamondPoints(cx: number, cy: number, s: number, straightFrac = OCTA_REGULAR): string {
+  const d = s / 2 - s * straightFrac; // demi-diagonale = h − t → arêtes calées sur les biseaux
   const pts: [number, number][] = [[d, 0], [0, d], [-d, 0], [0, -d]];
   return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
 }

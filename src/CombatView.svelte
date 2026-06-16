@@ -18,6 +18,7 @@
 
   const RADIUS = 4;
   const OCTA_N = 5;
+  const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
   const NAMES: Record<string, string> = { alice: 'Alice', bob: 'Bob' };
@@ -37,7 +38,9 @@
         const L = ob.layout[h.id]!;
         return {
           id: h.id, cx: L.cx, cy: L.cy, small: L.shape === 'carre',
-          points: L.shape === 'carre' ? diamondPoints(L.cx, L.cy, ob.spacing) : octagonPoints(L.cx, L.cy, ob.spacing),
+          points: L.shape === 'carre'
+            ? diamondPoints(L.cx, L.cy, ob.spacing, OCTA_FRAC)
+            : octagonPoints(L.cx, L.cy, ob.spacing, OCTA_FRAC),
         };
       });
     } else {
