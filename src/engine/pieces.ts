@@ -27,6 +27,7 @@ export interface Archetype {
   name: string;
   glyph: string;     // marqueur affiché sur la pièce
   rangeTier: number; // position sur la droite de calibrage
+  profile?: Partial<Profile>;   // override des stats dérivées — pour les pièces HORS-DROITE (ex. Duelliste)
   guard?: GuardProfile;         // verbe « se défendre » — propre aux CAC ; nombres par perso
   overwatch?: OverwatchProfile; // verbe « tir réservé » — propre aux pièces à distance
 }
@@ -40,6 +41,9 @@ export const ARCHETYPES: Record<string, Archetype> = {
   lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1, guard: { cost: 3, damageTakenMul: 0.5 } }, // 1/4 — mêlée-tank
   // Le Tireur (distance) réserve son tir : 3 PA (→ pas d'attaque le même tour) pour un réflexe.
   tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4, overwatch: { cost: 3 } }, // 4/1 — distance-verre
+  // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
+  // en échange d'une attaque à 1 PA → frappe deux fois par tour. Escarmouche/harcèlement. Sans verbe.
+  duelliste: { key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1, profile: { maxHp: 9, damage: 2, attackCost: 1 } },
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
@@ -47,7 +51,8 @@ export const ARCHETYPES: Record<string, Archetype> = {
 
 /** Fabrique une pièce d'un archétype donné, à pleine vie et avec `ap` points d'action. */
 export function makeUnit(id: string, owner: string, hex: string, archetype: Archetype, ap: number): Unit {
-  const p = profileFor(archetype.rangeTier);
+  // Stats dérivées de la droite, puis override éventuel pour les pièces hors-droite (ex. Duelliste).
+  const p = { ...profileFor(archetype.rangeTier), ...archetype.profile };
   return {
     id, owner, hex, ap,
     hp: p.maxHp, maxHp: p.maxHp,

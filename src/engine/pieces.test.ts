@@ -49,3 +49,35 @@ describe('pieces/calibrage — droite portée + robustesse = 5', () => {
     expect(makeUnit('a1', 'alice', 'X', ARCHETYPES.lourde!, 4).overwatch).toBeUndefined();
   });
 });
+
+describe('pieces/Duelliste — pièce hors-droite via override de profil', () => {
+  it('l\'override remplace les stats dérivées, en gardant la portée de la droite', () => {
+    const d = makeUnit('a3', 'alice', 'Z', ARCHETYPES.duelliste!, 4);
+    expect(d).toMatchObject({
+      id: 'a3', owner: 'alice', hex: 'Z', ap: 4,
+      hp: 9, maxHp: 9, range: 1, damage: 2, attackCost: 1, kind: 'duelliste',
+    });
+  });
+
+  it('le Duelliste casse le calibrage : moins de PV/dégâts que la Lourde à portée égale, mais attaque à 1 PA', () => {
+    const lourde = profileFor(ARCHETYPES.lourde!.rangeTier); // 1/4 sur la droite
+    const d = makeUnit('a3', 'alice', 'Z', ARCHETYPES.duelliste!, 4);
+    expect(d.range).toBe(lourde.range);            // même portée (mêlée)
+    expect(d.maxHp).toBeLessThan(lourde.maxHp);    // plus fragile
+    expect(d.damage).toBeLessThan(lourde.damage);  // tape plus doucement
+    expect(d.attackCost).toBeLessThan(lourde.attackCost); // mais frappe deux fois par tour
+  });
+
+  it('le Duelliste n\'a aucun verbe (ni garde ni tir réservé)', () => {
+    expect(ARCHETYPES.duelliste!.guard).toBeUndefined();
+    expect(ARCHETYPES.duelliste!.overwatch).toBeUndefined();
+    const d = makeUnit('a3', 'alice', 'Z', ARCHETYPES.duelliste!, 4);
+    expect(d.guard).toBeUndefined();
+    expect(d.overwatch).toBeUndefined();
+  });
+
+  it('sans override, makeUnit suit toujours la droite (non-régression)', () => {
+    expect(makeUnit('a1', 'alice', 'X', ARCHETYPES.lourde!, 4)).toMatchObject(
+      { hp: 16, maxHp: 16, range: 1, damage: 5, attackCost: 2 });
+  });
+});

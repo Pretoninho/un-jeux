@@ -23,7 +23,9 @@
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
   const NAMES: Record<string, string> = { alice: 'Alice', bob: 'Bob' };
-  const KIND_NAME: Record<string, string> = { lourde: 'Lourde', tireur: 'Tireur' };
+  // Nom et glyphe d'affichage dérivés du registre → aucune dérive quand on ajoute un archétype.
+  const KIND_NAME: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.name]));
+  const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
 
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
@@ -56,17 +58,27 @@
     return { map, corners, tiles, bounds: { x: b.minX, y: b.minY, w: b.w, h: b.h } };
   }
 
-  // Chaque camp aligne la paire polaire : une Lourde (mêlée-tank) + un Tireur (distance-verre).
-  // 2ᵉ pièce sur un voisin « salle » (on évite de démarrer sur un carré-carrefour exigu).
+  // Chaque camp aligne Lourde (mêlée-tank) + Tireur (distance-verre) + Duelliste (escarmouche).
+  // Pièces 2 et 3 sur des voisins « salle » distincts (on évite les carrés-carrefours exigus).
+  // (Le Soigneur — 4ᵉ pièce — arrive au Lot 1, avec son verbe de soin.)
   function initialFor(geo: Geo): CombatState {
     const [c0, c1] = geo.corners;
     const nbOf = (id: string) => geo.map.hexes.find((h) => h.id === id)!.neighbors;
-    const roomNb = (id: string) => nbOf(id).find((x) => !x.startsWith('s:')) ?? nbOf(id)[0]!;
+    // Deux emplacements de départ distincts autour d'un coin (salles d'abord, sinon repli).
+    const spots = (id: string) => {
+      const rooms = nbOf(id).filter((x) => !x.startsWith('s:'));
+      const pool = rooms.length >= 2 ? rooms : nbOf(id);
+      return [pool[0]!, pool[1] ?? pool[0]!] as const;
+    };
+    const [a2, a3] = spots(c0);
+    const [b2, b3] = spots(c1);
     return makeCombatState(geo.map, [
       makeUnit('a1', 'alice', c0, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('a2', 'alice', roomNb(c0), ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('a2', 'alice', a2, ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('a3', 'alice', a3, ARCHETYPES.duelliste!, AP_PER_TURN),
       makeUnit('b1', 'bob', c1, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('b2', 'bob', roomNb(c1), ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('b2', 'bob', b2, ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('b3', 'bob', b3, ARCHETYPES.duelliste!, AP_PER_TURN),
     ], 'alice');
   }
 
@@ -331,7 +343,7 @@
           {@const w = t.small ? 16 : 22}
           {@const by = t.small ? 9 : 12}
           <circle cx={t.cx} cy={t.cy - 3} {r} fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
-          <text x={t.cx} y={t.cy + 1} class="utxt">{occ.kind === 'lourde' ? 'L' : 'T'}</text>
+          <text x={t.cx} y={t.cy + 1} class="utxt">{KIND_GLYPH[occ.kind] ?? '?'}</text>
           <!-- barre de PV (couleur = joueur, lettre = archétype) -->
           <rect x={t.cx - w / 2} y={t.cy + by} width={w} height="3.5" rx="1.5" fill="#0e1015" />
           <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
