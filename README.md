@@ -1,17 +1,19 @@
 # un-jeux
 
-Jeu web tour par tour, solo-first. **Cœur actuel** : une économie territoriale minimale
-sur grille hexagonale — on acquiert des hexes d'income, on couvre la charge de sa dette de
-base, et le plus riche en valeur nette à l'horizon gagne.
+Jeu web **tour par tour, hotseat local** (deux joueurs à tour de rôle sur le même écran).
+**Cœur actuel** : un **combat tactique** façon échecs + *Divinity: Original Sin* — des pièces
+distinctes sur un plateau, **information parfaite, aucun hasard**, des **points d'action** par
+pièce, des verbes (garde, tir réservé, riposte) et la **Résonance** (réactions en chaîne entre
+alliés d'une même escouade).
 
-**Direction** : fusionner cette base économique avec une couche de **combat tactique au tour
-par tour** (inspiration *Divinity: Original Sin* — points d'action, surfaces élémentaires,
-combos). La prise d'un hex adverse se fera par le combat, pas par l'économie — c'est pourquoi
-le cœur a été ramené à l'essentiel (voir l'historique dans `.claude/design-progress.md`).
+**Direction** : fusionner ce noyau tactique avec la base **économie territoriale** (hexes
+d'income, dette de base, valeur nette) restée dans le repo — la prise d'un hex adverse passera
+par le **combat**, pas par l'économie.
 
-> ⚠️ Le précédent prototype (4X financier : fragilité/crises/crédit) a été retiré du code lors
-> de la simplification — il reste dans l'historique git. Les docs `docs/*` antérieures à ce
-> virage sont conservées comme **référence historique**.
+> ⚠️ La vue économique (`GameView`) et son moteur (`revenue/camp/state/tick/game`) **dorment**
+> dans le repo, en attente de fusion ; l'App lance aujourd'hui le **combat** (`CombatView`). Un
+> précédent prototype 4X financier a été retiré du code (présent dans l'historique git) ; les
+> `docs/*` antérieures à ce virage sont conservées comme **référence historique**.
 
 ## ▶️ Lancer le jeu
 
@@ -21,6 +23,8 @@ le cœur a été ramené à l'essentiel (voir l'historique dans `.claude/design-
 npm install      # une seule fois (ou après un pull qui ajoute des deps)
 npm run dev      # démarre Vite → http://localhost:5173/
 ```
+
+En ligne (24/7, déployé à chaque push sur `main`) : **https://pretoninho.github.io/un-jeux/**
 
 ## 🔄 Récupérer les changements dans le Codespace (sans PR)
 
@@ -57,22 +61,32 @@ npm run check    # vérification de types Svelte/TS
 ## Principes portés par le code
 
 - **Moteur découplé** : `src/engine/` est du TS pur (aucun DOM) → testable headless.
-- **Modules purs et immuables** : chaque action rend un nouvel état (rejouable, déterministe).
+- **Modules purs et immuables** : chaque action rend un nouvel état (rejouable, déterministe,
+  sérialisable).
+- **Topologie vs présentation** : le moteur de combat ne lit que `neighbors` → il est agnostique
+  à la forme des tuiles (plateau hexagonal **ou** octogonal, au choix).
 
 ## Structure
 
 ```
 src/
-├── engine/   # TS pur
-│   ├── types.ts     # la carte (Hex, GameMap)
-│   ├── rng.ts       # générateur seedé
-│   ├── board.ts     # génération du plateau hexagonal (income rare, symétrique)
-│   ├── revenue.ts   # income par hex
-│   ├── camp.ts      # dette de base (charge permanente)
-│   ├── state.ts     # état de partie
-│   ├── tick.ts      # boucle économique (income − charges, faillite, fin de partie)
-│   └── game.ts      # actions jouables (acquérir, emprunter, IA, valeur nette)
-├── lib/      # helpers UI (layout hexagonal)
-├── GameView.svelte  # LE jeu (carte + panneaux)
+├── engine/   # TS pur (aucun DOM), testable headless
+│   ├── types.ts      # la carte (Hex, GameMap)
+│   ├── rng.ts        # générateur seedé
+│   ├── board.ts      # plateau hexagonal
+│   ├── octaboard.ts  # plateau octogonal (OCTA_N = 23)
+│   ├── combat.ts     # NOYAU tactique : déplacement, attaque, verbes, Résonance, tours
+│   ├── pieces.ts     # archétypes + calibrage (portée + robustesse = 5), fabrique d'unités
+│   └── revenue · camp · state · tick · game   # économie (DORMANT, en attente de fusion)
+├── lib/      # helpers de rendu (layout hexagonal / octogonal)
+├── CombatView.svelte # LE jeu actuel (board + panneaux d'info)
+├── GameView.svelte   # vue économie (dormante)
 └── App.svelte + main.ts  # coquille
 ```
+
+## Documentation
+
+- **`docs/classes.md`** — classes, verbes et **Résonance** (source de vérité du contenu de jeu).
+- **`CLAUDE.md`** — décisions de design en vigueur + règles de collaboration.
+- **`.claude/design-progress.md`** — journal de conception (historique + virage de direction).
+</content>
