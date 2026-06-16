@@ -89,9 +89,13 @@ describe('pieces/Duelliste — pièce hors-droite via override de profil', () =>
 describe('pieces/Personnages — couche héros (socle de classe + signature)', () => {
   it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
     const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
-    expect(d).toMatchObject({ name: 'Estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
-    expect(d.reactions).toHaveLength(1);
-    expect(d.reactions![0]!.id).toBe('epines_relayees');
+    expect(d).toMatchObject({ name: 'Estoc', characterId: 'a_duelliste', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
+    expect(d.reactions).toHaveLength(2);                                    // deux duos
+    const ids = d.reactions!.map((r) => r.id);
+    expect(ids).toContain('epines_estoc_bastion');                         // × Bastion
+    expect(ids).toContain('marquage_estoc_mireille');                      // × Mireille
+    expect(d.reactions!.find((r) => r.id === 'epines_estoc_bastion')!.fromCharacter).toBe('a_lourde');
+    expect(d.reactions!.find((r) => r.id === 'marquage_estoc_mireille')!.fromCharacter).toBe('a_tireur');
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
   });
 
@@ -109,13 +113,15 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(u.reactions!.some((r) => r.id === 'r2')).toBe(true);       // et l'étend
   });
 
-  it('héros distincts par camp mais stats MIROIR (seuls les noms diffèrent)', () => {
+  it('Estoc et Fil : stats encore miroir mais Résonances DISSOCIÉES (Estoc devient unique)', () => {
     const a = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
     const b = makeUnitFromCharacter('b3', 'bob', 'Z', CHARACTERS.b_duelliste!, 4);
     expect(a.name).not.toBe(b.name);
     expect({ hp: a.hp, damage: a.damage, range: a.range, attackCost: a.attackCost })
       .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });
-    expect(a.reactions).toEqual(b.reactions);
+    expect(a.reactions).not.toEqual(b.reactions);            // plus de signature partagée
+    expect(a.reactions![0]!.id).toBe('epines_estoc_bastion'); // Estoc : duo propre
+    expect(b.reactions![0]!.id).toBe('epines_relayees');      // Fil : générique (en attente)
   });
 
   it('un personnage à l\'archétype inconnu est rejeté', () => {

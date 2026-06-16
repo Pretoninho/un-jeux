@@ -389,6 +389,10 @@ describe('combat — réactions en chaîne (synergies)', () => {
   const listener = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
         kind: 'epines', amount: 1, amountBySource: { lourde: 3 } }], cooldowns: {}, ...over });
+  // Écouteur dont la cellule existe À LA FOIS par classe (lourde→3) et par héros (bastion→5).
+  const charListener = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+        kind: 'epines', amount: 1, amountBySource: { lourde: 3 }, amountByCharacter: { bastion: 5 } }], cooldowns: {}, ...over });
 
   it('garde encaissée → un allié à portée relaie des épines sur l\'attaquant (dégâts selon la source)', () => {
     const base = makeCombatState(LINE, [
@@ -400,6 +404,50 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(unitById(s, 'a')!.hp).toBe(14);            // 16 − floor(4·0.5) = 2 (encaissé en garde)
     expect(unitById(s, 'b')!.hp).toBe(7);             // épines 3 (source = lourde)
     expect(unitById(s, 'c')!.cooldowns!.ep).toBe(2);  // passif mis en cooldown
+  });
+
+  it('matrice « × personnage » : la cellule du héros source prime sur celle de sa classe', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: 'bastion' }), // héros identifié
+      charListener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(5); // 10 − 5 (cellule héros, pas lourde→3)
+  });
+
+  it('matrice « × personnage » : repli sur la classe si le héros source n\'a pas de cellule perso', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: 'rempart' }), // absent d'amountByCharacter
+      charListener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(7); // 10 − 3 (repli sur lourde)
+  });
+
+  it('duo gâté par héros (fromCharacter) : ne réagit QUE pour ce héros source', () => {
+    const reac = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+      u({ reactions: [{ id: 'duo', on: 'garde_encaissee', fromCharacter: 'bastion',
+          scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2 }], cooldowns: {}, ...over });
+    const withSrc = (cid: string) => makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: cid }),
+      reac({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(withSrc('bastion'), 'b', 'a'), 'b')!.hp).toBe(8);  // 10 − 2 : le duo part
+    expect(unitById(attack(withSrc('rempart'), 'b', 'a'), 'b')!.hp).toBe(10); // autre héros : rien
+  });
+
+  it('duo gâté par classe (fromKind) : ne réagit QUE pour cet archétype source', () => {
+    const reac = (k: string, over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+      u({ reactions: [{ id: 'duo', on: 'garde_encaissee', fromKind: k,
+          scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2 }], cooldowns: {}, ...over });
+    const base = (k: string) => makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }), // source = lourde
+      reac(k, { id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base('lourde'), 'b', 'a'), 'b')!.hp).toBe(8);  // source lourde = match → 2
+    expect(unitById(attack(base('tireur'), 'b', 'a'), 'b')!.hp).toBe(10); // source ≠ tireur → rien
   });
 
   it('pas de chaîne si l\'écouteur est hors du rayon', () => {
@@ -452,6 +500,19 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10);
   });
 
+  it('la source ne réagit pas à son propre signal (synergie d\'escouade, pas auto-buff)', () => {
+    const base = makeCombatState(LINE, [
+      // le tank en garde porte LUI-MÊME le passif épines, et reste le seul allié présent
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4,
+        reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+          kind: 'epines', amount: 1, amountBySource: { lourde: 3 } }], cooldowns: {} }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'b')!.hp).toBe(10);              // aucune épine : la source s'exclut
+    expect(unitById(s, 'a')!.cooldowns!.ep ?? 0).toBe(0); // son propre passif n'est pas parti
+  });
+
   it('previewReactions annonce la cascade sans muter l\'état', () => {
     const base = makeCombatState(LINE, [
       u({ id: 'x', owner: 'alice', hex: 'B', ap: 4, damage: 4 }),  // ton attaquant
@@ -462,6 +523,64 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(pv).toHaveLength(1);
     expect(pv[0]).toMatchObject({ listenerId: 'l', targetId: 'x', amount: 3 });
     expect(unitById(base, 'x')!.hp).toBe(10); // état d'origine intact (dry-run pur)
+  });
+});
+
+describe('combat — Résonance Estoc × Mireille (marquage)', () => {
+  // Mireille (Tireuse, characterId a_tireur) en guet ; Estoc à portée porte la Résonance marquage.
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'a_tireur', ...over });
+  const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'mq', on: 'tir_reserve', fromCharacter: 'a_tireur', scope: { squad: true },
+        cooldown: 2, kind: 'marquage', amount: 1, duration: 2 }], cooldowns: {}, ...over });
+
+  // État de départ : le tir réservé de Mireille part sur la cible, Estoc la marque.
+  const afterOverwatch = () => {
+    const base = makeCombatState(LINE, [
+      mireille({ id: 'm', owner: 'alice', hex: 'A', ap: 4 }),
+      estoc({ id: 'e', owner: 'alice', hex: 'B', ap: 4 }),     // escouade : position indifférente
+      u({ id: 'x', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),   // cible
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'm'), 4);            // Mireille en guet, bob actif
+    return resolveOverwatch(moveUnit(bobTurn, 'x', 'C'), 'x'); // E→C (dist 2 ≤ portée 4) → tir
+  };
+
+  it('le tir réservé de Mireille marque la cible (et met la Résonance en CD)', () => {
+    const s = afterOverwatch();
+    expect(unitById(s, 'x')!.hp).toBe(18);                                   // 20 − 2 (tir)
+    expect(unitById(s, 'x')!.mark).toMatchObject({ by: 'e', bonus: 1, expiresIn: 2 });
+    expect(unitById(s, 'e')!.cooldowns!.mq).toBe(2);                         // Résonance en CD 2
+  });
+
+  it('un tir réservé d\'un AUTRE tireur (pas Mireille) ne marque pas', () => {
+    const base = makeCombatState(LINE, [
+      mireille({ id: 'm', owner: 'alice', hex: 'A', ap: 4, characterId: 'autre_tireur' }),
+      estoc({ id: 'e', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'x', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'm'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'x', 'C'), 'x');
+    expect(unitById(s, 'x')!.mark).toBeUndefined();
+  });
+
+  it('le 1er coup d\'Estoc sur la cible marquée gagne +1, puis la marque tombe', () => {
+    const aliceTurn = endTurn(afterOverwatch(), 4);    // bob finit → alice active (marque non décomptée)
+    expect(unitById(aliceTurn, 'x')!.mark!.expiresIn).toBe(2);
+    const hit1 = attack(aliceTurn, 'e', 'x');          // marqué : 4 + 1 = 5
+    expect(unitById(hit1, 'x')!.hp).toBe(13);          // 18 − 5
+    expect(unitById(hit1, 'x')!.mark).toBeUndefined(); // marque consommée
+    const hit2 = attack(hit1, 'e', 'x');               // 2e coup : dégâts normaux 4
+    expect(unitById(hit2, 'x')!.hp).toBe(9);           // 13 − 4
+  });
+
+  it('la marque s\'efface après 2 tours d\'Estoc si elle n\'est pas consommée', () => {
+    const s = afterOverwatch();                 // bob actif, marque expiresIn 2
+    const e1 = endTurn(s, 4);                    // → alice (tour 1 d'Estoc), pas de décompte
+    const e2 = endTurn(e1, 4);                   // alice finit → décompte : 1
+    const e3 = endTurn(e2, 4);                   // → alice (tour 2 d'Estoc)
+    expect(unitById(e3, 'x')!.mark!.expiresIn).toBe(1); // encore là pendant le 2e tour
+    const e4 = endTurn(e3, 4);                    // alice finit → décompte : 0 → disparaît
+    expect(unitById(e4, 'x')!.mark).toBeUndefined();
   });
 });
 

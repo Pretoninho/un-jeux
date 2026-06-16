@@ -64,10 +64,32 @@ export const ARCHETYPES: Record<string, Archetype> = {
 // fusionne avec le socle de classe PAR `id` (elle l'étend ou l'écrase). Les deux camps alignent
 // des héros DISTINCTS (noms propres) mais aux stats MIROIR → équité préservée (esprit échecs).
 
-/** Résonance signature partagée par les deux Duellistes (mêmes nombres → miroir équitable). */
+/**
+ * Résonance DUO « Estoc × Bastion » — un duo = sa propre Résonance (gâtée à la source par
+ * `fromCharacter`). Quand Bastion (en garde, rayon 2) encaisse, Estoc pince l'attaquant pour 2.
+ * Ne se déclenche QUE pour Bastion (`a_lourde`), pas un tank quelconque. CD 2 tours.
+ */
+const EPINES_ESTOC_BASTION: ReactionSpec = {
+  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'a_lourde',
+  scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2,
+};
+
+/**
+ * Résonance DUO « Estoc × Mireille » — quand le Tir Réservé de Mireille (`a_tireur`) part, Estoc
+ * MARQUE la cible touchée : son 1er coup sur elle gagne +1 dégât. La marque dure 2 tours d'Estoc
+ * (sinon s'efface), et la Résonance passe en CD 2. Portée `escouade` (toute l'équipe) : Mireille
+ * tire de loin et Estoc est au contact → ils ne seront quasiment jamais à portée l'un de l'autre.
+ */
+const MARQUAGE_ESTOC_MIREILLE: ReactionSpec = {
+  id: 'marquage_estoc_mireille', on: 'tir_reserve', fromCharacter: 'a_tireur',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+
+/**
+ * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
+ * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
+ */
 const EPINES_RELAYEES: ReactionSpec = {
-  // Quand un allié en garde (rayon 2) ENCAISSE un coup, le Duelliste pince l'attaquant —
-  // dégâts selon la SOURCE (Lourde → 2, défaut 1). Première cellule de la matrice ; CD 2 tours.
   id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
   kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
 };
@@ -88,7 +110,7 @@ export const CHARACTERS: Record<string, Character> = {
   // Camp A (Alice)
   a_lourde:    { id: 'a_lourde',    name: 'Bastion', archetype: 'lourde' },
   a_tireur:    { id: 'a_tireur',    name: 'Mireille', archetype: 'tireur' },
-  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE] },
   // Camp B (Bob)
   b_lourde:    { id: 'b_lourde',    name: 'Rempart', archetype: 'lourde' },
   b_tireur:    { id: 'b_tireur',    name: 'Orso', archetype: 'tireur' },
@@ -97,6 +119,7 @@ export const CHARACTERS: Record<string, Character> = {
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */
 export interface Overlay {
+  id?: string;                // identité héros stable, reportée sur `Unit.characterId`
   name?: string;
   profile?: Partial<Profile>;
   reactions?: ReactionSpec[];
@@ -120,6 +143,7 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
   const p = { ...profileFor(archetype.rangeTier), ...archetype.profile, ...overlay?.profile };
   return {
     id, owner, hex, ap,
+    characterId: overlay?.id,
     name: overlay?.name,
     hp: p.maxHp, maxHp: p.maxHp,
     range: p.range, damage: p.damage, attackCost: p.attackCost,

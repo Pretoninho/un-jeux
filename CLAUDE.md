@@ -42,6 +42,7 @@
   l'inspecte, il n'attaque plus directement. L'attaque part du panneau adverse.
 
 ## Classes, verbes & Résonance (avancement — détail : `docs/classes.md`)
+> **Créer un personnage : processus pas-à-pas → `docs/personnages.md`.**
 - **Calibrage « portée + robustesse = 5 »** (`engine/pieces.ts`, `profileFor`) : une pièce
   *sur la droite* est définie par son seul palier de portée `r∈{1..4}`, `t=5−r` → `maxHp=4+3t`,
   `damage=1+t`, `attackCost=2`. Aucune pièce strictement meilleure, tout est positionnel.
@@ -61,6 +62,26 @@
   camps alignent des **héros distincts** (noms propres) aux **stats miroir** (équité). `Unit.kind`
   reste l'archétype → la matrice `amountBySource` (× classe-source) intacte, la signature ajoute
   l'axe *× personnage*. Noms actuels = **placeholders**. Épines = signature des Duellistes-héros.
+  - **Axe « × personnage » CÂBLÉ (sous-lot A, 2026-06-16)** : `Unit.characterId` (identité héros
+    stable, posée par `makeUnitFromCharacter` ; sert aussi vivier/draft) + `ReactionSpec.amountByCharacter`.
+    Lookup `reactionAmount` priorisé : **héros** (`characterId`) → **classe** (`kind`) → défaut → 1.
+    UI : le panneau `?` affiche « selon classe » **et** « selon héros ». **Sous-lot B AJOURNÉ** :
+    faire varier l'**effet** (`kind`) et pas seulement le **nombre** par héros source.
+- **HÉROS UNIQUES (cap visée — décidé le 2026-06-16)** : on quitte le miroir. Chaque
+  personnage devient un **héros unique** (identité propre, **Résonance signature** propre,
+  **stats sur-mesure** autorisées — calque `profile?` au niveau perso, hors-droite permis).
+  À terme : **vivier commun** où n'importe quel héros peut être choisi par n'importe quel camp
+  (plus de pool a_/b_ couplé au camp).
+  - **Deux couches séparables** : (1) **les héros eux-mêmes** = la fondation, déjà en place,
+    qu'on enrichit *sans* toucher au reste ; (2) **le draft** (comment on les choisit) = couche
+    au-dessus, ajoutée plus tard.
+  - **Décision de draft / d'équité AJOURNÉE** : on ne tranche le modèle (miroir / exclusif /
+    libre) **qu'au moment de construire l'écran de sélection**, quand le vivier sera assez
+    profond. Conséquence assumée : héros uniques + fieldés une fois ⇒ escouades **asymétriques
+    par nature** → l'**équité devient un sujet de design au draft**, pas avant (sans gravité en
+    phase de construction).
+  - **Méthode** : on façonne les héros **un à la fois** (un héros = un petit lot validé, comme
+    une cellule de matrice) ; line-up par défaut jouable conservé pour tester en attendant.
 - **RÉSONANCE** = système de **réactions en chaîne** (synergies d'escouade), dans
   `engine/combat.ts` : un événement émet un **signal typé**, les alliés dont un passif
   (`ReactionSpec`) l'**écoute** réagissent ; l'effet dépend de la **source** (`amountBySource`)
@@ -70,8 +91,22 @@
   (décompté à `endTurn`) ; **terminaison** (file FIFO bornée + un passif au plus une fois/cascade).
   `attack()` scindé en `strike()` (frappe nue + signal) + résolution → permettra de rebrancher
   `overwatch`/`riposte` sur ce canal plus tard.
-  - **1ʳᵉ cellule livrée** — *Épines relayées* (Duelliste) : un allié **en garde** (rayon 2)
-    qui **encaisse** → le Duelliste pince l'attaquant (Lourde→2, défaut 1), CD 2 tours.
+  - **MODÈLE PAR-DUO (décidé 2026-06-16)** — *« un duo de héros = sa propre Résonance »*. Filtre
+    de source `ReactionSpec.fromCharacter` / `fromKind` : une Résonance peut ne réagir QU'À une
+    source précise (héros ou archétype). Chaque binôme porte alors **sa** `ReactionSpec` distincte
+    (id/effet/portée/CD propres), pas un effet partagé scalé. `amountBySource`/`amountByCharacter`
+    restent pour le cas léger « même effet, magnitude variable ». **Contrainte** : un duo n'existe
+    que s'il a un **signal que le partenaire émet** (aujourd'hui seul `garde_encaissee`, émis par
+    la Garde → seuls les duos avec un tank sont déclenchables sans nouveau signal).
+  - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`a_lourde`, en garde, rayon 2)
+    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'a_lourde'`), CD 2 tours. Fil
+    garde la Résonance générique *Épines relayées* en attendant son propre façonnage.
+  - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`
+    quand le Tir Réservé de Mireille part) ; Estoc (`fromCharacter: 'a_tireur'`, **portée escouade**)
+    pose une **marque** (`kind: 'marquage'`) sur la cible touchée → son **1ᵉʳ coup** sur elle gagne
+    **+1** puis la marque tombe. Durée 2 tours d'Estoc (statut `Unit.mark`, décompté à `endTurn`),
+    CD 2. **1ᵉʳ effet PERSISTANT** + 1ᵉʳ signal hors-garde. Portée escouade voulue (Mireille tire de
+    loin, Estoc au contact → jamais côte à côte).
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
