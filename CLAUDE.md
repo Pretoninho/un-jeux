@@ -119,6 +119,12 @@
     toucher ses attaques** (statut `Unit.cripple`, lu via `moveBudget = ap − cripple`, décompté à
     `endTurn` ; duration 3 car posée pendant le tour de la cible). 2ᵉ effet persistant ; `tickStatus`
     généralise le décompte (marque + estropie).
+  - **4ᵉ duo livré — *Estoc × Orso*** : quand le Tir Réservé d'Orso part (`tir_reserve`,
+    `fromCharacter: 'orso'`, **portée escouade**), Estoc **PROVOQUE** la cible (`kind: 'provocation'`)
+    → elle est tirée **d'1 case vers Estoc** (déplacement forcé, voisin libre le plus proche,
+    déterministe ; agnostique à la forme). CD 2 (= 1 tour plein réel), posé même si la cible ne peut
+    pas bouger (déjà collée à Estoc). Ne redéclenche pas l'overwatch. **Estoc a ses 4 duos** (Bastion,
+    Mireille, Rempart, Orso) ; dans le line-up courant seul *× Rempart* + *× Orso* sont vivants.
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

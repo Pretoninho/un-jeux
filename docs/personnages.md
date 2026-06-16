@@ -126,6 +126,9 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `estropier` — effet **persistant** : pose un `Unit.cripple` → **−`amount` en déplacement** sur la
   cible (les attaques ne sont pas touchées), pendant `duration` de SES tours. Appliqué via
   `moveBudget()` (= `ap − cripple`), décompté dans `endTurn()`.
+- `provocation` — **déplacement forcé** (instantané) : tire la cible d'1 case VERS le possesseur
+  (voisin libre le plus proche, départage déterministe). Agnostique à la forme (`neighbors` +
+  `graphDistance`). Ne redéclenche pas l'overwatch ; CD posé même si aucune case n'est libre.
 - Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant : statut sur
   `Unit`, tick dans `endTurn` via `tickStatus`, lecture à l'endroit concerné) + **lot moteur**.
 
