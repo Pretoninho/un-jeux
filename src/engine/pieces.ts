@@ -67,22 +67,32 @@ export const ARCHETYPES: Record<string, Archetype> = {
 /**
  * Résonance DUO « Estoc × Bastion » — un duo = sa propre Résonance (gâtée à la source par
  * `fromCharacter`). Quand Bastion (en garde, rayon 2) encaisse, Estoc pince l'attaquant pour 2.
- * Ne se déclenche QUE pour Bastion (`a_lourde`), pas un tank quelconque. CD 2 tours.
+ * Ne se déclenche QUE pour Bastion (`bastion`), pas un tank quelconque. CD 2 tours.
  */
 const EPINES_ESTOC_BASTION: ReactionSpec = {
-  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'a_lourde',
+  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
   scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2,
 };
 
 /**
- * Résonance DUO « Estoc × Mireille » — quand le Tir Réservé de Mireille (`a_tireur`) part, Estoc
+ * Résonance DUO « Estoc × Mireille » — quand le Tir Réservé de Mireille (`mireille`) part, Estoc
  * MARQUE la cible touchée : son 1er coup sur elle gagne +1 dégât. La marque dure 2 tours d'Estoc
  * (sinon s'efface), et la Résonance passe en CD 2. Portée `escouade` (toute l'équipe) : Mireille
  * tire de loin et Estoc est au contact → ils ne seront quasiment jamais à portée l'un de l'autre.
  */
 const MARQUAGE_ESTOC_MIREILLE: ReactionSpec = {
-  id: 'marquage_estoc_mireille', on: 'tir_reserve', fromCharacter: 'a_tireur',
+  id: 'marquage_estoc_mireille', on: 'tir_reserve', fromCharacter: 'mireille',
   scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+
+/**
+ * Résonance DUO « Estoc × Rempart » — si Estoc est à portée 2 de Rempart quand celui-ci (en garde)
+ * encaisse, Estoc ESTROPIE l'attaquant : −2 en déplacement. `duration: 3` = le reste de son tour
+ * courant + ses 2 tours pleins suivants (l'estropie est posée pendant SON tour). CD 2 tours.
+ */
+const ESTROPIER_ESTOC_REMPART: ReactionSpec = {
+  id: 'estropier_estoc_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { radius: 2 }, cooldown: 2, kind: 'estropier', amount: 2, duration: 3,
 };
 
 /**
@@ -103,18 +113,17 @@ export interface Character {
 }
 
 /**
- * Le registre des héros déployés. NOMS = PLACEHOLDERS provisoires (modifiables en une string).
- * Stats miroir entre camps ; seuls les noms (et, plus tard, des signatures) diffèrent.
+ * VIVIER PLAT : un pool commun de héros uniques, découplé des camps. N'importe quel héros peut être
+ * assigné à n'importe quel camp au déploiement (cf. line-up dans CombatView). Ids = noms neutres.
+ * NOMS = PLACEHOLDERS provisoires. Le draft (qui choisit quoi) reste une couche au-dessus, ajournée.
  */
 export const CHARACTERS: Record<string, Character> = {
-  // Camp A (Alice)
-  a_lourde:    { id: 'a_lourde',    name: 'Bastion', archetype: 'lourde' },
-  a_tireur:    { id: 'a_tireur',    name: 'Mireille', archetype: 'tireur' },
-  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE] },
-  // Camp B (Bob)
-  b_lourde:    { id: 'b_lourde',    name: 'Rempart', archetype: 'lourde' },
-  b_tireur:    { id: 'b_tireur',    name: 'Orso', archetype: 'tireur' },
-  b_duelliste: { id: 'b_duelliste', name: 'Fil', archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
+  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur' },
+  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART] },
+  rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
+  orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

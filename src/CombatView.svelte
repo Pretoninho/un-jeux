@@ -10,7 +10,7 @@
   import { makeBoard } from './engine/board';
   import { makeOctaBoard } from './engine/octaboard';
   import {
-    makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
+    makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend,
     reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
     type Unit,
     unitAt, type CombatState,
@@ -29,7 +29,7 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché' };
 
   type Shape = 'hex' | 'octa';
@@ -77,13 +77,16 @@
     };
     const [a2, a3] = spots(c0);
     const [b2, b3] = spots(c1);
+    // Line-up par défaut (vivier plat) : Lourde au coin, Tireur puis Duelliste autour.
+    //   Alice = Rempart + Orso + Estoc · Bob = Bastion + Mireille + Fil.
+    //   → seule la Résonance Estoc × Rempart est vivante (Bastion et Mireille sont en face).
     return makeCombatState(geo.map, [
-      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.a_lourde!, AP_PER_TURN),
-      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.a_tireur!, AP_PER_TURN),
-      makeUnitFromCharacter('a3', 'alice', a3, CHARACTERS.a_duelliste!, AP_PER_TURN),
-      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.b_lourde!, AP_PER_TURN),
-      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.b_tireur!, AP_PER_TURN),
-      makeUnitFromCharacter('b3', 'bob', b3, CHARACTERS.b_duelliste!, AP_PER_TURN),
+      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.rempart!, AP_PER_TURN),
+      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.orso!, AP_PER_TURN),
+      makeUnitFromCharacter('a3', 'alice', a3, CHARACTERS.estoc!, AP_PER_TURN),
+      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.bastion!, AP_PER_TURN),
+      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.mireille!, AP_PER_TURN),
+      makeUnitFromCharacter('b3', 'bob', b3, CHARACTERS.fil!, AP_PER_TURN),
     ], 'alice');
   }
 
@@ -168,7 +171,7 @@
   const champ = $derived(winner(combat));
   const over = $derived(champ !== null);
   const selected = $derived(combat.units.find((u) => u.id === selectedId && u.owner === combat.active));
-  const reach = $derived(over || !selected ? new Map<string, number>() : reachable(combat, selected.id, selected.ap));
+  const reach = $derived(over || !selected ? new Map<string, number>() : reachable(combat, selected.id, moveBudget(selected)));
 
   const isAttackable = (hexId: string) => {
     const t = unitAt(combat, hexId);
@@ -397,6 +400,8 @@
                 · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours{#if rx.fromCharacter} · duo : {CHAR_NAME[rx.fromCharacter] ?? rx.fromCharacter}{:else if rx.fromKind} · duo : {KIND_NAME[rx.fromKind] ?? rx.fromKind}{/if}
                 {#if rx.kind === 'marquage'}
                   <div class="amt">+{rx.amount ?? 1} au 1ᵉʳ coup sur la cible · marque {rx.duration ?? 2} tours</div>
+                {:else if rx.kind === 'estropier'}
+                  <div class="amt">−{rx.amount ?? 1} déplacement sur la cible · {rx.duration ?? 2} tours</div>
                 {:else}
                   <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
                 {/if}
@@ -421,6 +426,9 @@
           {#if selected.mark}
             {@const mk = combat.units.find((mu) => mu.id === selected.mark!.by)}
             <div class="ptags"><span class="tag m">✖ Marqué{#if mk} par {mk.name ?? KIND_NAME[mk.kind]}{/if} (+{selected.mark.bonus} au 1ᵉʳ coup · ⏳{selected.mark.expiresIn})</span></div>
+          {/if}
+          {#if selected.cripple}
+            <div class="ptags"><span class="tag c">🦿 Estropié (−{selected.cripple.amount} dépl. · ⏳{selected.cripple.expiresIn})</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -459,12 +467,15 @@
             {@const mk = combat.units.find((mu) => mu.id === foe.mark!.by)}
             <div class="ptags"><span class="tag m">✖ Marqué{#if mk} par {mk.name ?? KIND_NAME[mk.kind]}{/if} (+{foe.mark.bonus} au 1ᵉʳ coup · ⏳{foe.mark.expiresIn})</span></div>
           {/if}
+          {#if foe.cripple}
+            <div class="ptags"><span class="tag c">🦿 Estropié (−{foe.cripple.amount} dépl. · ⏳{foe.cripple.expiresIn})</span></div>
+          {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
             <div class="chainwarn">
               {#each chainPreview as p}
                 {@const lst = combat.units.find((u) => u.id === p.listenerId)}
-                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) pince ta pièce (−{p.amount})</span>
+                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) {#if p.spec.kind === 'estropier'}estropie ta pièce (−{p.amount} dépl.){:else}pince ta pièce (−{p.amount}){/if}</span>
               {/each}
             </div>
           {/if}
@@ -571,6 +582,7 @@
   .tag.w { background: #3a2a22; color: #ffd9b8; }
   .tag.r { background: #342a4a; color: #e2d6ff; }
   .tag.m { background: #4a2230; color: #ffc8d6; }
+  .tag.c { background: #2a3a2a; color: #c8e6c0; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }

@@ -72,6 +72,12 @@
   **stats sur-mesure** autorisées — calque `profile?` au niveau perso, hors-droite permis).
   À terme : **vivier commun** où n'importe quel héros peut être choisi par n'importe quel camp
   (plus de pool a_/b_ couplé au camp).
+  - **VIVIER PLAT LIVRÉ (2026-06-16)** : `CHARACTERS` découplé des camps, ids = **noms neutres**
+    (`bastion, mireille, estoc, rempart, orso, fil`) ; le déploiement (`CombatView`) assigne
+    librement les héros aux camps. Line-up par défaut : **Alice = Rempart + Orso + Estoc**, **Bob =
+    Bastion + Mireille + Fil** (→ seule *Estoc × Rempart* est vivante ; *× Bastion* et *× Mireille*
+    dormantes, leurs partenaires sont en face). **Une seule Lourde/escouade** → les duos-tank d'Estoc
+    sont **mutuellement exclusifs** (selon le tank fieldé). Le **draft** reste ajourné.
   - **Deux couches séparables** : (1) **les héros eux-mêmes** = la fondation, déjà en place,
     qu'on enrichit *sans* toucher au reste ; (2) **le draft** (comment on les choisit) = couche
     au-dessus, ajoutée plus tard.
@@ -98,15 +104,21 @@
     restent pour le cas léger « même effet, magnitude variable ». **Contrainte** : un duo n'existe
     que s'il a un **signal que le partenaire émet** (aujourd'hui seul `garde_encaissee`, émis par
     la Garde → seuls les duos avec un tank sont déclenchables sans nouveau signal).
-  - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`a_lourde`, en garde, rayon 2)
-    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'a_lourde'`), CD 2 tours. Fil
+  - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`bastion`, en garde, rayon 2)
+    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'bastion'`), CD 2 tours. Fil
     garde la Résonance générique *Épines relayées* en attendant son propre façonnage.
   - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`
-    quand le Tir Réservé de Mireille part) ; Estoc (`fromCharacter: 'a_tireur'`, **portée escouade**)
+    quand le Tir Réservé de Mireille part) ; Estoc (`fromCharacter: 'mireille'`, **portée escouade**)
     pose une **marque** (`kind: 'marquage'`) sur la cible touchée → son **1ᵉʳ coup** sur elle gagne
     **+1** puis la marque tombe. Durée 2 tours d'Estoc (statut `Unit.mark`, décompté à `endTurn`),
     CD 2. **1ᵉʳ effet PERSISTANT** + 1ᵉʳ signal hors-garde. Portée escouade voulue (Mireille tire de
     loin, Estoc au contact → jamais côte à côte).
+  - **3ᵉ duo livré — *Estoc × Rempart*** : si Estoc est à **portée 2** de Rempart quand celui-ci
+    (en garde) encaisse, Estoc **ESTROPIE** l'attaquant (`fromCharacter: 'rempart'`, `kind: 'estropier'`,
+    amount 2, **duration 3**, CD 2) : **−2 en déplacement** sur ses **2 tours pleins** suivants, **sans
+    toucher ses attaques** (statut `Unit.cripple`, lu via `moveBudget = ap − cripple`, décompté à
+    `endTurn` ; duration 3 car posée pendant le tour de la cible). 2ᵉ effet persistant ; `tickStatus`
+    généralise le décompte (marque + estropie).
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
