@@ -15,7 +15,7 @@
     type Unit,
     unitAt, type CombatState,
   } from './engine/combat';
-  import { makeUnit, ARCHETYPES } from './engine/pieces';
+  import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
@@ -77,12 +77,12 @@
     const [a2, a3] = spots(c0);
     const [b2, b3] = spots(c1);
     return makeCombatState(geo.map, [
-      makeUnit('a1', 'alice', c0, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('a2', 'alice', a2, ARCHETYPES.tireur!, AP_PER_TURN),
-      makeUnit('a3', 'alice', a3, ARCHETYPES.duelliste!, AP_PER_TURN),
-      makeUnit('b1', 'bob', c1, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('b2', 'bob', b2, ARCHETYPES.tireur!, AP_PER_TURN),
-      makeUnit('b3', 'bob', b3, ARCHETYPES.duelliste!, AP_PER_TURN),
+      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.a_lourde!, AP_PER_TURN),
+      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.a_tireur!, AP_PER_TURN),
+      makeUnitFromCharacter('a3', 'alice', a3, CHARACTERS.a_duelliste!, AP_PER_TURN),
+      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.b_lourde!, AP_PER_TURN),
+      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.b_tireur!, AP_PER_TURN),
+      makeUnitFromCharacter('b3', 'bob', b3, CHARACTERS.b_duelliste!, AP_PER_TURN),
     ], 'alice');
   }
 
@@ -405,7 +405,7 @@
       <div class="panels">
       <div class="panel ally" style="--c:{COLORS[combat.active]}">
         {#if selected}
-          <div class="phead"><span class="pdot"></span>{KIND_NAME[selected.kind]} <span class="powner">· {NAMES[selected.owner]}</span></div>
+          <div class="phead"><span class="pdot"></span>{selected.name ?? KIND_NAME[selected.kind]} <span class="powner">· {KIND_NAME[selected.kind]} · {NAMES[selected.owner]}</span></div>
           <div class="pv">PV <b>{selected.hp}/{selected.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -438,7 +438,7 @@
 
       <div class="panel foe" style="--c:{foe ? COLORS[foe.owner] : '#3a4150'}">
         {#if foe}
-          <div class="phead"><span class="pdot"></span>{KIND_NAME[foe.kind]} <span class="powner">· {NAMES[foe.owner]}</span></div>
+          <div class="phead"><span class="pdot"></span>{foe.name ?? KIND_NAME[foe.kind]} <span class="powner">· {KIND_NAME[foe.kind]} · {NAMES[foe.owner]}</span></div>
           <div class="pv">PV <b>{foe.hp}/{foe.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * foe.hp / foe.maxHp)}%; background:{foe.hp / foe.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -450,7 +450,8 @@
           {#if chainPreview.length}
             <div class="chainwarn">
               {#each chainPreview as p}
-                <span>⚡ En chaîne : le <b>{KIND_NAME[combat.units.find((u) => u.id === p.listenerId)?.kind ?? '']}</b> adverse pince ta pièce (−{p.amount})</span>
+                {@const lst = combat.units.find((u) => u.id === p.listenerId)}
+                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) pince ta pièce (−{p.amount})</span>
               {/each}
             </div>
           {/if}

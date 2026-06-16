@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { profileFor, makeUnit, ARCHETYPES } from './pieces';
+import { profileFor, makeUnit, makeUnitFromCharacter, ARCHETYPES, CHARACTERS, type Archetype } from './pieces';
+import type { ReactionSpec } from './combat';
 
 describe('pieces/calibrage — droite portée + robustesse = 5', () => {
   it('la paire polaire est aux extrêmes de la droite', () => {
@@ -82,5 +83,42 @@ describe('pieces/Duelliste — pièce hors-droite via override de profil', () =>
   it('sans override, makeUnit suit toujours la droite (non-régression)', () => {
     expect(makeUnit('a1', 'alice', 'X', ARCHETYPES.lourde!, 4)).toMatchObject(
       { hp: 16, maxHp: 16, range: 1, damage: 5, attackCost: 2 });
+  });
+});
+
+describe('pieces/Personnages — couche héros (socle de classe + signature)', () => {
+  it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
+    const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
+    expect(d).toMatchObject({ name: 'Estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
+    expect(d.reactions).toHaveLength(1);
+    expect(d.reactions![0]!.id).toBe('epines_relayees');
+    expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
+  });
+
+  it('la Résonance est portée par le PERSONNAGE, pas par la classe', () => {
+    expect(ARCHETYPES.duelliste!.reactions).toBeUndefined();
+    expect(makeUnit('x', 'alice', 'Z', ARCHETYPES.duelliste!, 4).reactions).toBeUndefined();
+  });
+
+  it('la signature fusionne avec le socle de classe par id (écrase + étend)', () => {
+    const socle: ReactionSpec = { id: 'r', on: 'garde_encaissee', scope: { radius: 1 }, cooldown: 1, kind: 'epines', amount: 1 };
+    const base: Archetype = { key: 'k', name: 'K', glyph: 'K', rangeTier: 1, reactions: [socle] };
+    const u = makeUnit('x', 'alice', 'Z', base, 4, { reactions: [{ ...socle, amount: 9 }, { ...socle, id: 'r2', amount: 2 }] });
+    expect(u.reactions).toHaveLength(2);
+    expect(u.reactions!.find((r) => r.id === 'r')!.amount).toBe(9);  // la signature écrase le socle
+    expect(u.reactions!.some((r) => r.id === 'r2')).toBe(true);       // et l'étend
+  });
+
+  it('héros distincts par camp mais stats MIROIR (seuls les noms diffèrent)', () => {
+    const a = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
+    const b = makeUnitFromCharacter('b3', 'bob', 'Z', CHARACTERS.b_duelliste!, 4);
+    expect(a.name).not.toBe(b.name);
+    expect({ hp: a.hp, damage: a.damage, range: a.range, attackCost: a.attackCost })
+      .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });
+    expect(a.reactions).toEqual(b.reactions);
+  });
+
+  it('un personnage à l\'archétype inconnu est rejeté', () => {
+    expect(() => makeUnitFromCharacter('x', 'alice', 'Z', { id: 'x', name: 'X', archetype: 'nope' }, 4)).toThrow();
   });
 });

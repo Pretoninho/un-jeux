@@ -55,6 +55,12 @@
 - **Effectif déployé** : Lourde + Tireur + **Duelliste** (3/camp pour l'instant). Cible = 4
   (le **Soigneur** sera la 4ᵉ). Exotiques (Hallebardier/Saboteur) en réserve dans le registre.
   Le **Duelliste** est hors-droite (PV 9, dégâts 2, **attaque 1 PA** → frappe deux fois/tour).
+- **Couche PERSONNAGE** (`Character`/`CHARACTERS`, `makeUnitFromCharacter`) : une pièce déployée
+  = **socle de classe** (archétype) + **calque perso** (nom, override de stats, **Résonance
+  signature**). Fusion des Résonances **par `id`** (signature étend/écrase le socle). Les deux
+  camps alignent des **héros distincts** (noms propres) aux **stats miroir** (équité). `Unit.kind`
+  reste l'archétype → la matrice `amountBySource` (× classe-source) intacte, la signature ajoute
+  l'axe *× personnage*. Noms actuels = **placeholders**. Épines = signature des Duellistes-héros.
 - **RÉSONANCE** = système de **réactions en chaîne** (synergies d'escouade), dans
   `engine/combat.ts` : un événement émet un **signal typé**, les alliés dont un passif
   (`ReactionSpec`) l'**écoute** réagissent ; l'effet dépend de la **source** (`amountBySource`)

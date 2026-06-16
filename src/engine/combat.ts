@@ -82,6 +82,7 @@ export interface PendingReaction {
 export interface Unit {
   id: string;
   owner: string;
+  name?: string;      // nom du personnage (identité héros) ; affichage seulement
   hex: HexId;
   hp: number;
   maxHp: number;

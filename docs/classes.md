@@ -67,6 +67,21 @@ Garde-fous (déterminisme + terminaison, esprit échecs) :
 **encaisse** un coup, le Duelliste **pince l'attaquant** ; dégâts selon la source (Lourde → 2,
 défaut 1), CD 2 tours. À terme, `overwatch` et `riposte` passeront par ce même canal.
 
+## Personnages (couche héros)
+
+Une pièce déployée est un **personnage** (`Character` dans `engine/pieces.ts`, registre
+`CHARACTERS`), pas un archétype brut. Un personnage = **socle de classe** (archétype : calibrage,
+verbes, Résonances de classe) **+ calque perso** : `name`, `profile?` (override de stats),
+`reactions?` (Résonances **signature**). `makeUnitFromCharacter` résout l'archétype puis applique
+le calque ; les Résonances fusionnent **par `id`** (la signature étend ou écrase le socle).
+
+- **Lisibilité** conservée : le socle reste au niveau classe ; l'identité s'ajoute par-dessus.
+- **Axe supplémentaire de la matrice** : on avait *possesseur × déclencheur* (`amountBySource`,
+  keyé sur la classe-source via `Unit.kind`) ; la signature ajoute *× personnage*.
+- **Les deux camps alignent des héros DISTINCTS** (noms propres) aux **stats miroir** → équité.
+- Première signature : *Épines relayées* est désormais portée par les **Duellistes-héros** (Estoc /
+  Fil), plus par la classe. Noms actuels = **placeholders** (Bastion/Mireille/Estoc · Rempart/Orso/Fil).
+
 ## Effectif déployé (hotseat)
 
 Équipe **visée : 4 pièces/camp**. Composition cible : **Lourde + Tireur + Duelliste + Soigneur**.

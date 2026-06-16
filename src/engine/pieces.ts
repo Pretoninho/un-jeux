@@ -46,35 +46,94 @@ export const ARCHETYPES: Record<string, Archetype> = {
   // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
   // en échange d'une attaque à 1 PA → frappe deux fois par tour. Verbe atypique : Riposte (2 PA →
   // contre tout attaquant adjacent jusqu'au prochain coup). Escarmouche/harcèlement.
-  // PASSIF « Épines relayées » : quand un allié en garde (rayon 2) ENCAISSE un coup, le Duelliste
-  // pince l'attaquant — dégâts selon la SOURCE (Lourde → 2, défaut 1). Première cellule de la
-  // matrice de synergies ; CD 2 tours.
+  // (Ses Résonances sont portées au niveau PERSONNAGE — voir CHARACTERS — pas au niveau classe.)
   duelliste: {
     key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1,
     profile: { maxHp: 9, damage: 2, attackCost: 1 },
     riposte: { cost: 2 },
-    reactions: [{
-      id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
-      kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
-    }],
   },
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
 };
 
-/** Fabrique une pièce d'un archétype donné, à pleine vie et avec `ap` points d'action. */
-export function makeUnit(id: string, owner: string, hex: string, archetype: Archetype, ap: number): Unit {
-  // Stats dérivées de la droite, puis override éventuel pour les pièces hors-droite (ex. Duelliste).
-  const p = { ...profileFor(archetype.rangeTier), ...archetype.profile };
+// ─────────────────────── Personnages (couche héros) ──────────────────────────
+//
+// Un PERSONNAGE = un archétype (socle : calibrage, verbes, Résonances de classe) + un calque
+// PERSO : nom, override de stats éventuel, et surtout sa Résonance SIGNATURE. La signature
+// fusionne avec le socle de classe PAR `id` (elle l'étend ou l'écrase). Les deux camps alignent
+// des héros DISTINCTS (noms propres) mais aux stats MIROIR → équité préservée (esprit échecs).
+
+/** Résonance signature partagée par les deux Duellistes (mêmes nombres → miroir équitable). */
+const EPINES_RELAYEES: ReactionSpec = {
+  // Quand un allié en garde (rayon 2) ENCAISSE un coup, le Duelliste pince l'attaquant —
+  // dégâts selon la SOURCE (Lourde → 2, défaut 1). Première cellule de la matrice ; CD 2 tours.
+  id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+  kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
+};
+
+export interface Character {
+  id: string;                 // identifiant unique du héros
+  name: string;               // nom affiché (identité)
+  archetype: string;          // clé dans ARCHETYPES (socle)
+  profile?: Partial<Profile>; // override de stats perso (rare ; mêmes règles que le hook de classe)
+  reactions?: ReactionSpec[]; // Résonances SIGNATURE du personnage
+}
+
+/**
+ * Le registre des héros déployés. NOMS = PLACEHOLDERS provisoires (modifiables en une string).
+ * Stats miroir entre camps ; seuls les noms (et, plus tard, des signatures) diffèrent.
+ */
+export const CHARACTERS: Record<string, Character> = {
+  // Camp A (Alice)
+  a_lourde:    { id: 'a_lourde',    name: 'Bastion', archetype: 'lourde' },
+  a_tireur:    { id: 'a_tireur',    name: 'Mireille', archetype: 'tireur' },
+  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+  // Camp B (Bob)
+  b_lourde:    { id: 'b_lourde',    name: 'Rempart', archetype: 'lourde' },
+  b_tireur:    { id: 'b_tireur',    name: 'Orso', archetype: 'tireur' },
+  b_duelliste: { id: 'b_duelliste', name: 'Fil', archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+};
+
+/** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */
+export interface Overlay {
+  name?: string;
+  profile?: Partial<Profile>;
+  reactions?: ReactionSpec[];
+}
+
+/** Fusionne socle de classe + signature perso PAR `id` (la signature étend ou écrase le socle). */
+function mergeReactions(base?: ReactionSpec[], extra?: ReactionSpec[]): ReactionSpec[] | undefined {
+  if (!base?.length && !extra?.length) return undefined;
+  const byId = new Map<string, ReactionSpec>();
+  for (const r of base ?? []) byId.set(r.id, r);
+  for (const r of extra ?? []) byId.set(r.id, r);
+  return [...byId.values()];
+}
+
+/**
+ * Fabrique une pièce d'un archétype, à pleine vie et avec `ap` points d'action. Un `overlay`
+ * (personnage) peut surcharger nom/stats et apporter des Résonances signature (cf. `makeUnitFromCharacter`).
+ */
+export function makeUnit(id: string, owner: string, hex: string, archetype: Archetype, ap: number, overlay?: Overlay): Unit {
+  // Stats : droite → override de classe (hors-droite) → override perso.
+  const p = { ...profileFor(archetype.rangeTier), ...archetype.profile, ...overlay?.profile };
   return {
     id, owner, hex, ap,
+    name: overlay?.name,
     hp: p.maxHp, maxHp: p.maxHp,
     range: p.range, damage: p.damage, attackCost: p.attackCost,
     kind: archetype.key,
     guard: archetype.guard, guarding: false,
     overwatch: archetype.overwatch, watching: false,
     riposte: archetype.riposte, riposting: false,
-    reactions: archetype.reactions, cooldowns: {},
+    reactions: mergeReactions(archetype.reactions, overlay?.reactions), cooldowns: {},
   };
+}
+
+/** Déploie un PERSONNAGE : résout son archétype et applique son calque (nom, stats, signature). */
+export function makeUnitFromCharacter(pieceId: string, owner: string, hex: string, character: Character, ap: number): Unit {
+  const archetype = ARCHETYPES[character.archetype];
+  if (!archetype) throw new Error(`Archétype inconnu : ${character.archetype}`);
+  return makeUnit(pieceId, owner, hex, archetype, ap, character);
 }
