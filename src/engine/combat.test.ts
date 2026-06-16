@@ -527,11 +527,11 @@ describe('combat — réactions en chaîne (synergies)', () => {
 });
 
 describe('combat — Résonance Estoc × Mireille (marquage)', () => {
-  // Mireille (Tireuse, characterId a_tireur) en guet ; Estoc à portée porte la Résonance marquage.
+  // Mireille (Tireuse, characterId mireille) en guet ; Estoc à portée porte la Résonance marquage.
   const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
-    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'a_tireur', ...over });
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'mireille', ...over });
   const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
-    u({ reactions: [{ id: 'mq', on: 'tir_reserve', fromCharacter: 'a_tireur', scope: { squad: true },
+    u({ reactions: [{ id: 'mq', on: 'tir_reserve', fromCharacter: 'mireille', scope: { squad: true },
         cooldown: 2, kind: 'marquage', amount: 1, duration: 2 }], cooldowns: {}, ...over });
 
   // État de départ : le tir réservé de Mireille part sur la cible, Estoc la marque.

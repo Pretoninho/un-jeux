@@ -88,14 +88,14 @@ describe('pieces/Duelliste — pièce hors-droite via override de profil', () =>
 
 describe('pieces/Personnages — couche héros (socle de classe + signature)', () => {
   it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
-    const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
-    expect(d).toMatchObject({ name: 'Estoc', characterId: 'a_duelliste', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
+    const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.estoc!, 4);
+    expect(d).toMatchObject({ name: 'Estoc', characterId: 'estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
     expect(d.reactions).toHaveLength(2);                                    // deux duos
     const ids = d.reactions!.map((r) => r.id);
     expect(ids).toContain('epines_estoc_bastion');                         // × Bastion
     expect(ids).toContain('marquage_estoc_mireille');                      // × Mireille
-    expect(d.reactions!.find((r) => r.id === 'epines_estoc_bastion')!.fromCharacter).toBe('a_lourde');
-    expect(d.reactions!.find((r) => r.id === 'marquage_estoc_mireille')!.fromCharacter).toBe('a_tireur');
+    expect(d.reactions!.find((r) => r.id === 'epines_estoc_bastion')!.fromCharacter).toBe('bastion');
+    expect(d.reactions!.find((r) => r.id === 'marquage_estoc_mireille')!.fromCharacter).toBe('mireille');
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
   });
 
@@ -114,8 +114,8 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
   });
 
   it('Estoc et Fil : stats encore miroir mais Résonances DISSOCIÉES (Estoc devient unique)', () => {
-    const a = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
-    const b = makeUnitFromCharacter('b3', 'bob', 'Z', CHARACTERS.b_duelliste!, 4);
+    const a = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.estoc!, 4);
+    const b = makeUnitFromCharacter('b3', 'bob', 'Z', CHARACTERS.fil!, 4);
     expect(a.name).not.toBe(b.name);
     expect({ hp: a.hp, damage: a.damage, range: a.range, attackCost: a.attackCost })
       .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });

@@ -66,7 +66,7 @@ Une Résonance = un `ReactionSpec` (donnée **pure**, sérialisable) :
   kind: 'epines',            // EFFET (le moteur dispatch dessus ; effets dispo : §4.2)
   amount: 1,                 // valeur par défaut
   amountBySource?: { lourde: 2 },        // override selon la CLASSE du déclencheur (Unit.kind)
-  amountByCharacter?: { a_lourde: 3 },   // override selon le HÉROS du déclencheur (Unit.characterId)
+  amountByCharacter?: { bastion: 3 },    // override selon le HÉROS du déclencheur (Unit.characterId)
 }
 ```
 
@@ -103,7 +103,7 @@ portée, son CD), gâtée à son partenaire. `amountBySource`/`amountByCharacter
 **Exemple livré — *Estoc × Bastion*** :
 ```ts
 const EPINES_ESTOC_BASTION: ReactionSpec = {
-  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'a_lourde',
+  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
   scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2,
 };
 ```
@@ -143,9 +143,9 @@ mon_heros: {
 },
 ```
 
-> **Note vivier (cible « héros uniques »)** : les `id` actuels sont préfixés `a_/b_` (couplage
-> camp = legacy miroir). La direction visée est un **vivier plat** (un héros = une entrée, choisi
-> par n'importe quel camp). Tant que le découplage n'est pas fait, garde la convention existante.
+> **Note vivier (FAIT)** : `CHARACTERS` est un **vivier plat** — ids = noms neutres (`estoc`,
+> `bastion`…), découplés des camps. N'importe quel héros est assignable à n'importe quel camp au
+> déploiement (line-up dans `CombatView`). Le **draft** (qui choisit quoi) reste une couche ajournée.
 
 ## 6. Déployer (line-up jouable)
 
