@@ -87,11 +87,12 @@ const MARQUAGE_ESTOC_MIREILLE: ReactionSpec = {
 
 /**
  * Résonance DUO « Estoc × Rempart » — si Estoc est à portée 2 de Rempart quand celui-ci (en garde)
- * encaisse, Estoc ESTROPIE l'attaquant : −2 en déplacement pendant 2 de ses tours. CD 2 tours.
+ * encaisse, Estoc ESTROPIE l'attaquant : −2 en déplacement. `duration: 3` = le reste de son tour
+ * courant + ses 2 tours pleins suivants (l'estropie est posée pendant SON tour). CD 2 tours.
  */
 const ESTROPIER_ESTOC_REMPART: ReactionSpec = {
   id: 'estropier_estoc_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
-  scope: { radius: 2 }, cooldown: 2, kind: 'estropier', amount: 2, duration: 2,
+  scope: { radius: 2 }, cooldown: 2, kind: 'estropier', amount: 2, duration: 3,
 };
 
 /**

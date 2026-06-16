@@ -590,7 +590,7 @@ describe('combat — Résonance Estoc × Rempart (estropier)', () => {
     u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'rempart', ...over });
   const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ reactions: [{ id: 'es', on: 'garde_encaissee', fromCharacter: 'rempart', scope: { radius: 2 },
-        cooldown: 2, kind: 'estropier', amount: 2, duration: 2 }], cooldowns: {}, ...over });
+        cooldown: 2, kind: 'estropier', amount: 2, duration: 3 }], cooldowns: {}, ...over });
 
   it('Rempart encaisse + Estoc à portée → l\'attaquant est estropié (et CD posé)', () => {
     const base = makeCombatState(LINE, [
@@ -599,7 +599,7 @@ describe('combat — Résonance Estoc × Rempart (estropier)', () => {
       u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
     ], 'bob');
     const s = attack(base, 'b', 'r');
-    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 2, owner: 'bob', expiresIn: 2 });
+    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 2, owner: 'bob', expiresIn: 3 });
     expect(unitById(s, 'e')!.cooldowns!.es).toBe(2);
   });
 
@@ -631,19 +631,20 @@ describe('combat — Résonance Estoc × Rempart (estropier)', () => {
     expect(unitAt(moveUnit(st, 'a', 'C'), 'C')?.id).toBe('a');     // C (dist 2) ≤ budget 2 → ok
   });
 
-  it('l\'estropie s\'efface après 2 tours de la pièce touchée', () => {
+  it('l\'estropie tient les 2 tours pleins suivants de la pièce touchée (duration 3)', () => {
     const base = makeCombatState(LINE, [
       rempart({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
       estoc({ id: 'e', owner: 'alice', hex: 'A', hp: 10 }),
       u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
     ], 'bob');
-    const s = attack(base, 'b', 'r');                  // bob estropié (expiresIn 2), bob actif
-    const e1 = endTurn(s, 4);                           // bob finit → décompte : 1
-    expect(unitById(e1, 'b')!.cripple!.expiresIn).toBe(1);
-    const e2 = endTurn(e1, 4);                          // alice finit → pas de décompte (owner bob)
-    expect(unitById(e2, 'b')!.cripple!.expiresIn).toBe(1);
-    const e3 = endTurn(e2, 4);                          // bob finit → décompte : 0 → disparaît
-    expect(unitById(e3, 'b')!.cripple).toBeUndefined();
+    const s = attack(base, 'b', 'r');                      // posée pendant le tour de bob
+    expect(unitById(s, 'b')!.cripple!.expiresIn).toBe(3);
+    const t1 = endTurn(endTurn(s, 4), 4);                  // → bob actif : 1ᵉʳ tour plein
+    expect(unitById(t1, 'b')!.cripple!.expiresIn).toBe(2);
+    const t2 = endTurn(endTurn(t1, 4), 4);                 // → bob actif : 2ᵉ tour plein
+    expect(unitById(t2, 'b')!.cripple!.expiresIn).toBe(1);
+    const t3 = endTurn(endTurn(t2, 4), 4);                 // → bob actif : estropie disparue
+    expect(unitById(t3, 'b')!.cripple).toBeUndefined();
   });
 });
 
