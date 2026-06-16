@@ -40,6 +40,9 @@
 - `vite.config` : `base: '/un-jeux/'` au **build** (project page), `/` en **dev local**.
 - L'environnement Pages n'autorise que **`main`** à déployer → le travail validé doit
   arriver sur `main` pour être publié (la branche de dev seule ne déploie pas).
+- **Accord permanent de l'utilisateur** : à chaque lot validé (gates verts), je
+  **fast-forward `main`** sur la branche de dev pour publier, afin qu'il puisse tester en
+  ligne. (Seule exception à la règle « ne pas pousser sur `main` sans accord ».)
 - Le **conteneur cloud** où tourne l'assistant est éphémère et sans réseau entrant : il ne
   peut PAS servir de lien de preview. Le site publié ne dépend pas de lui.
 
