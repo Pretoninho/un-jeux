@@ -18,7 +18,7 @@
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
-  const OCTA_N = 13;
+  const OCTA_N = 19;
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -89,7 +89,7 @@
   // navigateur (≈ 82vh) et la largeur dispo, en respectant le ratio du plateau.
   const mapStyle = $derived(
     `aspect-ratio:${geo.bounds.w} / ${geo.bounds.h};` +
-    `width:min(100%, ${((geo.bounds.w / geo.bounds.h) * 82).toFixed(1)}vh)`,
+    `width:min(100%, ${((geo.bounds.w / geo.bounds.h) * 88).toFixed(1)}vh)`,
   );
 
   // Garde la fenêtre à l'intérieur du plateau (jamais de vide hors-carte).
