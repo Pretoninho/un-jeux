@@ -61,6 +61,21 @@
   camps alignent des **héros distincts** (noms propres) aux **stats miroir** (équité). `Unit.kind`
   reste l'archétype → la matrice `amountBySource` (× classe-source) intacte, la signature ajoute
   l'axe *× personnage*. Noms actuels = **placeholders**. Épines = signature des Duellistes-héros.
+- **HÉROS UNIQUES (cap visée — décidé le 2026-06-16)** : on quitte le miroir. Chaque
+  personnage devient un **héros unique** (identité propre, **Résonance signature** propre,
+  **stats sur-mesure** autorisées — calque `profile?` au niveau perso, hors-droite permis).
+  À terme : **vivier commun** où n'importe quel héros peut être choisi par n'importe quel camp
+  (plus de pool a_/b_ couplé au camp).
+  - **Deux couches séparables** : (1) **les héros eux-mêmes** = la fondation, déjà en place,
+    qu'on enrichit *sans* toucher au reste ; (2) **le draft** (comment on les choisit) = couche
+    au-dessus, ajoutée plus tard.
+  - **Décision de draft / d'équité AJOURNÉE** : on ne tranche le modèle (miroir / exclusif /
+    libre) **qu'au moment de construire l'écran de sélection**, quand le vivier sera assez
+    profond. Conséquence assumée : héros uniques + fieldés une fois ⇒ escouades **asymétriques
+    par nature** → l'**équité devient un sujet de design au draft**, pas avant (sans gravité en
+    phase de construction).
+  - **Méthode** : on façonne les héros **un à la fois** (un héros = un petit lot validé, comme
+    une cellule de matrice) ; line-up par défaut jouable conservé pour tester en attendant.
 - **RÉSONANCE** = système de **réactions en chaîne** (synergies d'escouade), dans
   `engine/combat.ts` : un événement émet un **signal typé**, les alliés dont un passif
   (`ReactionSpec`) l'**écoute** réagissent ; l'effet dépend de la **source** (`amountBySource`)
