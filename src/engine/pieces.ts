@@ -106,12 +106,13 @@ const PROVOCATION_ESTOC_ORSO: ReactionSpec = {
 };
 
 /**
- * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
- * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
+ * Résonance DUO « Fil × Bastion » — quand Bastion (en garde, rayon 2) encaisse et que Fil est à
+ * portée, Fil octroie à Bastion la VENDETTA : +2 à sa PROCHAINE attaque (garde sa rancune jusqu'à
+ * frapper, pas d'expiration). 1ᵉʳ effet de SOUTIEN (buff d'un allié). CD 3 (= 2 tours pleins réels).
  */
-const EPINES_RELAYEES: ReactionSpec = {
-  id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
-  kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
+const VENDETTA_FIL_BASTION: ReactionSpec = {
+  id: 'vendetta_fil_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
+  scope: { radius: 2 }, cooldown: 3, kind: 'vendetta', amount: 2,
 };
 
 export interface Character {
@@ -133,7 +134,7 @@ export const CHARACTERS: Record<string, Character> = {
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
-  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

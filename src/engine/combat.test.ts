@@ -694,6 +694,58 @@ describe('combat — Résonance Estoc × Orso (provocation)', () => {
   });
 });
 
+describe('combat — Résonance Fil × Bastion (vendetta)', () => {
+  // Bastion (Lourde, characterId bastion) en garde ; Fil à portée 2 porte la Résonance vendetta.
+  const bastion = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'bastion', ...over });
+  const fil = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'vd', on: 'garde_encaissee', fromCharacter: 'bastion', scope: { radius: 2 },
+        cooldown: 3, kind: 'vendetta', amount: 2 }], cooldowns: {}, ...over });
+
+  it('Bastion encaisse + Fil à portée → Bastion gagne Vendetta (+2) et la Résonance passe en CD 3', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),  // A..B = 1 ≤ rayon 2
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'r');
+    expect(unitById(s, 'r')!.vendetta).toBe(2);            // le SOURCE (Bastion) est buffé, pas l'attaquant
+    expect(unitById(s, 'b')!.vendetta).toBeUndefined();
+    expect(unitById(s, 'f')!.cooldowns!.vd).toBe(3);
+  });
+
+  it('Bastion consomme la Vendetta à sa prochaine attaque (+2), puis elle tombe', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 16, damage: 4 }),
+    ], 'bob');
+    const s = endTurn(attack(base, 'b', 'r'), 4);          // bob frappe Bastion → Vendetta ; puis tour d'alice
+    expect(unitById(s, 'r')!.vendetta).toBe(2);            // la rancune survit au passage de tour
+    const hit = attack(s, 'r', 'b');                        // Bastion (dégâts 4) frappe : 4 + 2 = 6
+    expect(unitById(hit, 'b')!.hp).toBe(10);               // 16 − 6
+    expect(unitById(hit, 'r')!.vendetta).toBeUndefined();  // consommée
+  });
+
+  it('gâté à Bastion : un autre tank en garde ne donne pas la Vendetta', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4, characterId: 'rempart' }), // pas Bastion
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'r'), 'r')!.vendetta).toBeUndefined();
+  });
+
+  it('pas de Vendetta si Fil est hors du rayon 2', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      fil({ id: 'f', owner: 'alice', hex: 'E', hp: 10 }),   // E..B = 3 > rayon 2
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'r'), 'r')!.vendetta).toBeUndefined();
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

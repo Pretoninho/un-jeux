@@ -117,15 +117,15 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(u.reactions!.some((r) => r.id === 'r2')).toBe(true);       // et l'étend
   });
 
-  it('Estoc et Fil : stats encore miroir mais Résonances DISSOCIÉES (Estoc devient unique)', () => {
+  it('Estoc et Fil : stats miroir mais Résonances propres et DISSOCIÉES (héros uniques)', () => {
     const a = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.estoc!, 4);
     const b = makeUnitFromCharacter('b3', 'bob', 'Z', CHARACTERS.fil!, 4);
     expect(a.name).not.toBe(b.name);
     expect({ hp: a.hp, damage: a.damage, range: a.range, attackCost: a.attackCost })
       .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });
-    expect(a.reactions).not.toEqual(b.reactions);            // plus de signature partagée
-    expect(a.reactions![0]!.id).toBe('epines_estoc_bastion'); // Estoc : duo propre
-    expect(b.reactions![0]!.id).toBe('epines_relayees');      // Fil : générique (en attente)
+    expect(a.reactions).not.toEqual(b.reactions);            // duos distincts
+    expect(a.reactions!.map((r) => r.id)).toContain('epines_estoc_bastion'); // Estoc × Bastion
+    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion']);  // Fil × Bastion (façonné)
   });
 
   it('un personnage à l\'archétype inconnu est rejeté', () => {

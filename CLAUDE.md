@@ -105,8 +105,7 @@
     que s'il a un **signal que le partenaire émet** (aujourd'hui seul `garde_encaissee`, émis par
     la Garde → seuls les duos avec un tank sont déclenchables sans nouveau signal).
   - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`bastion`, en garde, rayon 2)
-    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'bastion'`), CD 2 tours. Fil
-    garde la Résonance générique *Épines relayées* en attendant son propre façonnage.
+    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'bastion'`), CD 2 tours.
   - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`
     quand le Tir Réservé de Mireille part) ; Estoc (`fromCharacter: 'mireille'`, **portée escouade**)
     pose une **marque** (`kind: 'marquage'`) sur la cible touchée → son **1ᵉʳ coup** sur elle gagne
@@ -125,8 +124,14 @@
     déterministe ; agnostique à la forme). CD 2 (= 1 tour plein réel), posé même si la cible ne peut
     pas bouger (déjà collée à Estoc). Ne redéclenche pas l'overwatch. **Estoc a ses 4 duos** (Bastion,
     Mireille, Rempart, Orso) ; dans le line-up courant seul *× Rempart* + *× Orso* sont vivants.
-  - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
-    `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
+  - **Duo livré — *Fil × Bastion*** (1ᵉʳ façonnage de Fil) : quand Bastion (en garde, rayon 2)
+    encaisse et que Fil est à portée, Fil octroie à **Bastion** la **VENDETTA** (`fromCharacter: 'bastion'`,
+    `kind: 'vendetta'`, amount 2, CD 3 = 2 tours pleins) : **+2 à sa PROCHAINE attaque**, gardée jusqu'à
+    frapper (statut `Unit.vendetta`, sans expiration, consommé dans `strike()`). **1ᵉʳ effet de SOUTIEN**
+    (buff d'un allié) → `PendingReaction.sourceId` ajouté (l'effet vise l'allié émetteur, pas l'attaquant).
+    Dans le line-up courant, Fil et Bastion sont alliés (Bob) → ce duo est **vivant**.
+  - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
+    bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
   (`allie_a_terre`, `pres_de_mourir`…), nouvelles cellules sur pièces existantes, nouveaux
   effets `kind`, puis **spécialistes** (Soigneur/Hallebardier/Saboteur) « nés résonants ».

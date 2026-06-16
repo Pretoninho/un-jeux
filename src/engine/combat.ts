@@ -62,7 +62,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -97,7 +97,8 @@ export interface Cripple {
 export interface PendingReaction {
   listenerId: string;
   spec: ReactionSpec;
-  targetId: string;
+  sourceId: string; // l'allié qui a émis le signal (cible des effets de SOUTIEN, ex. vendetta)
+  targetId: string; // l'ennemi visé (cible des effets OFFENSIFS : épines, marquage, estropie, provocation)
   amount: number;
 }
 
@@ -129,6 +130,7 @@ export interface Unit {
   cooldowns?: Record<string, number>;  // CD restant par passif (clé = ReactionSpec.id), en tours
   mark?: Mark;                         // statut « marqué » subi (posé par un allié adverse, ex. Estoc)
   cripple?: Cripple;                   // statut « estropié » subi : malus de déplacement (ex. Estoc × Rempart)
+  vendetta?: number;                   // bonus de dégâts en attente sur SA prochaine attaque (ex. Fil × Bastion)
 }
 
 export interface CombatState {
@@ -273,10 +275,11 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   const target0 = unitById(state, targetId)!;
   // Marque : si la cible portait une marque DE CET attaquant, son 1er coup gagne le bonus, puis tombe.
   const marked = !!target0.mark && target0.mark.by === attackerId;
-  const raw = attacker.damage + (marked ? target0.mark!.bonus : 0);
+  // Bonus de dégâts : marque (sur cette cible) + vendetta en attente (sur SON attaque) ; consommés.
+  const raw = attacker.damage + (marked ? target0.mark!.bonus : 0) + (attacker.vendetta ?? 0);
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
-    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
+    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, ...(attacker.vendetta ? { vendetta: undefined } : {}) };
     if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, raw), ...(marked ? { mark: undefined } : {}) };
     return u;
   });
@@ -360,7 +363,7 @@ export function pendingReactions(state: CombatState, signal: Signal, fired: Set<
       if (fired.has(`${u.id}:${spec.id}`)) continue;
       if ((u.cooldowns?.[spec.id] ?? 0) > 0) continue;
       if (!inScope(state.map, source, u, spec.scope)) continue;
-      out.push({ listenerId: u.id, spec, targetId: target.id, amount: reactionAmount(spec, source) });
+      out.push({ listenerId: u.id, spec, sourceId: source.id, targetId: target.id, amount: reactionAmount(spec, source) });
     }
   }
   return out;
@@ -400,6 +403,14 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
         if (u.id === p.listenerId) return arm(u);
         if (u.id === p.targetId)
           return { ...u, cripple: { amount: p.amount, owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'vendetta': { // SOUTIEN : buffe l'allié SOURCE (ex. Bastion) → +amount à sa prochaine attaque
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.sourceId) return { ...u, vendetta: p.amount };
         return u;
       });
       return { ...state, units };

@@ -129,6 +129,12 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `provocation` — **déplacement forcé** (instantané) : tire la cible d'1 case VERS le possesseur
   (voisin libre le plus proche, départage déterministe). Agnostique à la forme (`neighbors` +
   `graphDistance`). Ne redéclenche pas l'overwatch ; CD posé même si aucune case n'est libre.
+- `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
+  l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
+  consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).
+
+> **Offensif vs soutien** : `PendingReaction` porte `targetId` (l'ennemi, cible des effets
+> offensifs) **et** `sourceId` (l'allié émetteur, cible des effets de soutien). Choisis selon l'effet.
 - Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant : statut sur
   `Unit`, tick dans `endTurn` via `tickStatus`, lecture à l'endroit concerné) + **lot moteur**.
 
