@@ -452,6 +452,19 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10);
   });
 
+  it('la source ne réagit pas à son propre signal (synergie d\'escouade, pas auto-buff)', () => {
+    const base = makeCombatState(LINE, [
+      // le tank en garde porte LUI-MÊME le passif épines, et reste le seul allié présent
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4,
+        reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+          kind: 'epines', amount: 1, amountBySource: { lourde: 3 } }], cooldowns: {} }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'b')!.hp).toBe(10);              // aucune épine : la source s'exclut
+    expect(unitById(s, 'a')!.cooldowns!.ep ?? 0).toBe(0); // son propre passif n'est pas parti
+  });
+
   it('previewReactions annonce la cascade sans muter l\'état', () => {
     const base = makeCombatState(LINE, [
       u({ id: 'x', owner: 'alice', hex: 'B', ap: 4, damage: 4 }),  // ton attaquant
