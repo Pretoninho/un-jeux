@@ -392,21 +392,22 @@
 
     <aside class="info">
     {#snippet reson(unit: Unit, open: boolean, toggle: () => void)}
-      {#if unit.reactions?.length}
+      {@const active = (unit.reactions ?? []).filter((rx) => duoActive(unit, rx))}
+      {#if active.length}
         <div class="reson">
           <span class="reslabel">RÉSONANCE</span>
-          {#each unit.reactions as rx}
-            <span class="resbadge" class:dormant={!duoActive(unit, rx)}>✦ {RESON_LABEL[rx.kind] ?? 'Résonance'}
-              {#if !duoActive(unit, rx)}<span class="dorm">dormant</span>{:else if (unit.cooldowns?.[rx.id] ?? 0) > 0}<span class="cd">⏳{unit.cooldowns?.[rx.id]}</span>{:else}<span class="rdy">prêt</span>{/if}
+          {#each active as rx}
+            <span class="resbadge">✦ {RESON_LABEL[rx.kind] ?? 'Résonance'}
+              {#if (unit.cooldowns?.[rx.id] ?? 0) > 0}<span class="cd">⏳{unit.cooldowns?.[rx.id]}</span>{:else}<span class="rdy">prêt</span>{/if}
             </span>
           {/each}
           <button class="qbtn" class:on={open} onclick={toggle} title="Détail de la Résonance">?</button>
         </div>
         {#if open}
           <div class="resdetail">
-            {#each unit.reactions as rx}
+            {#each active as rx}
               <div><b>{RESON_LABEL[rx.kind] ?? rx.id}</b> — {SIGNAL_LABEL[rx.on] ?? rx.on}
-                · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours{#if rx.fromCharacter} · duo : {CHAR_NAME[rx.fromCharacter] ?? rx.fromCharacter}{:else if rx.fromKind} · duo : {KIND_NAME[rx.fromKind] ?? rx.fromKind}{/if}{#if !duoActive(unit, rx)} <span class="dorm">(partenaire absent)</span>{/if}
+                · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours{#if rx.fromCharacter} · duo : {CHAR_NAME[rx.fromCharacter] ?? rx.fromCharacter}{:else if rx.fromKind} · duo : {KIND_NAME[rx.fromKind] ?? rx.fromKind}{/if}
                 {#if rx.kind === 'marquage'}
                   <div class="amt">+{rx.amount ?? 1} au 1ᵉʳ coup sur la cible · marque {rx.duration ?? 2} tours</div>
                 {:else if rx.kind === 'estropier'}
@@ -607,8 +608,6 @@
   .resbadge { font-size: .72rem; padding: .12rem .45rem; border-radius: 4px; background: #2c2640; color: #cbb6ec; display: inline-flex; gap: .3rem; align-items: center; }
   .resbadge .cd { color: #e2c66a; }
   .resbadge .rdy { color: #7fcf9e; }
-  .resbadge.dormant { background: #242231; color: #6b6680; }
-  .dorm { color: #6b6680; font-style: italic; }
   .qbtn { width: 1.25rem; height: 1.25rem; line-height: 1; padding: 0; border-radius: 50%; border: 1px solid #4a4368; background: #221d33; color: #b7a6e0; cursor: pointer; font-size: .72rem; }
   .qbtn:hover, .qbtn.on { border-color: #9a7cc8; color: #e2d6ff; }
   .resdetail { font-size: .72rem; color: #b9afd0; background: #1d1930; border: 1px solid #352f4e; border-radius: 5px; padding: .35rem .5rem; margin: .1rem 0 .3rem; display: flex; flex-direction: column; gap: .25rem; }
