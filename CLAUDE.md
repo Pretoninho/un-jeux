@@ -42,6 +42,7 @@
   l'inspecte, il n'attaque plus directement. L'attaque part du panneau adverse.
 
 ## Classes, verbes & Résonance (avancement — détail : `docs/classes.md`)
+> **Créer un personnage : processus pas-à-pas → `docs/personnages.md`.**
 - **Calibrage « portée + robustesse = 5 »** (`engine/pieces.ts`, `profileFor`) : une pièce
   *sur la droite* est définie par son seul palier de portée `r∈{1..4}`, `t=5−r` → `maxHp=4+3t`,
   `damage=1+t`, `attackCost=2`. Aucune pièce strictement meilleure, tout est positionnel.

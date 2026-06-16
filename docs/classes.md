@@ -3,6 +3,8 @@
 Référence vivante des archétypes. Source de vérité du code : `src/engine/pieces.ts`
 (registre `ARCHETYPES`, dérivation `profileFor`, fabrique `makeUnit`).
 
+> **Créer un nouveau personnage ?** Suivre le processus pas-à-pas : `docs/personnages.md`.
+
 ## Calibrage — la droite « portée + robustesse = 5 »
 
 Une pièce *sur la droite* est définie par un seul levier : son palier de **portée**
