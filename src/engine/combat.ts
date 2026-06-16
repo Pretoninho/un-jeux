@@ -64,7 +64,8 @@ export interface ReactionSpec {
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
   kind: 'epines';                          // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
-  amountBySource?: Record<string, number>; // override selon l'archétype de la SOURCE
+  amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
+  amountByCharacter?: Record<string, number>; // override selon le HÉROS de la source (Unit.characterId) — plus spécifique
 }
 /** Une réaction prête à partir, résolue depuis un signal (sert résolution ET prévisualisation). */
 export interface PendingReaction {
@@ -82,6 +83,7 @@ export interface PendingReaction {
 export interface Unit {
   id: string;
   owner: string;
+  characterId?: string; // identité héros stable (clé de la matrice « × personnage », vivier/draft)
   name?: string;      // nom du personnage (identité héros) ; affichage seulement
   hex: HexId;
   hp: number;
@@ -286,9 +288,17 @@ function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): bool
   return 'squad' in scope ? true : graphDistance(map, source.hex, listener.hex) <= scope.radius;
 }
 
-/** Valeur de l'effet selon l'archétype de la SOURCE (la matrice possesseur×déclencheur). */
-function reactionAmount(spec: ReactionSpec, sourceKind: string): number {
-  return spec.amountBySource?.[sourceKind] ?? spec.amount ?? 1;
+/**
+ * Valeur de l'effet selon la SOURCE (la matrice possesseur×déclencheur). Priorité du plus
+ * spécifique au plus général : héros (`characterId`) → archétype (`kind`) → défaut (`amount`) → 1.
+ */
+function reactionAmount(spec: ReactionSpec, source: Unit): number {
+  return (
+    (source.characterId !== undefined ? spec.amountByCharacter?.[source.characterId] : undefined) ??
+    spec.amountBySource?.[source.kind] ??
+    spec.amount ??
+    1
+  );
 }
 
 /**
@@ -308,7 +318,7 @@ export function pendingReactions(state: CombatState, signal: Signal, fired: Set<
       if (fired.has(`${u.id}:${spec.id}`)) continue;
       if ((u.cooldowns?.[spec.id] ?? 0) > 0) continue;
       if (!inScope(state.map, source, u, spec.scope)) continue;
-      out.push({ listenerId: u.id, spec, targetId: target.id, amount: reactionAmount(spec, source.kind) });
+      out.push({ listenerId: u.id, spec, targetId: target.id, amount: reactionAmount(spec, source) });
     }
   }
   return out;

@@ -61,6 +61,11 @@
   camps alignent des **héros distincts** (noms propres) aux **stats miroir** (équité). `Unit.kind`
   reste l'archétype → la matrice `amountBySource` (× classe-source) intacte, la signature ajoute
   l'axe *× personnage*. Noms actuels = **placeholders**. Épines = signature des Duellistes-héros.
+  - **Axe « × personnage » CÂBLÉ (sous-lot A, 2026-06-16)** : `Unit.characterId` (identité héros
+    stable, posée par `makeUnitFromCharacter` ; sert aussi vivier/draft) + `ReactionSpec.amountByCharacter`.
+    Lookup `reactionAmount` priorisé : **héros** (`characterId`) → **classe** (`kind`) → défaut → 1.
+    UI : le panneau `?` affiche « selon classe » **et** « selon héros ». **Sous-lot B AJOURNÉ** :
+    faire varier l'**effet** (`kind`) et pas seulement le **nombre** par héros source.
 - **HÉROS UNIQUES (cap visée — décidé le 2026-06-16)** : on quitte le miroir. Chaque
   personnage devient un **héros unique** (identité propre, **Résonance signature** propre,
   **stats sur-mesure** autorisées — calque `profile?` au niveau perso, hors-droite permis).

@@ -97,6 +97,7 @@ export const CHARACTERS: Record<string, Character> = {
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */
 export interface Overlay {
+  id?: string;                // identité héros stable, reportée sur `Unit.characterId`
   name?: string;
   profile?: Partial<Profile>;
   reactions?: ReactionSpec[];
@@ -120,6 +121,7 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
   const p = { ...profileFor(archetype.rangeTier), ...archetype.profile, ...overlay?.profile };
   return {
     id, owner, hex, ap,
+    characterId: overlay?.id,
     name: overlay?.name,
     hp: p.maxHp, maxHp: p.maxHp,
     range: p.range, damage: p.damage, attackCost: p.attackCost,

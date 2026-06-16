@@ -89,7 +89,7 @@ describe('pieces/Duelliste — pièce hors-droite via override de profil', () =>
 describe('pieces/Personnages — couche héros (socle de classe + signature)', () => {
   it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
     const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
-    expect(d).toMatchObject({ name: 'Estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
+    expect(d).toMatchObject({ name: 'Estoc', characterId: 'a_duelliste', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
     expect(d.reactions).toHaveLength(1);
     expect(d.reactions![0]!.id).toBe('epines_relayees');
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé

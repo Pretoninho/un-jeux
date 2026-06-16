@@ -26,6 +26,7 @@
   const NAMES: Record<string, string> = { alice: 'Alice', bob: 'Bob' };
   // Nom et glyphe d'affichage dérivés du registre → aucune dérive quand on ajoute un archétype.
   const KIND_NAME: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.name]));
+  const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
   const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées' };
@@ -394,7 +395,7 @@
             {#each unit.reactions as rx}
               <div><b>{RESON_LABEL[rx.kind] ?? rx.id}</b> — {SIGNAL_LABEL[rx.on] ?? rx.on}
                 · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours
-                <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon source : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
+                <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
               </div>
             {/each}
           </div>

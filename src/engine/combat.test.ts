@@ -389,6 +389,10 @@ describe('combat — réactions en chaîne (synergies)', () => {
   const listener = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
         kind: 'epines', amount: 1, amountBySource: { lourde: 3 } }], cooldowns: {}, ...over });
+  // Écouteur dont la cellule existe À LA FOIS par classe (lourde→3) et par héros (bastion→5).
+  const charListener = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+        kind: 'epines', amount: 1, amountBySource: { lourde: 3 }, amountByCharacter: { bastion: 5 } }], cooldowns: {}, ...over });
 
   it('garde encaissée → un allié à portée relaie des épines sur l\'attaquant (dégâts selon la source)', () => {
     const base = makeCombatState(LINE, [
@@ -400,6 +404,24 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(unitById(s, 'a')!.hp).toBe(14);            // 16 − floor(4·0.5) = 2 (encaissé en garde)
     expect(unitById(s, 'b')!.hp).toBe(7);             // épines 3 (source = lourde)
     expect(unitById(s, 'c')!.cooldowns!.ep).toBe(2);  // passif mis en cooldown
+  });
+
+  it('matrice « × personnage » : la cellule du héros source prime sur celle de sa classe', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: 'bastion' }), // héros identifié
+      charListener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(5); // 10 − 5 (cellule héros, pas lourde→3)
+  });
+
+  it('matrice « × personnage » : repli sur la classe si le héros source n\'a pas de cellule perso', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: 'rempart' }), // absent d'amountByCharacter
+      charListener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(7); // 10 − 3 (repli sur lourde)
   });
 
   it('pas de chaîne si l\'écouteur est hors du rayon', () => {
