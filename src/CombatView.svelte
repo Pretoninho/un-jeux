@@ -18,7 +18,7 @@
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
-  const OCTA_N = 11;
+  const OCTA_N = 13;
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -84,6 +84,13 @@
   let svgEl: SVGSVGElement | undefined;
   let view = $state({ ...startGeo.bounds }); // fenêtre visible (x, y, w, h)
   function resetView() { view = { ...geo.bounds }; }
+
+  // Taille à l'écran : aussi grande que possible, bornée par la hauteur du
+  // navigateur (≈ 82vh) et la largeur dispo, en respectant le ratio du plateau.
+  const mapStyle = $derived(
+    `aspect-ratio:${geo.bounds.w} / ${geo.bounds.h};` +
+    `width:min(100%, ${((geo.bounds.w / geo.bounds.h) * 82).toFixed(1)}vh)`,
+  );
 
   // Garde la fenêtre à l'intérieur du plateau (jamais de vide hors-carte).
   function clampPan(x: number, y: number, w: number, h: number) {
@@ -292,7 +299,7 @@
     </div>
   {/if}
 
-  <svg bind:this={svgEl} viewBox="{view.x} {view.y} {view.w} {view.h}" class="map"
+  <svg bind:this={svgEl} viewBox="{view.x} {view.y} {view.w} {view.h}" class="map" style={mapStyle}
        role="application" aria-label="Plateau de jeu — molette pour zoomer, glisser pour déplacer"
        onwheel={onWheel} onpointerdown={onPointerDown} onpointermove={onPointerMove}
        onpointerup={onPointerUp} onpointercancel={onPointerUp}>
@@ -432,7 +439,7 @@
   .banner { background: #1e2435; border: 1px solid var(--c); border-radius: 8px; padding: .6rem 1rem; display: flex; align-items: center; gap: 1rem; }
   .banner b { color: var(--c); }
   .rematch { margin-left: auto; background: #1a2030; border: 1px solid var(--c); color: #e6ebf5; border-radius: 5px; padding: .35rem .8rem; cursor: pointer; }
-  .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; cursor: grab; touch-action: none; }
+  .map { display: block; margin: 0 auto; height: auto; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; cursor: grab; touch-action: none; }
   .map:active { cursor: grabbing; }
   .zoom { display: flex; gap: .3rem; }
   .zoom button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .6rem; cursor: pointer; font-size: .9rem; min-width: 32px; line-height: 1; }

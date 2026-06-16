@@ -21,8 +21,12 @@
 ## État du jeu (décisions de design en vigueur)
 - **Mode actuel : hotseat local** (Alice et Bob à tour de rôle sur le même écran). Pas
   encore de multijoueur en réseau.
-- **Plateau octogonal porté à `OCTA_N = 11`** (221 cases) : parties plus longues, centre
-  dégagé réservé aux futurs camps/objectifs. Le plateau hexagonal reste dispo (toggle).
+- **Plateau octogonal porté à `OCTA_N = 13`** (313 cases : `n² + (n-1)²`) : parties plus
+  longues, centre dégagé réservé aux futurs camps/objectifs. Le plateau hexagonal reste
+  dispo (toggle).
+- **Carte agrandie à l'écran** : plus de plafond `720px` (App `max-width: min(1280px, 96vw)`) ;
+  le SVG est dimensionné à la hauteur du navigateur (`width: min(100%, ratio·82vh)`, ratio du
+  plateau) → grand rendu centré. Navigation : molette = zoom, glisser = pan, boutons `−/+/⤢`.
 - **Inspection au clic** : cliquer une pièce affiche sa portée d'attaque — la tienne
   (sélection, teinte teal pointillée) et celle de l'adverse (inspection, rouge). Les deux
   coexistent à l'écran.
