@@ -381,6 +381,7 @@
     {#snippet reson(unit: Unit, open: boolean, toggle: () => void)}
       {#if unit.reactions?.length}
         <div class="reson">
+          <span class="reslabel">RÉSONANCE</span>
           {#each unit.reactions as rx}
             <span class="resbadge">✦ {RESON_LABEL[rx.kind] ?? 'Résonance'}
               {#if (unit.cooldowns?.[rx.id] ?? 0) > 0}<span class="cd">⏳{unit.cooldowns?.[rx.id]}</span>{:else}<span class="rdy">prêt</span>{/if}
@@ -564,6 +565,7 @@
   .chainwarn { display: flex; flex-direction: column; gap: .15rem; margin: .1rem 0 .3rem; font-size: .74rem; color: #e2c66a; }
   .chainwarn b { color: #f0d886; }
   .reson { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin: .2rem 0; }
+  .reslabel { font-size: .64rem; font-weight: 700; letter-spacing: .08em; color: #9a7cc8; }
   .resbadge { font-size: .72rem; padding: .12rem .45rem; border-radius: 4px; background: #2c2640; color: #cbb6ec; display: inline-flex; gap: .3rem; align-items: center; }
   .resbadge .cd { color: #e2c66a; }
   .resbadge .rdy { color: #7fcf9e; }
