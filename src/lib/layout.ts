@@ -52,6 +52,26 @@ export function genBounds(centers: Array<[number, number]>): { minX: number; min
   return { minX, minY, w: Math.max(...xs) + m - minX, h: Math.max(...ys) + m - minY };
 }
 
+// ─────────── Pavage 4.8.8 (octogones + carrés) ───────────
+// `s` = espacement des centres d'octogones (= largeur plat-à-plat de l'octogone).
+
+/** Points d'un octogone régulier (côtés droits alignés sur les axes) centré en (cx, cy). */
+export function octagonPoints(cx: number, cy: number, s: number): string {
+  const h = s / 2;                       // demi plat-à-plat
+  const a = (s * (Math.SQRT2 - 1)) / 2;  // demi-côté (coins biseautés)
+  const pts: [number, number][] = [
+    [-a, -h], [a, -h], [h, -a], [h, a], [a, h], [-a, h], [-h, a], [-h, -a],
+  ];
+  return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
+}
+
+/** Points du petit carré (losange) qui comble un creux, calé sur les coins des octogones. */
+export function diamondPoints(cx: number, cy: number, s: number): string {
+  const d = s * (1 - 1 / Math.SQRT2); // demi-diagonale → arêtes coïncidant avec les biseaux
+  const pts: [number, number][] = [[d, 0], [0, d], [-d, 0], [0, -d]];
+  return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
+}
+
 /** Couleur de remplissage par nature/cluster d'hexe. */
 export function hexFill(kind: string, cluster?: string): string {
   if (kind === 'noeud') return '#3a3f4b';

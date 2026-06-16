@@ -1,39 +1,75 @@
 <script lang="ts">
   // NOYAU TACTIQUE — 2 pièces par camp, PA par pièce. Échecs + Divinity (esprit).
   // À ton tour : clique une de TES pièces pour la sélectionner, puis dépense ses PA —
-  // bouger (1 PA/case) et/ou frapper une pièce adverse adjacente (2 PA). Joue tes deux
-  // pièces dans l'ordre que tu veux, puis « Finir le tour ».
+  // bouger (1 PA/case) et/ou frapper une pièce adverse à portée. Joue tes deux pièces
+  // dans l'ordre que tu veux, puis « Finir le tour ».
+  //
+  // La vue est AGNOSTIQUE À LA FORME : elle dessine une liste de tuiles {id, points, shape}
+  // et délègue toute la logique au moteur (topologie pure). Deux plateaux interchangeables :
+  // hexagonal (6 voisins) ou octogonal 4.8.8 (octogones + carrés-carrefours jouables).
   import { makeBoard } from './engine/board';
+  import { makeOctaBoard } from './engine/octaboard';
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, endTurn, winner,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
-  import { axialToPixel, hexPointsPointy, genBounds } from './lib/layout';
+  import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
+  const OCTA_N = 5;
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
   const NAMES: Record<string, string> = { alice: 'Alice', bob: 'Bob' };
   const KIND_NAME: Record<string, string> = { lourde: 'Lourde', tireur: 'Tireur' };
 
-  const GEO = makeBoard(RADIUS, 6, 0, 0); // on ne garde que la géométrie
-  const hexOf = (id: string) => GEO.map.hexes.find((h) => h.id === id)!;
+  type Shape = 'hex' | 'octa';
+  interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
+  interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; viewBox: string }
+
+  // Construit la géométrie ET la topologie d'un plateau (le moteur ne lit que `map`).
+  function buildBoard(shape: Shape): Geo {
+    let map: CombatState['map'], corners: [string, string], tiles: Tile[];
+    if (shape === 'octa') {
+      const ob = makeOctaBoard(OCTA_N);
+      map = ob.map; corners = ob.corners;
+      tiles = ob.map.hexes.map((h) => {
+        const L = ob.layout[h.id]!;
+        return {
+          id: h.id, cx: L.cx, cy: L.cy, small: L.shape === 'carre',
+          points: L.shape === 'carre' ? diamondPoints(L.cx, L.cy, ob.spacing) : octagonPoints(L.cx, L.cy, ob.spacing),
+        };
+      });
+    } else {
+      const hb = makeBoard(RADIUS, 6, 0, 0);
+      map = hb.map; corners = hb.corners;
+      tiles = hb.map.hexes.map((h) => {
+        const [cx, cy] = axialToPixel(h.coord!.q, h.coord!.r);
+        return { id: h.id, cx, cy, small: false, points: hexPointsPointy(cx, cy, 30) };
+      });
+    }
+    const b = genBounds(tiles.map((t) => [t.cx, t.cy] as [number, number]));
+    return { map, corners, tiles, viewBox: `${b.minX.toFixed(1)} ${b.minY.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}` };
+  }
 
   // Chaque camp aligne la paire polaire : une Lourde (mêlée-tank) + un Tireur (distance-verre).
-  function initial(): CombatState {
-    const [c0, c1] = GEO.corners;
-    const n0 = hexOf(c0).neighbors[0]!;
-    const n1 = hexOf(c1).neighbors[0]!;
-    return makeCombatState(GEO.map, [
+  // 2ᵉ pièce sur un voisin « salle » (on évite de démarrer sur un carré-carrefour exigu).
+  function initialFor(geo: Geo): CombatState {
+    const [c0, c1] = geo.corners;
+    const nbOf = (id: string) => geo.map.hexes.find((h) => h.id === id)!.neighbors;
+    const roomNb = (id: string) => nbOf(id).find((x) => !x.startsWith('s:')) ?? nbOf(id)[0]!;
+    return makeCombatState(geo.map, [
       makeUnit('a1', 'alice', c0, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('a2', 'alice', n0, ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('a2', 'alice', roomNb(c0), ARCHETYPES.tireur!, AP_PER_TURN),
       makeUnit('b1', 'bob', c1, ARCHETYPES.lourde!, AP_PER_TURN),
-      makeUnit('b2', 'bob', n1, ARCHETYPES.tireur!, AP_PER_TURN),
+      makeUnit('b2', 'bob', roomNb(c1), ARCHETYPES.tireur!, AP_PER_TURN),
     ], 'alice');
   }
 
-  let combat = $state<CombatState>(initial());
+  const startGeo = buildBoard('hex'); // const ordinaire → pas de capture de $state à l'init
+  let boardShape = $state<Shape>('hex');
+  let geo = $state<Geo>(startGeo);
+  let combat = $state<CombatState>(initialFor(startGeo));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
   let selectedId = $state<string>('a1');
   const acted = $derived(history.length > 0);
@@ -86,16 +122,16 @@
   }
 
   function restart() {
-    combat = initial();
+    combat = initialFor(geo);
     history = [];
     selectedId = 'a1';
   }
 
-  // ── Layout pixel (géométrie fixe) ──────────────────────────────────────────────
-  const centers: Record<string, [number, number]> = {};
-  for (const h of GEO.map.hexes) centers[h.id] = axialToPixel(h.coord!.q, h.coord!.r);
-  const bnds = genBounds(Object.values(centers));
-  const viewBox = `${bnds.minX.toFixed(1)} ${bnds.minY.toFixed(1)} ${bnds.w.toFixed(1)} ${bnds.h.toFixed(1)}`;
+  function setShape(s: Shape) {
+    boardShape = s;
+    geo = buildBoard(s);
+    restart();
+  }
 </script>
 
 <div class="combat">
@@ -107,6 +143,10 @@
         {#if selected}<span class="ap"><b>{KIND_NAME[selected.kind]}</b> · portée {selected.range} · PA <b>{selected.ap}</b>/{AP_PER_TURN}</span>{/if}
       </div>
     {/if}
+    <div class="shape">
+      <button class:on={boardShape === 'hex'} onclick={() => setShape('hex')}>⬡ Hexagone</button>
+      <button class:on={boardShape === 'octa'} onclick={() => setShape('octa')}>⯃ Octogone</button>
+    </div>
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
@@ -119,35 +159,37 @@
     </div>
   {/if}
 
-  <svg {viewBox} class="map">
-    {#each combat.map.hexes as h (h.id)}
-      {@const c = centers[h.id]!}
-      {@const occ = unitAt(combat, h.id)}
-      {@const d = reach.get(h.id)}
+  <svg viewBox={geo.viewBox} class="map">
+    {#each geo.tiles as t (t.id)}
+      {@const occ = unitAt(combat, t.id)}
+      {@const d = reach.get(t.id)}
       {@const inReach = d !== undefined}
-      {@const attackable = isAttackable(h.id)}
+      {@const attackable = isAttackable(t.id)}
       {@const mine = !!occ && occ.owner === combat.active && !over}
       <g class="hex" class:reach={inReach} class:attackable class:mine role="button" tabindex="0"
-         onclick={() => onHex(h.id)}
-         onkeydown={(e) => e.key === 'Enter' && onHex(h.id)}>
+         onclick={() => onHex(t.id)}
+         onkeydown={(e) => e.key === 'Enter' && onHex(t.id)}>
         <polygon
-          points={hexPointsPointy(c[0], c[1], 30)}
-          fill={inReach ? '#1f3340' : '#161a22'}
-          stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : '#272c37'}
+          points={t.points}
+          fill={inReach ? '#1f3340' : t.small ? '#10131a' : '#161a22'}
+          stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : t.small ? '#222734' : '#272c37'}
           stroke-width={attackable ? 3.5 : inReach ? 2.5 : 1.5} />
         {#if occ}
           {@const isSel = occ.id === selectedId && occ.owner === combat.active && !over}
           {@const frac = occ.hp / occ.maxHp}
-          <circle cx={c[0]} cy={c[1] - 3} r="12" fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
-          <text x={c[0]} y={c[1] + 1} class="utxt">{occ.kind === 'lourde' ? 'L' : 'T'}</text>
+          {@const r = t.small ? 9 : 12}
+          {@const w = t.small ? 16 : 22}
+          {@const by = t.small ? 9 : 12}
+          <circle cx={t.cx} cy={t.cy - 3} {r} fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
+          <text x={t.cx} y={t.cy + 1} class="utxt">{occ.kind === 'lourde' ? 'L' : 'T'}</text>
           <!-- barre de PV (couleur = joueur, lettre = archétype) -->
-          <rect x={c[0] - 11} y={c[1] + 12} width="22" height="3.5" rx="1.5" fill="#0e1015" />
-          <rect x={c[0] - 11} y={c[1] + 12} width={22 * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
+          <rect x={t.cx - w / 2} y={t.cy + by} width={w} height="3.5" rx="1.5" fill="#0e1015" />
+          <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
-          {#if mine}<text x={c[0] + 13} y={c[1] - 9} class="apbadge">{occ.ap}</text>{/if}
-          {#if attackable}<text x={c[0]} y={c[1] - 15} class="atkmark">⚔</text>{/if}
+          {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
+          {#if attackable}<text x={t.cx} y={t.cy - r - 3} class="atkmark">⚔</text>{/if}
         {:else if inReach}
-          <text x={c[0]} y={c[1] + 4} class="dist">{d}</text>
+          <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
       </g>
     {/each}
@@ -155,25 +197,29 @@
 
   <div class="hint muted small">
     {#if over}
-      Clique <b>Revanche</b> pour rejouer.
+      Clique <b>Revanche</b> ou change de plateau pour rejouer.
+    {:else}
       Couleur = joueur. <b>L</b> = Lourde (mêlée, robuste, gros dégâts, portée 1) ·
       <b>T</b> = Tireur (distance, fragile, dégâts faibles, portée 4).
       Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b>, puis une case
       verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse à portée</b> pour <b>frapper</b>.
-      Joue tes deux pièces, puis <b>Finir le tour</b>. <b>↩ Annuler</b> revient en arrière.
+      {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
     {/if}
   </div>
 </div>
 
 <style>
   .combat { display: flex; flex-direction: column; gap: .7rem; }
-  .topbar { display: flex; align-items: center; gap: 1rem; background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; padding: .55rem .9rem; }
+  .topbar { display: flex; align-items: center; gap: 1rem; background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; padding: .55rem .9rem; flex-wrap: wrap; }
   .turn { font-size: .9rem; color: #9aa3b5; }
   .turn b { color: #e6ebf5; font-size: 1.05rem; }
   .active { font-size: .85rem; color: #9aa3b5; border-left: 3px solid var(--c); padding-left: .55rem; display: flex; gap: .6rem; align-items: baseline; }
   .active b { color: #e6ebf5; }
   .ap { color: #9aa3b5; } .ap b { color: #ffd479; }
-  .undo { margin-left: auto; background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .shape { margin-left: auto; display: flex; gap: .3rem; }
+  .shape button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .7rem; cursor: pointer; font-size: .8rem; }
+  .shape button.on { border-color: #5a70b0; color: #cfe0ff; background: #20283a; }
+  .undo { background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .undo:hover:not(:disabled) { border-color: #8a6075; }
   .undo:disabled { opacity: .35; cursor: not-allowed; }
   .end-turn { background: #1a2030; border: 1px solid #3a4060; color: #9ab0d0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .88rem; }
