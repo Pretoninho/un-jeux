@@ -12,13 +12,13 @@
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
     reserve, canReserve, resolveOverwatch, endTurn, winner,
-    unitAt, graphDistance, type CombatState,
+    unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
-  const OCTA_N = 5;
+  const OCTA_N = 11;
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -76,6 +76,7 @@
   let combat = $state<CombatState>(initialFor(startGeo));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
   let selectedId = $state<string>('a1');
+  let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
   const acted = $derived(history.length > 0);
 
   const champ = $derived(winner(combat));
@@ -88,6 +89,43 @@
     return !!t && !!selected && t.owner !== combat.active && canAttack(combat, selected.id, t.id);
   };
 
+  // Pièce adverse inspectée (clic sur une pièce ennemie) — alimente le panneau adverse.
+  const foe = $derived(combat.units.find((u) => u.id === inspectedId && u.owner !== combat.active));
+  const canHitFoe = $derived(!!selected && !!foe && !over && canAttack(combat, selected.id, foe.id));
+  const attackBlock = $derived.by(() => {
+    if (!foe || over) return '';
+    if (!selected) return 'Sélectionne une de tes pièces.';
+    if (canHitFoe) return '';
+    if (selected.ap < selected.attackCost) return 'PA insuffisants.';
+    return 'Hors de portée.';
+  });
+
+  // BFS de portée (distance de graphe pure, occupation ignorée) — une passe par pièce.
+  function rangeSet(from: string, range: number): Set<string> {
+    const byId = new Map(combat.map.hexes.map((h) => [h.id, h] as const));
+    const seen = new Set<string>([from]);
+    let frontier = [from];
+    for (let d = 1; d <= range; d++) {
+      const next: string[] = [];
+      for (const h of frontier)
+        for (const nb of byId.get(h)?.neighbors ?? [])
+          if (!seen.has(nb)) { seen.add(nb); next.push(nb); }
+      frontier = next;
+    }
+    seen.delete(from);
+    return seen;
+  }
+
+  // Portées d'attaque affichées : la tienne (sélection) et celle de l'adverse inspecté.
+  const allyRange = $derived(selected && !over ? rangeSet(selected.hex, selected.range) : new Set<string>());
+  const foeRange = $derived(foe && !over ? rangeSet(foe.hex, foe.range) : new Set<string>());
+
+  function attackFoe() {
+    if (!selected || !foe || !canAttack(combat, selected.id, foe.id)) return;
+    history = [...history, combat];
+    combat = attack(combat, selected.id, foe.id);
+  }
+
   function selectDefault() {
     selectedId = combat.units.find((u) => u.owner === combat.active)?.id ?? '';
   }
@@ -97,14 +135,10 @@
     const occ = unitAt(combat, hexId);
     // Clic sur une de mes pièces → la sélectionner.
     if (occ && occ.owner === combat.active) { selectedId = occ.id; return; }
+    // Clic sur une pièce adverse → l'inspecter (panneau adverse + sa portée) ; l'attaque
+    // se déclenche ensuite via le bouton ⚔ Attaquer du panneau.
+    if (occ && occ.owner !== combat.active) { inspectedId = occ.id; return; }
     if (!selected) return;
-    // Clic sur un adverse à portée → l'attaquer avec la pièce sélectionnée.
-    if (occ && occ.owner !== combat.active) {
-      if (!canAttack(combat, selected.id, occ.id)) return;
-      history = [...history, combat];
-      combat = attack(combat, selected.id, occ.id);
-      return;
-    }
     // Clic sur une case atteignable → s'y déplacer (puis tirs réflexes des guetteurs adverses).
     if (reach.has(hexId)) {
       history = [...history, combat];
@@ -121,7 +155,8 @@
     if (over) return set;
     for (const w of combat.units) {
       if (!w.watching || w.owner === combat.active) continue;
-      for (const t of geo.tiles) if (graphDistance(combat.map, w.hex, t.id) <= w.range) set.add(t.id);
+      for (const id of rangeSet(w.hex, w.range)) set.add(id);
+      set.add(w.hex);
     }
     return set;
   });
@@ -148,6 +183,7 @@
     if (over) return;
     combat = endTurn(combat, AP_PER_TURN);
     history = [];
+    inspectedId = '';
     selectDefault();
   }
 
@@ -155,6 +191,7 @@
     combat = initialFor(geo);
     history = [];
     selectedId = 'a1';
+    inspectedId = '';
   }
 
   function setShape(s: Shape) {
@@ -170,23 +207,12 @@
     {#if !over}
       <div class="active" style="--c:{COLORS[combat.active]}">
         Au tour de <b>{NAMES[combat.active]}</b>
-        {#if selected}<span class="ap"><b>{KIND_NAME[selected.kind]}</b> · portée {selected.range} · PA <b>{selected.ap}</b>/{AP_PER_TURN}</span>{/if}
       </div>
     {/if}
     <div class="shape">
       <button class:on={boardShape === 'hex'} onclick={() => setShape('hex')}>⬡ Hexagone</button>
       <button class:on={boardShape === 'octa'} onclick={() => setShape('octa')}>⯃ Octogone</button>
     </div>
-    {#if !over && selected?.guard}
-      <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}>
-        {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
-      </button>
-    {/if}
-    {#if !over && selected?.overwatch}
-      <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}>
-        {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
-      </button>
-    {/if}
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
@@ -207,6 +233,8 @@
       {@const attackable = isAttackable(t.id)}
       {@const threatened = threat.has(t.id)}
       {@const mine = !!occ && occ.owner === combat.active && !over}
+      {@const inAlly = allyRange.has(t.id)}
+      {@const inFoe = foeRange.has(t.id)}
       <g class="hex" class:reach={inReach} class:attackable class:mine role="button" tabindex="0"
          onclick={() => onHex(t.id)}
          onkeydown={(e) => e.key === 'Enter' && onHex(t.id)}>
@@ -215,6 +243,8 @@
           fill={inReach ? '#1f3340' : threatened ? '#2a1a1e' : t.small ? '#10131a' : '#161a22'}
           stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : threatened ? '#7a3c44' : t.small ? '#222734' : '#272c37'}
           stroke-width={attackable ? 3.5 : inReach ? 2.5 : threatened ? 2 : 1.5} />
+        {#if inAlly}<polygon points={t.points} class="rng-ally" />{/if}
+        {#if inFoe}<polygon points={t.points} class="rng-foe" />{/if}
         {#if occ}
           {@const isSel = occ.id === selectedId && occ.owner === combat.active && !over}
           {@const frac = occ.hp / occ.maxHp}
@@ -230,7 +260,6 @@
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
           {#if occ.guarding}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🛡</text>{/if}
           {#if occ.watching}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🎯</text>{/if}
-          {#if attackable}<text x={t.cx} y={t.cy - r - 3} class="atkmark">⚔</text>{/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
@@ -238,14 +267,65 @@
     {/each}
   </svg>
 
+  {#if !over}
+    <div class="panels">
+      <div class="panel ally" style="--c:{COLORS[combat.active]}">
+        {#if selected}
+          <div class="phead"><span class="pdot"></span>{KIND_NAME[selected.kind]} <span class="powner">· {NAMES[selected.owner]}</span></div>
+          <div class="pv">PV <b>{selected.hp}/{selected.maxHp}</b>
+            <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
+          </div>
+          <div class="pstats"><span>PA <b>{selected.ap}</b>/{AP_PER_TURN}</span><span>Portée <b>{selected.range}</b></span><span>Dégâts <b>{selected.damage}</b></span></div>
+          {#if selected.guarding || selected.watching}
+            <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}</div>
+          {/if}
+          <div class="pacts">
+            {#if selected.guard}
+              <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}>
+                {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
+              </button>
+            {/if}
+            {#if selected.overwatch}
+              <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}>
+                {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
+              </button>
+            {/if}
+          </div>
+        {:else}
+          <div class="pempty">Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b> pour la sélectionner.</div>
+        {/if}
+      </div>
+
+      <div class="panel foe" style="--c:{foe ? COLORS[foe.owner] : '#3a4150'}">
+        {#if foe}
+          <div class="phead"><span class="pdot"></span>{KIND_NAME[foe.kind]} <span class="powner">· {NAMES[foe.owner]}</span></div>
+          <div class="pv">PV <b>{foe.hp}/{foe.maxHp}</b>
+            <span class="bar"><span style="width:{Math.max(0, 100 * foe.hp / foe.maxHp)}%; background:{foe.hp / foe.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
+          </div>
+          <div class="pstats"><span>Portée <b>{foe.range}</b></span><span>Dégâts <b>{foe.damage}</b></span></div>
+          {#if foe.guarding || foe.watching}
+            <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}</div>
+          {/if}
+          <div class="pacts">
+            <button class="attack" onclick={attackFoe} disabled={!canHitFoe}>⚔ Attaquer{#if selected} ({selected.attackCost} PA){/if}</button>
+            {#if attackBlock}<span class="reason">{attackBlock}</span>{/if}
+          </div>
+        {:else}
+          <div class="pempty">Clique une pièce <b style="color:#e0604a">adverse</b> pour l'inspecter.</div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
   <div class="hint muted small">
     {#if over}
       Clique <b>Revanche</b> ou change de plateau pour rejouer.
     {:else}
       Couleur = joueur. <b>L</b> = Lourde (mêlée, robuste, gros dégâts, portée 1) ·
       <b>T</b> = Tireur (distance, fragile, dégâts faibles, portée 4).
-      Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b>, puis une case
-      verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse à portée</b> pour <b>frapper</b>.
+      Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b> (sa <b style="color:#5ab0a0">portée</b> s'affiche) puis une case
+      verte pour <b>bouger</b>. Clique une <b style="color:#e0604a">pièce adverse</b> pour l'inspecter
+      (panneau + <b style="color:#e0604a">sa portée</b>), puis <b>⚔ Attaquer</b> si elle est à portée.
       La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
       Le <b>Tireur</b> peut <b style="color:#f0c0a0">🎯 Réserver (3 PA)</b> son tir : il <b>tire en réflexe</b> sur la première pièce qui s'arrête dans sa <b style="color:#c07a6a">zone de menace</b> (teintée pendant ton tour).
       {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
@@ -260,7 +340,6 @@
   .turn b { color: #e6ebf5; font-size: 1.05rem; }
   .active { font-size: .85rem; color: #9aa3b5; border-left: 3px solid var(--c); padding-left: .55rem; display: flex; gap: .6rem; align-items: baseline; }
   .active b { color: #e6ebf5; }
-  .ap { color: #9aa3b5; } .ap b { color: #ffd479; }
   .shape { margin-left: auto; display: flex; gap: .3rem; }
   .shape button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .7rem; cursor: pointer; font-size: .8rem; }
   .shape button.on { border-color: #5a70b0; color: #cfe0ff; background: #20283a; }
@@ -291,7 +370,30 @@
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
   .guardmark { font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .atkmark { fill: #ff8a6a; font-size: 12px; text-anchor: middle; pointer-events: none; }
+  .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
+  .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
+  /* Panneaux d'info — pièce alliée sélectionnée (gauche) et pièce adverse inspectée (droite). */
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+  .panel { background: #14161c; border: 1px solid #2a2f3a; border-left: 3px solid var(--c); border-radius: 8px; padding: .6rem .85rem; min-height: 96px; }
+  .phead { display: flex; align-items: center; gap: .45rem; font-weight: 700; color: #e6ebf5; font-size: .95rem; }
+  .pdot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
+  .powner { color: #8a93a5; font-weight: 400; font-size: .82rem; }
+  .pv { display: flex; align-items: center; gap: .55rem; margin-top: .45rem; font-size: .82rem; color: #9aa3b5; }
+  .pv b { color: #e6ebf5; font-size: .95rem; }
+  .pv .bar { flex: 1; height: 6px; background: #0e1015; border-radius: 3px; overflow: hidden; }
+  .pv .bar span { display: block; height: 100%; border-radius: 3px; }
+  .pstats { display: flex; gap: 1rem; margin-top: .4rem; font-size: .8rem; color: #9aa3b5; }
+  .pstats b { color: #e6ebf5; }
+  .ptags { display: flex; gap: .4rem; margin-top: .4rem; }
+  .tag { font-size: .72rem; padding: .12rem .4rem; border-radius: 4px; }
+  .tag.g { background: #243456; color: #d6e6ff; }
+  .tag.w { background: #3a2a22; color: #ffd9b8; }
+  .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
+  .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
+  .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }
+  .attack:hover:not(:disabled) { border-color: #e0604a; background: #3a2226; }
+  .attack:disabled { opacity: .4; cursor: not-allowed; }
+  .reason { font-size: .76rem; color: #8a93a5; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
   .hint { padding: 0 .2rem; }
