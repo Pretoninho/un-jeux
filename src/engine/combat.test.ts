@@ -648,6 +648,52 @@ describe('combat — Résonance Estoc × Rempart (estropier)', () => {
   });
 });
 
+describe('combat — Résonance Estoc × Orso (provocation)', () => {
+  // Orso (Tireur, characterId orso) en guet ; Estoc porte la Résonance provocation (tir vers lui).
+  const orso = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'orso', ...over });
+  const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'pv', on: 'tir_reserve', fromCharacter: 'orso', scope: { squad: true },
+        cooldown: 2, kind: 'provocation', amount: 1 }], cooldowns: {}, ...over });
+
+  it('le tir réservé d\'Orso tire la cible d\'1 case vers Estoc (et pose le CD)', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'A', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'D', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);          // Orso en guet, bob actif
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b'); // bob D→C (dist 2 ≤ portée 4) → tir
+    expect(unitById(s, 'b')!.hp).toBe(8);                    // 10 − 2 (tir d'Orso)
+    expect(unitById(s, 'b')!.hex).toBe('B');                 // tiré de C vers Estoc (A)
+    expect(unitById(s, 'e')!.cooldowns!.pv).toBe(2);         // CD posé
+  });
+
+  it('gâté à Orso : un tir d\'un autre tireur ne provoque pas', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'A', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4, characterId: 'mireille' }),
+      u({ id: 'b', owner: 'bob', hex: 'D', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b');
+    expect(unitById(s, 'b')!.hex).toBe('C');                 // pas tiré
+    expect(unitById(s, 'e')!.cooldowns!.pv ?? 0).toBe(0);    // pas déclenché
+  });
+
+  it('cible déjà collée à Estoc : pas de déplacement mais CD consommé quand même', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'A', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'B'), 'b'); // bob C→B (collé à Estoc en A)
+    expect(unitById(s, 'b')!.hex).toBe('B');                 // A occupé, C plus loin → pas tiré
+    expect(unitById(s, 'e')!.cooldowns!.pv).toBe(2);         // CD consommé malgré tout
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

@@ -62,7 +62,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -400,6 +400,27 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
         if (u.id === p.listenerId) return arm(u);
         if (u.id === p.targetId)
           return { ...u, cripple: { amount: p.amount, owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'provocation': { // tire la cible d'1 case VERS le possesseur (déplacement forcé, déterministe)
+      const listener = unitById(state, p.listenerId);
+      const target = unitById(state, p.targetId);
+      if (!listener || !target) return state;
+      const byId = new Map(state.map.hexes.map((h) => [h.id, h] as const));
+      const occupied = new Set(state.units.map((u) => u.hex)); // toutes les pièces sont des obstacles
+      const cur = graphDistance(state.map, target.hex, listener.hex);
+      // voisins LIBRES strictement plus proches du possesseur ; départage déterministe (distance puis id)
+      const dest = (byId.get(target.hex)?.neighbors ?? [])
+        .filter((nb) => !occupied.has(nb))
+        .map((nb) => ({ nb, d: graphDistance(state.map, nb, listener.hex) }))
+        .filter((c) => c.d < cur)
+        .sort((a, b) => a.d - b.d || (a.nb < b.nb ? -1 : 1))[0]?.nb;
+      // Le CD est posé même si aucune case n'est libre (la cible est déjà collée au possesseur).
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (dest && u.id === p.targetId) return { ...u, hex: dest };
         return u;
       });
       return { ...state, units };

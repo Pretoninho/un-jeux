@@ -96,6 +96,16 @@ const ESTROPIER_ESTOC_REMPART: ReactionSpec = {
 };
 
 /**
+ * Résonance DUO « Estoc × Orso » — quand le Tir Réservé d'Orso (`orso`) part, Estoc PROVOQUE la
+ * cible touchée : elle est tirée d'1 case VERS Estoc (déplacement forcé). Portée `escouade` (Orso
+ * tire de loin). CD 2 (= 1 tour plein réel). Le CD est posé même si la cible ne peut pas bouger.
+ */
+const PROVOCATION_ESTOC_ORSO: ReactionSpec = {
+  id: 'provocation_estoc_orso', on: 'tir_reserve', fromCharacter: 'orso',
+  scope: { squad: true }, cooldown: 2, kind: 'provocation', amount: 1,
+};
+
+/**
  * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
  * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
  */
@@ -120,7 +130,7 @@ export interface Character {
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur' },
-  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART] },
+  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
