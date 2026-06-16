@@ -7,7 +7,7 @@
 // Tous les archétypes vivent sur cette même droite : aucun n'est strictement meilleur,
 // tout est positionnel. Les valeurs ci-dessous sont des LEVIERS, à affiner au jeu.
 
-import type { GuardProfile, OverwatchProfile, Unit } from './combat';
+import type { GuardProfile, OverwatchProfile, RiposteProfile, Unit } from './combat';
 
 export interface Profile {
   range: number;      // portée d'attaque (cases)
@@ -30,6 +30,7 @@ export interface Archetype {
   profile?: Partial<Profile>;   // override des stats dérivées — pour les pièces HORS-DROITE (ex. Duelliste)
   guard?: GuardProfile;         // verbe « se défendre » — propre aux CAC ; nombres par perso
   overwatch?: OverwatchProfile; // verbe « tir réservé » — propre aux pièces à distance
+  riposte?: RiposteProfile;     // verbe « riposte » — atypique (Duelliste) ; contre en mêlée
 }
 
 /**
@@ -42,8 +43,9 @@ export const ARCHETYPES: Record<string, Archetype> = {
   // Le Tireur (distance) réserve son tir : 3 PA (→ pas d'attaque le même tour) pour un réflexe.
   tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4, overwatch: { cost: 3 } }, // 4/1 — distance-verre
   // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
-  // en échange d'une attaque à 1 PA → frappe deux fois par tour. Escarmouche/harcèlement. Sans verbe.
-  duelliste: { key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1, profile: { maxHp: 9, damage: 2, attackCost: 1 } },
+  // en échange d'une attaque à 1 PA → frappe deux fois par tour. Verbe atypique : Riposte (2 PA →
+  // contre tout attaquant adjacent jusqu'au prochain coup). Escarmouche/harcèlement.
+  duelliste: { key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1, profile: { maxHp: 9, damage: 2, attackCost: 1 }, riposte: { cost: 2 } },
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
@@ -60,5 +62,6 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
     kind: archetype.key,
     guard: archetype.guard, guarding: false,
     overwatch: archetype.overwatch, watching: false,
+    riposte: archetype.riposte, riposting: false,
   };
 }

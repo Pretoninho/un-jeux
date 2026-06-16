@@ -11,7 +11,7 @@
   import { makeOctaBoard } from './engine/octaboard';
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
-    reserve, canReserve, resolveOverwatch, endTurn, winner,
+    reserve, canReserve, resolveOverwatch, riposte, canRiposte, endTurn, winner,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
@@ -228,6 +228,7 @@
 
   const canGuard = $derived(!!selected && !over && canDefend(combat, selected.id));
   const canWatch = $derived(!!selected && !over && canReserve(combat, selected.id));
+  const canParry = $derived(!!selected && !over && canRiposte(combat, selected.id));
 
   // Cases sous le feu d'un guetteur ADVERSE (zone de menace affichée pendant ton tour).
   const threat = $derived.by(() => {
@@ -251,6 +252,12 @@
     if (!selected || !canReserve(combat, selected.id)) return;
     history = [...history, combat];
     combat = reserve(combat, selected.id);
+  }
+
+  function riposteSelected() {
+    if (!selected || !canRiposte(combat, selected.id)) return;
+    history = [...history, combat];
+    combat = riposte(combat, selected.id);
   }
 
   function undo() {
@@ -351,6 +358,7 @@
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
           {#if occ.guarding}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🛡</text>{/if}
           {#if occ.watching}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🎯</text>{/if}
+          {#if occ.riposting}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🗡</text>{/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
@@ -369,8 +377,8 @@
             <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
           <div class="pstats"><span>PA <b>{selected.ap}</b>/{AP_PER_TURN}</span><span>Portée <b>{selected.range}</b></span><span>Dégâts <b>{selected.damage}</b></span></div>
-          {#if selected.guarding || selected.watching}
-            <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}</div>
+          {#if selected.guarding || selected.watching || selected.riposting}
+            <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if selected.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
           <div class="pacts">
             {#if selected.guard}
@@ -381,6 +389,11 @@
             {#if selected.overwatch}
               <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}>
                 {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
+              </button>
+            {/if}
+            {#if selected.riposte}
+              <button class="riposte" class:on={selected.riposting} onclick={riposteSelected} disabled={!canParry}>
+                {selected.riposting ? '🗡 Riposte armée' : `🗡 Riposter (${selected.riposte.cost})`}
               </button>
             {/if}
           </div>
@@ -396,8 +409,8 @@
             <span class="bar"><span style="width:{Math.max(0, 100 * foe.hp / foe.maxHp)}%; background:{foe.hp / foe.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
           <div class="pstats"><span>Portée <b>{foe.range}</b></span><span>Dégâts <b>{foe.damage}</b></span></div>
-          {#if foe.guarding || foe.watching}
-            <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}</div>
+          {#if foe.guarding || foe.watching || foe.riposting}
+            <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if foe.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
           <div class="pacts">
             <button class="attack" onclick={attackFoe} disabled={!canHitFoe}>⚔ Attaquer{#if selected} ({selected.attackCost} PA){/if}</button>
@@ -455,6 +468,10 @@
   .watch:hover:not(:disabled) { border-color: #c08056; }
   .watch.on { background: #3a2a22; border-color: #c08056; color: #ffd9b8; font-weight: 600; }
   .watch:disabled { opacity: .4; cursor: not-allowed; }
+  .riposte { background: #2a2236; border: 1px solid #6a5288; color: #cbb6ec; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .riposte:hover:not(:disabled) { border-color: #9a7cc8; }
+  .riposte.on { background: #342a4a; border-color: #9a7cc8; color: #e2d6ff; font-weight: 600; }
+  .riposte:disabled { opacity: .4; cursor: not-allowed; }
   .undo { background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .undo:hover:not(:disabled) { border-color: #8a6075; }
   .undo:disabled { opacity: .35; cursor: not-allowed; }
@@ -496,6 +513,7 @@
   .tag { font-size: .72rem; padding: .12rem .4rem; border-radius: 4px; }
   .tag.g { background: #243456; color: #d6e6ff; }
   .tag.w { background: #3a2a22; color: #ffd9b8; }
+  .tag.r { background: #342a4a; color: #e2d6ff; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }

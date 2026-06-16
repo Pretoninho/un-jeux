@@ -38,6 +38,10 @@ Les capacités sont des **verbes** portés par la pièce ; leurs **nombres** viv
   les dégâts subis jusqu'au début de son prochain tour. (Lourde : 3 PA → ×0.5.)
 - **Tir réservé** (`overwatch`) — verbe « réflexe », propre aux pièces à distance. Dépense
   des PA pour armer un tir qui part quand un ennemi s'arrête à portée. (Tireur : 3 PA.)
+- **Riposte** (`riposte`) — verbe « contre », atypique (Duelliste). Miroir mêlée du tir
+  réservé : dépense des PA pour armer un contre qui part quand un ennemi **adjacent l'attaque**
+  (et qu'elle survit au coup). Le contre rend les dégâts propres de la pièce, puis la posture
+  est consommée. Un attaquant **à distance n'est pas contré**. (Duelliste : 2 PA.)
 
 ## Effectif déployé (hotseat)
 
@@ -48,7 +52,7 @@ Les archétypes du registre non déployés restent « en réserve », prêts à 
 |--------|-----|:------:|:------:|:--:|:------:|:---------:|-------|--------|
 | Lourde | `lourde` | L | 1 | 16 | 5 | 2 | Garde | **déployée** |
 | Tireur | `tireur` | T | 4 | 7 | 2 | 2 | Tir réservé | **déployée** |
-| Duelliste | `duelliste` | D | 1 | 9 | 2 | **1** | — | **déployée** |
+| Duelliste | `duelliste` | D | 1 | 9 | 2 | **1** | Riposte | **déployée** |
 | Soigneur | `soigneur` | S | 2 | ~ | ~ | ~ | Soin | *à venir (Lot 1)* |
 | Hallebardier | `hallebardier` | H | 2 | 13 | 4 | 2 | Repousser | *réserve (Lot 2)* |
 | Saboteur | `saboteur` | Sa | ~ | ~ | ~ | ~ | Surface | *réserve (Lot 3)* |
@@ -57,7 +61,9 @@ Les archétypes du registre non déployés restent « en réserve », prêts à 
 
 Mêlée (portée 1) comme la Lourde, mais **fragile et qui gratte** (PV 9, dégâts 2) — en
 échange, son attaque ne coûte que **1 PA**, donc elle peut **frapper deux fois par tour**.
-Rôle : escarmouche / harcèlement. Aucun verbe : sa défense passe par le placement.
+Rôle : escarmouche / harcèlement. Verbe signature : **Riposte** (2 PA) — punit quiconque
+vient la frapper au corps-à-corps, ce qui force l'adversaire à la traiter avec respect ou à
+la cueillir à distance.
 
 ## Feuille de route des spécialistes
 

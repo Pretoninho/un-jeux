@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
-  reserve, canReserve, resolveOverwatch, endTurn, winner,
+  reserve, canReserve, resolveOverwatch, riposte, canRiposte, endTurn, winner,
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
@@ -274,6 +274,110 @@ describe('combat — tir réservé / overwatch', () => {
       u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
     ], 'alice'), 'a');
     expect(canReserve(armed, 'a')).toBe(false); // déjà en guet
+  });
+});
+
+describe('combat — riposte / contre', () => {
+  // Pièce dotée de la riposte (2 PA), comme le Duelliste ; mêlée portée 1, dégâts 2 par défaut.
+  const riposter = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ riposte: { cost: 2 }, range: 1, damage: 2, ...over });
+
+  it('riposte arme le contre et dépense le coût en PA', () => {
+    const s0 = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
+    ], 'alice');
+    const s = riposte(s0, 'a');
+    expect(unitById(s, 'a')!.riposting).toBe(true);
+    expect(unitById(s, 'a')!.ap).toBe(2); // 4 − 2
+  });
+
+  it('un attaquant adjacent que la cible encaisse se prend un contre', () => {
+    const base = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4, hp: 10 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 7, damage: 4 }),
+    ], 'alice');
+    const bobTurn = endTurn(riposte(base, 'a'), 4);          // alice armée, bob actif
+    expect(unitById(bobTurn, 'a')!.riposting).toBe(true);    // endTurn n'efface pas la riposte adverse
+    const s = attack(bobTurn, 'b', 'a');
+    expect(unitById(s, 'a')!.hp).toBe(6);                    // 10 − 4 (coup encaissé)
+    expect(unitById(s, 'b')!.hp).toBe(5);                    // 7 − 2 (contre)
+    expect(unitById(s, 'a')!.riposting).toBe(false);         // posture consommée
+  });
+
+  it('pas de contre contre un attaquant hors de portée mêlée (ex. un tireur)', () => {
+    const base = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'A', ap: 4, hp: 10 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 7, range: 2, damage: 4 }), // frappe à distance 2
+    ], 'alice');
+    const s = attack(endTurn(riposte(base, 'a'), 4), 'b', 'a');
+    expect(unitById(s, 'a')!.hp).toBe(6);                    // touchée à distance
+    expect(unitById(s, 'b')!.hp).toBe(7);                    // mais pas de contre (A..C = 2 > portée 1)
+    expect(unitById(s, 'a')!.riposting).toBe(true);          // posture conservée
+  });
+
+  it('pas de contre si la cible meurt du coup', () => {
+    const base = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4, hp: 3 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 7, damage: 4 }),
+    ], 'alice');
+    const s = attack(endTurn(riposte(base, 'a'), 4), 'b', 'a');
+    expect(unitById(s, 'a')).toBeUndefined();
+    expect(unitById(s, 'b')!.hp).toBe(7);                    // indemne
+    expect(winner(s)).toBe('bob');
+  });
+
+  it('le contre peut être létal', () => {
+    const base = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4, hp: 10, damage: 5 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 3, damage: 2 }),
+    ], 'alice');
+    const s = attack(endTurn(riposte(base, 'a'), 4), 'b', 'a');
+    expect(unitById(s, 'a')!.hp).toBe(8);                    // 10 − 2
+    expect(unitById(s, 'b')).toBeUndefined();                // 3 − 5
+    expect(winner(s)).toBe('alice');
+  });
+
+  it('le contre respecte la garde de l\'attaquant (réduit)', () => {
+    // Bob s'est gardé ET attaque dans le même tour → le contre qu'il encaisse est réduit.
+    const s0 = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', hp: 10, damage: 4, riposting: true }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 2,
+        guarding: true, guard: { cost: 3, damageTakenMul: 0.5 } }),
+    ], 'bob');
+    const s = attack(s0, 'b', 'a');
+    expect(unitById(s, 'b')!.hp).toBe(8);                    // contre 4 → ×0.5 = 2
+  });
+
+  it('la posture protège pendant le tour adverse puis expire au retour du duelliste', () => {
+    const base = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
+    ], 'alice');
+    const bobTurn = endTurn(riposte(base, 'a'), 4);
+    expect(unitById(bobTurn, 'a')!.riposting).toBe(true);
+    expect(unitById(endTurn(bobTurn, 4), 'a')!.riposting).toBe(false);
+  });
+
+  it('refus : sans capacité, sans PA, ou déjà armée', () => {
+    const noCap = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }), // pas de `riposte`
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
+    ], 'alice');
+    expect(canRiposte(noCap, 'a')).toBe(false);
+    expect(riposte(noCap, 'a')).toBe(noCap);
+
+    const lowAp = makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 1 }), // 1 < coût 2
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
+    ], 'alice');
+    expect(canRiposte(lowAp, 'a')).toBe(false);
+
+    const armed = riposte(makeCombatState(LINE, [
+      riposter({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
+    ], 'alice'), 'a');
+    expect(canRiposte(armed, 'a')).toBe(false); // déjà armée
   });
 });
 

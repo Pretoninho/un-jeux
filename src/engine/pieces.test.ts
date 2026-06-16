@@ -68,10 +68,13 @@ describe('pieces/Duelliste — pièce hors-droite via override de profil', () =>
     expect(d.attackCost).toBeLessThan(lourde.attackCost); // mais frappe deux fois par tour
   });
 
-  it('le Duelliste n\'a aucun verbe (ni garde ni tir réservé)', () => {
+  it('le Duelliste a le verbe Riposte (et lui seul : ni garde ni tir réservé)', () => {
+    expect(ARCHETYPES.duelliste!.riposte).toEqual({ cost: 2 });
     expect(ARCHETYPES.duelliste!.guard).toBeUndefined();
     expect(ARCHETYPES.duelliste!.overwatch).toBeUndefined();
     const d = makeUnit('a3', 'alice', 'Z', ARCHETYPES.duelliste!, 4);
+    expect(d.riposte).toEqual({ cost: 2 });
+    expect(d.riposting).toBe(false);
     expect(d.guard).toBeUndefined();
     expect(d.overwatch).toBeUndefined();
   });

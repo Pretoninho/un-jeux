@@ -35,6 +35,16 @@ export interface OverwatchProfile {
 }
 
 /**
+ * Capacité de RIPOSTE — le verbe « contre », atypique (le Duelliste). Miroir mêlée du tir
+ * réservé : au lieu de réagir à un ennemi qui ARRIVE à portée, la pièce arme un contre qui
+ * part quand un ennemi ADJACENT l'ATTAQUE (et qu'elle survit au coup). Les nombres vivent sur
+ * la pièce → personnalisables perso par perso. Le contre rend les dégâts propres de la pièce.
+ */
+export interface RiposteProfile {
+  cost: number; // PA pour armer la riposte
+}
+
+/**
  * Une pièce : à qui elle est, où elle est, ses PV/PA, et son PROFIL d'attaque
  * (portée/dégâts/coût). Le profil vit sur la pièce — voir engine/pieces.ts pour
  * la dérivation depuis le palier de portée (calibrage « portée + robustesse = 5 »).
@@ -54,6 +64,8 @@ export interface Unit {
   guarding?: boolean;   // posture de garde active, jusqu'au début de son prochain tour
   overwatch?: OverwatchProfile; // capacité de tir réservé (absente = pas de réflexe possible)
   watching?: boolean;   // tir réservé armé, jusqu'au début de son prochain tour
+  riposte?: RiposteProfile; // capacité de riposte (absente = pas de contre possible)
+  riposting?: boolean;  // riposte armée, jusqu'au prochain tour OU jusqu'au premier contre
 }
 
 export interface CombatState {
@@ -182,19 +194,30 @@ export function damageTaken(target: Unit, raw: number): number {
 /**
  * `attackerId` attaque `targetId` : inflige les dégâts de l'attaquant (réduits si la cible
  * est en garde), dépense son coût en PA. Une cible à 0 PV ou moins quitte le plateau.
- * Sans effet si l'attaque est illégale.
+ * RIPOSTE : si la cible SURVIT au coup, était en posture de riposte, et que l'attaquant est
+ * à SA portée (mêlée), elle rend aussitôt un coup (dégâts propres, réduits si l'attaquant est
+ * en garde) et sa posture est consommée. Sans effet si l'attaque est illégale.
  */
 export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
   if (!canAttack(state, attackerId, targetId)) return state;
   const attacker = unitById(state, attackerId)!;
-  const units = state.units
-    .map((u) => {
-      if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
-      if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, attacker.damage) };
+  // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
+  let units = state.units.map((u) => {
+    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
+    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, attacker.damage) };
+    return u;
+  });
+  // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
+  const tgt = units.find((u) => u.id === targetId)!;
+  if (tgt.hp > 0 && tgt.riposting && graphDistance(state.map, tgt.hex, attacker.hex) <= tgt.range) {
+    const back = damageTaken(attacker, tgt.damage);
+    units = units.map((u) => {
+      if (u.id === targetId) return { ...u, riposting: false };
+      if (u.id === attackerId) return { ...u, hp: u.hp - back };
       return u;
-    })
-    .filter((u) => u.hp > 0);
-  return { ...state, units };
+    });
+  }
+  return { ...state, units: units.filter((u) => u.hp > 0) };
 }
 
 // ─────────────────────── Garde / Défendre ────────────────────────────────────
@@ -278,9 +301,37 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
   return units === state.units ? state : { ...state, units };
 }
 
+// ─────────────────────── Riposte / Contre ────────────────────────────────────
+
+/**
+ * La pièce `unitId` peut-elle armer sa riposte ? Pièce du camp actif, dotée de la capacité
+ * `riposte`, pas déjà en posture, et assez de PA pour le coût.
+ */
+export function canRiposte(state: CombatState, unitId: string): boolean {
+  const u = unitById(state, unitId);
+  if (!u || u.owner !== state.active) return false;
+  if (!u.riposte || u.riposting) return false;
+  return u.ap >= u.riposte.cost;
+}
+
+/**
+ * `unitId` arme sa riposte : dépense le coût et passe en posture de contre jusqu'au début de
+ * son prochain tour OU jusqu'à ce qu'elle riposte une fois (résolu dans `attack`). Sans effet
+ * si illégal.
+ */
+export function riposte(state: CombatState, unitId: string): CombatState {
+  if (!canRiposte(state, unitId)) return state;
+  const u = unitById(state, unitId)!;
+  return {
+    ...state,
+    units: state.units.map((x) =>
+      x.id === unitId ? { ...x, ap: x.ap - u.riposte!.cost, riposting: true } : x),
+  };
+}
+
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
-/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde et guet expirent. */
+/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde, guet et riposte expirent. */
 export function endTurn(state: CombatState, apPerTurn: number): CombatState {
   const owners = liveOwners(state);
   const i = owners.indexOf(state.active);
@@ -290,6 +341,6 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     active: next,
     turn: state.turn + 1,
     units: state.units.map((u) =>
-      u.owner === next ? { ...u, ap: apPerTurn, guarding: false, watching: false } : u),
+      u.owner === next ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false } : u),
   };
 }
