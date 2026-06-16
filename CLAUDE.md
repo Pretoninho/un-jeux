@@ -101,8 +101,12 @@
   - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`a_lourde`, en garde, rayon 2)
     encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'a_lourde'`), CD 2 tours. Fil
     garde la Résonance générique *Épines relayées* en attendant son propre façonnage.
-  - **Duo *Estoc × Mireille* EN ATTENTE** : nécessite un **nouveau signal** émis par une action
-    de Tireur (déclencheur + effet à définir).
+  - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`
+    quand le Tir Réservé de Mireille part) ; Estoc (`fromCharacter: 'a_tireur'`, **portée escouade**)
+    pose une **marque** (`kind: 'marquage'`) sur la cible touchée → son **1ᵉʳ coup** sur elle gagne
+    **+1** puis la marque tombe. Durée 2 tours d'Estoc (statut `Unit.mark`, décompté à `endTurn`),
+    CD 2. **1ᵉʳ effet PERSISTANT** + 1ᵉʳ signal hors-garde. Portée escouade voulue (Mireille tire de
+    loin, Estoc au contact → jamais côte à côte).
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

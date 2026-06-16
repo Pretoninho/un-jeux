@@ -113,12 +113,17 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 
 ### 4.1 Signaux disponibles (`SignalType`, `combat.ts`)
 
-- `garde_encaissee` (seul existant). Ajouter un signal = un **lot moteur séparé** (émission +
-  type + tests), pas une simple donnée de perso.
+- `garde_encaissee` — émis par un allié qui **encaisse en garde** (la Lourde).
+- `tir_reserve` — émis par `resolveOverwatch` quand le **Tir Réservé** d'un allié part (le Tireur).
+- Ajouter un signal = un **lot moteur séparé** (type + point d'émission + tests), pas une donnée de perso.
 
 ### 4.2 Effets disponibles (`kind`, `applyReaction`)
 
-- `epines` (seul existant). Ajouter un `kind` = case `switch` dans `applyReaction` + **lot moteur**.
+- `epines` — dégâts instantanés relayés sur l'attaquant.
+- `marquage` — effet **persistant** : pose un `Unit.mark` (statut) → +`amount` au **1ᵉʳ coup** du
+  possesseur sur la cible, pendant `duration` tours, puis s'efface ou se consomme. Consommé dans
+  `strike()`, décompté dans `endTurn()`.
+- Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant) + **lot moteur**.
 
 > Un personnage **« né résonant »** réutilise un signal et un effet **existants** ; inventer un
 > nouveau signal/effet est un chantier moteur amont (sous-lot B de la matrice : faire varier

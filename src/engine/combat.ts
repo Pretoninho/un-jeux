@@ -50,11 +50,11 @@ export interface RiposteProfile {
  * vit dans l'effet : `amountBySource` module selon l'archétype de la SOURCE — on n'écrit que les
  * cellules utiles, jamais les N². Données PURES (sérialisables) ; le moteur dispatch sur `kind`.
  */
-export type SignalType = 'garde_encaissee';
+export type SignalType = 'garde_encaissee' | 'tir_reserve';
 export interface Signal {
   type: SignalType;
-  sourceId: string;   // la pièce qui émet (ex. la Lourde qui a encaissé en garde)
-  attackerId: string; // l'ennemi à l'origine du coup (cible des effets « épines »)
+  sourceId: string;   // la pièce alliée qui émet (Lourde qui encaisse en garde ; Tireur dont l'OW part)
+  attackerId: string; // l'ennemi ciblé par les effets (attaquant des épines ; cible touchée du tir réservé)
 }
 export type Scope = { radius: number } | { squad: true };
 export interface ReactionSpec {
@@ -62,13 +62,26 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines';                          // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage';             // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
+  duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
   amountByCharacter?: Record<string, number>; // override selon le HÉROS de la source (Unit.characterId) — plus spécifique
   fromKind?: string;      // ne réagit QU'À une source de cet archétype (duo par classe)
   fromCharacter?: string; // ne réagit QU'À une source = ce héros précis (duo par personnage) — « un duo = sa Résonance »
 }
+/**
+ * Statut « marqué » posé sur un ennemi par un allié (ex. Estoc, via la Résonance avec Mireille).
+ * Seul le marqueur (`by`) gagne le bonus, sur son PREMIER coup contre la cible (puis la marque
+ * tombe). Disparaît après `expiresIn` tours du marqueur si elle n'a pas été consommée.
+ */
+export interface Mark {
+  by: string;        // unité qui a posé la marque (seul ce marqueur profite du bonus)
+  owner: string;     // camp du marqueur (sert le décompte d'expiration)
+  bonus: number;     // dégâts ajoutés au 1er coup du marqueur sur la cible
+  expiresIn: number; // tours du marqueur restants avant disparition
+}
+
 /** Une réaction prête à partir, résolue depuis un signal (sert résolution ET prévisualisation). */
 export interface PendingReaction {
   listenerId: string;
@@ -103,6 +116,7 @@ export interface Unit {
   riposting?: boolean;  // riposte armée, jusqu'au prochain tour OU jusqu'au premier contre
   reactions?: ReactionSpec[];          // passifs en chaîne (écouteurs de signaux) — synergies d'escouade
   cooldowns?: Record<string, number>;  // CD restant par passif (clé = ReactionSpec.id), en tours
+  mark?: Mark;                         // statut « marqué » subi (posé par un allié adverse, ex. Estoc)
 }
 
 export interface CombatState {
@@ -236,10 +250,14 @@ export function damageTaken(target: Unit, raw: number): number {
  */
 function strike(state: CombatState, attackerId: string, targetId: string): { state: CombatState; signal: Signal | null } {
   const attacker = unitById(state, attackerId)!;
+  const target0 = unitById(state, targetId)!;
+  // Marque : si la cible portait une marque DE CET attaquant, son 1er coup gagne le bonus, puis tombe.
+  const marked = !!target0.mark && target0.mark.by === attackerId;
+  const raw = attacker.damage + (marked ? target0.mark!.bonus : 0);
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
     if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
-    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, attacker.damage) };
+    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, raw), ...(marked ? { mark: undefined } : {}) };
     return u;
   });
   // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
@@ -345,6 +363,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
         .filter((u) => u.hp > 0);
       return { ...state, units };
     }
+    case 'marquage': { // pose une marque sur l'ennemi : +bonus au 1er coup du possesseur, durée bornée
+      const listener = unitById(state, p.listenerId)!;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.targetId)
+          return { ...u, mark: { by: p.listenerId, owner: listener.owner, bonus: p.amount, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
     default:
       return state;
   }
@@ -435,24 +463,28 @@ export function reserve(state: CombatState, unitId: string): CombatState {
  * gardent leur tir. Module pur.
  */
 export function resolveOverwatch(state: CombatState, movedUnitId: string): CombatState {
-  const mover = unitById(state, movedUnitId);
-  if (!mover) return state;
-  let units = state.units;
+  let s = state;
   for (const w of state.units) {
-    if (!w.watching || w.owner === mover.owner) continue;
-    const cur = units.find((u) => u.id === movedUnitId);
-    if (!cur) break; // la cible a déjà été abattue
-    if (graphDistance(state.map, w.hex, cur.hex) > w.range) continue;
-    const dmg = damageTaken(cur, w.damage);
-    units = units
+    const watcher = unitById(s, w.id);
+    const mover = unitById(s, movedUnitId);
+    if (!watcher || !mover) break; // plus de tireur ou cible déjà abattue
+    if (!watcher.watching || watcher.owner === mover.owner) continue;
+    if (graphDistance(s.map, watcher.hex, mover.hex) > watcher.range) continue;
+    const dmg = damageTaken(mover, watcher.damage);
+    const units = s.units
       .map((u) => {
-        if (u.id === w.id) return { ...u, watching: false };
+        if (u.id === watcher.id) return { ...u, watching: false };
         if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg };
         return u;
       })
       .filter((u) => u.hp > 0);
+    s = { ...s, units };
+    // Le tir réservé est parti : on émet le signal ; si la cible survit, les réactions (ex. marquage) se résolvent.
+    if (unitById(s, movedUnitId)) {
+      s = resolveReactions(s, { type: 'tir_reserve', sourceId: watcher.id, attackerId: movedUnitId });
+    }
   }
-  return units === state.units ? state : { ...state, units };
+  return s;
 }
 
 // ─────────────────────── Riposte / Contre ────────────────────────────────────
@@ -494,6 +526,17 @@ function tickCooldowns(cd: Record<string, number> | undefined): Record<string, n
 }
 
 /**
+ * Vieillit une marque au tour QUI S'ACHÈVE : on ne décompte qu'à la fin du tour de SON marqueur
+ * (`endingOwner === mark.owner`) → la cible reste marquée pendant `expiresIn` tours pleins du
+ * marqueur. Renvoie `undefined` quand la marque expire (à 0).
+ */
+function tickMark(mark: Mark | undefined, endingOwner: string): Mark | undefined {
+  if (!mark || mark.owner !== endingOwner) return mark;
+  const left = mark.expiresIn - 1;
+  return left > 0 ? { ...mark, expiresIn: left } : undefined;
+}
+
+/**
  * Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde, guet et riposte
  * expirent, et les cooldowns de réaction du camp entrant décomptent d'un tour.
  */
@@ -505,9 +548,13 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     ...state,
     active: next,
     turn: state.turn + 1,
-    units: state.units.map((u) =>
-      u.owner === next
-        ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
-        : u),
+    units: state.units.map((u) => {
+      const mark = tickMark(u.mark, state.active); // le tour de `state.active` s'achève
+      const base =
+        u.owner === next
+          ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          : u;
+      return mark === u.mark ? base : { ...base, mark };
+    }),
   };
 }

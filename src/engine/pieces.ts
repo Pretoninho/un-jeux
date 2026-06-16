@@ -75,6 +75,17 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 };
 
 /**
+ * Résonance DUO « Estoc × Mireille » — quand le Tir Réservé de Mireille (`a_tireur`) part, Estoc
+ * MARQUE la cible touchée : son 1er coup sur elle gagne +1 dégât. La marque dure 2 tours d'Estoc
+ * (sinon s'efface), et la Résonance passe en CD 2. Portée `escouade` (toute l'équipe) : Mireille
+ * tire de loin et Estoc est au contact → ils ne seront quasiment jamais à portée l'un de l'autre.
+ */
+const MARQUAGE_ESTOC_MIREILLE: ReactionSpec = {
+  id: 'marquage_estoc_mireille', on: 'tir_reserve', fromCharacter: 'a_tireur',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+
+/**
  * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
  * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
  */
@@ -99,7 +110,7 @@ export const CHARACTERS: Record<string, Character> = {
   // Camp A (Alice)
   a_lourde:    { id: 'a_lourde',    name: 'Bastion', archetype: 'lourde' },
   a_tireur:    { id: 'a_tireur',    name: 'Mireille', archetype: 'tireur' },
-  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION] },
+  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE] },
   // Camp B (Bob)
   b_lourde:    { id: 'b_lourde',    name: 'Rempart', archetype: 'lourde' },
   b_tireur:    { id: 'b_tireur',    name: 'Orso', archetype: 'tireur' },

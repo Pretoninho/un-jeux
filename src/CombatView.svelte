@@ -29,8 +29,8 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées' };
-  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage' };
+  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché' };
 
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
@@ -395,7 +395,11 @@
             {#each unit.reactions as rx}
               <div><b>{RESON_LABEL[rx.kind] ?? rx.id}</b> — {SIGNAL_LABEL[rx.on] ?? rx.on}
                 · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours{#if rx.fromCharacter} · duo : {CHAR_NAME[rx.fromCharacter] ?? rx.fromCharacter}{:else if rx.fromKind} · duo : {KIND_NAME[rx.fromKind] ?? rx.fromKind}{/if}
-                <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
+                {#if rx.kind === 'marquage'}
+                  <div class="amt">+{rx.amount ?? 1} au 1ᵉʳ coup sur la cible · marque {rx.duration ?? 2} tours</div>
+                {:else}
+                  <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -413,6 +417,10 @@
           <div class="pstats"><span>PA <b>{selected.ap}</b>/{AP_PER_TURN}</span><span>Portée <b>{selected.range}</b></span><span>Dégâts <b>{selected.damage}</b></span></div>
           {#if selected.guarding || selected.watching || selected.riposting}
             <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if selected.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
+          {/if}
+          {#if selected.mark}
+            {@const mk = combat.units.find((mu) => mu.id === selected.mark!.by)}
+            <div class="ptags"><span class="tag m">✖ Marqué{#if mk} par {mk.name ?? KIND_NAME[mk.kind]}{/if} (+{selected.mark.bonus} au 1ᵉʳ coup · ⏳{selected.mark.expiresIn})</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -446,6 +454,10 @@
           <div class="pstats"><span>Portée <b>{foe.range}</b></span><span>Dégâts <b>{foe.damage}</b></span></div>
           {#if foe.guarding || foe.watching || foe.riposting}
             <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if foe.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
+          {/if}
+          {#if foe.mark}
+            {@const mk = combat.units.find((mu) => mu.id === foe.mark!.by)}
+            <div class="ptags"><span class="tag m">✖ Marqué{#if mk} par {mk.name ?? KIND_NAME[mk.kind]}{/if} (+{foe.mark.bonus} au 1ᵉʳ coup · ⏳{foe.mark.expiresIn})</span></div>
           {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
@@ -558,6 +570,7 @@
   .tag.g { background: #243456; color: #d6e6ff; }
   .tag.w { background: #3a2a22; color: #ffd9b8; }
   .tag.r { background: #342a4a; color: #e2d6ff; }
+  .tag.m { background: #4a2230; color: #ffc8d6; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }

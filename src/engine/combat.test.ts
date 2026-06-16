@@ -526,6 +526,64 @@ describe('combat — réactions en chaîne (synergies)', () => {
   });
 });
 
+describe('combat — Résonance Estoc × Mireille (marquage)', () => {
+  // Mireille (Tireuse, characterId a_tireur) en guet ; Estoc à portée porte la Résonance marquage.
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'a_tireur', ...over });
+  const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'mq', on: 'tir_reserve', fromCharacter: 'a_tireur', scope: { squad: true },
+        cooldown: 2, kind: 'marquage', amount: 1, duration: 2 }], cooldowns: {}, ...over });
+
+  // État de départ : le tir réservé de Mireille part sur la cible, Estoc la marque.
+  const afterOverwatch = () => {
+    const base = makeCombatState(LINE, [
+      mireille({ id: 'm', owner: 'alice', hex: 'A', ap: 4 }),
+      estoc({ id: 'e', owner: 'alice', hex: 'B', ap: 4 }),     // escouade : position indifférente
+      u({ id: 'x', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),   // cible
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'm'), 4);            // Mireille en guet, bob actif
+    return resolveOverwatch(moveUnit(bobTurn, 'x', 'C'), 'x'); // E→C (dist 2 ≤ portée 4) → tir
+  };
+
+  it('le tir réservé de Mireille marque la cible (et met la Résonance en CD)', () => {
+    const s = afterOverwatch();
+    expect(unitById(s, 'x')!.hp).toBe(18);                                   // 20 − 2 (tir)
+    expect(unitById(s, 'x')!.mark).toMatchObject({ by: 'e', bonus: 1, expiresIn: 2 });
+    expect(unitById(s, 'e')!.cooldowns!.mq).toBe(2);                         // Résonance en CD 2
+  });
+
+  it('un tir réservé d\'un AUTRE tireur (pas Mireille) ne marque pas', () => {
+    const base = makeCombatState(LINE, [
+      mireille({ id: 'm', owner: 'alice', hex: 'A', ap: 4, characterId: 'autre_tireur' }),
+      estoc({ id: 'e', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'x', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'm'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'x', 'C'), 'x');
+    expect(unitById(s, 'x')!.mark).toBeUndefined();
+  });
+
+  it('le 1er coup d\'Estoc sur la cible marquée gagne +1, puis la marque tombe', () => {
+    const aliceTurn = endTurn(afterOverwatch(), 4);    // bob finit → alice active (marque non décomptée)
+    expect(unitById(aliceTurn, 'x')!.mark!.expiresIn).toBe(2);
+    const hit1 = attack(aliceTurn, 'e', 'x');          // marqué : 4 + 1 = 5
+    expect(unitById(hit1, 'x')!.hp).toBe(13);          // 18 − 5
+    expect(unitById(hit1, 'x')!.mark).toBeUndefined(); // marque consommée
+    const hit2 = attack(hit1, 'e', 'x');               // 2e coup : dégâts normaux 4
+    expect(unitById(hit2, 'x')!.hp).toBe(9);           // 13 − 4
+  });
+
+  it('la marque s\'efface après 2 tours d\'Estoc si elle n\'est pas consommée', () => {
+    const s = afterOverwatch();                 // bob actif, marque expiresIn 2
+    const e1 = endTurn(s, 4);                    // → alice (tour 1 d'Estoc), pas de décompte
+    const e2 = endTurn(e1, 4);                   // alice finit → décompte : 1
+    const e3 = endTurn(e2, 4);                   // → alice (tour 2 d'Estoc)
+    expect(unitById(e3, 'x')!.mark!.expiresIn).toBe(1); // encore là pendant le 2e tour
+    const e4 = endTurn(e3, 4);                    // alice finit → décompte : 0 → disparaît
+    expect(unitById(e4, 'x')!.mark).toBeUndefined();
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

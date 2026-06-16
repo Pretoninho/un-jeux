@@ -90,9 +90,12 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
   it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
     const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.a_duelliste!, 4);
     expect(d).toMatchObject({ name: 'Estoc', characterId: 'a_duelliste', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
-    expect(d.reactions).toHaveLength(1);
-    expect(d.reactions![0]!.id).toBe('epines_estoc_bastion');
-    expect(d.reactions![0]!.fromCharacter).toBe('a_lourde'); // duo gâté à Bastion
+    expect(d.reactions).toHaveLength(2);                                    // deux duos
+    const ids = d.reactions!.map((r) => r.id);
+    expect(ids).toContain('epines_estoc_bastion');                         // × Bastion
+    expect(ids).toContain('marquage_estoc_mireille');                      // × Mireille
+    expect(d.reactions!.find((r) => r.id === 'epines_estoc_bastion')!.fromCharacter).toBe('a_lourde');
+    expect(d.reactions!.find((r) => r.id === 'marquage_estoc_mireille')!.fromCharacter).toBe('a_tireur');
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
   });
 
