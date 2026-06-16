@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  makeCombatState, reachable, moveUnit, attack, canAttack, endTurn, winner,
+  makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend, endTurn, winner,
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
@@ -126,6 +126,73 @@ describe('combat/attaque', () => {
 
   it('partie en cours tant que les deux camps ont une pièce', () => {
     expect(winner(fresh())).toBeNull();
+  });
+});
+
+describe('combat — garde / défendre', () => {
+  // Pièce dotée de la capacité de garde (3 PA → ×0.5 dégâts subis), comme la Lourde.
+  const guardian = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ guard: { cost: 3, damageTakenMul: 0.5 }, ...over });
+
+  it('defend met la pièce en garde et dépense le coût en PA', () => {
+    const s0 = makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    const s = defend(s0, 'a');
+    expect(unitById(s, 'a')!.guarding).toBe(true);
+    expect(unitById(s, 'a')!.ap).toBe(1); // 4 − 3
+  });
+
+  it('une cible en garde subit des dégâts réduits (×0.5, arrondi bas)', () => {
+    const base = makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 4, hp: 16 }),
+      u({ id: 'b', owner: 'bob', hex: 'B', ap: 4, damage: 5 }),
+    ], 'alice');
+    const s = attack(endTurn(defend(base, 'a'), 4), 'b', 'a'); // alice gardée, puis bob frappe
+    expect(unitById(s, 'a')!.hp).toBe(14); // 16 − floor(5 × 0.5) = 16 − 2
+  });
+
+  it('plancher de dégâts à 1 même en garde', () => {
+    const base = makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 4, hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'B', ap: 4, damage: 1 }),
+    ], 'alice');
+    const s = attack(endTurn(defend(base, 'a'), 4), 'b', 'a');
+    expect(unitById(s, 'a')!.hp).toBe(6); // 7 − max(1, floor(0.5)) = 7 − 1
+  });
+
+  it('la garde protège le tour adverse puis expire au début du tour suivant', () => {
+    const base = makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    const bobTurn = endTurn(defend(base, 'a'), 4);
+    expect(unitById(bobTurn, 'a')!.guarding).toBe(true); // protégée pendant le tour de bob
+    const aliceAgain = endTurn(bobTurn, 4);
+    expect(unitById(aliceAgain, 'a')!.guarding).toBe(false); // garde levée à son retour
+  });
+
+  it('sans la capacité de garde, le Tireur ne peut pas se défendre', () => {
+    const s0 = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }), // pas de `guard`
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    expect(canDefend(s0, 'a')).toBe(false);
+    expect(defend(s0, 'a')).toBe(s0);
+  });
+
+  it('pas de garde sans assez de PA, ni deux fois', () => {
+    const s0 = makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 2 }), // 2 < coût 3
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    expect(canDefend(s0, 'a')).toBe(false);
+    const ok = defend(makeCombatState(LINE, [
+      guardian({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice'), 'a');
+    expect(canDefend(ok, 'a')).toBe(false); // déjà en garde
   });
 });
 

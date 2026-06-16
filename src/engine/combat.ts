@@ -15,6 +15,17 @@
 import type { GameMap, HexId } from './types';
 
 /**
+ * Capacité de GARDE — le verbe « se défendre », propre à certains archétypes (les CAC).
+ * Les NOMBRES vivent sur la pièce (comme portée/dégâts) → personnalisables perso par perso :
+ * un autre CAC peut avoir un autre coût / une autre réduction. Une pièce sans `guard`
+ * (ex. le Tireur) ne peut pas se garder du tout — sa défense reste portée/placement.
+ */
+export interface GuardProfile {
+  cost: number;           // PA pour entrer en garde
+  damageTakenMul: number; // multiplicateur des dégâts subis pendant la garde (ex. 0.5)
+}
+
+/**
  * Une pièce : à qui elle est, où elle est, ses PV/PA, et son PROFIL d'attaque
  * (portée/dégâts/coût). Le profil vit sur la pièce — voir engine/pieces.ts pour
  * la dérivation depuis le palier de portée (calibrage « portée + robustesse = 5 »).
@@ -30,6 +41,8 @@ export interface Unit {
   damage: number;     // dégâts par coup
   attackCost: number; // coût en PA d'une attaque
   kind: string;       // clé d'archétype (affichage)
+  guard?: GuardProfile; // capacité de garde (absente = pièce qui ne peut pas se défendre)
+  guarding?: boolean;   // posture de garde active, jusqu'au début de son prochain tour
 }
 
 export interface CombatState {
@@ -149,9 +162,16 @@ export function canAttack(state: CombatState, attackerId: string, targetId: stri
   return graphDistance(state.map, attacker.hex, target.hex) <= attacker.range;
 }
 
+/** Dégâts effectivement subis par `target` : réduits (plancher 1) si la pièce est en garde. */
+export function damageTaken(target: Unit, raw: number): number {
+  if (target.guarding && target.guard) return Math.max(1, Math.floor(raw * target.guard.damageTakenMul));
+  return raw;
+}
+
 /**
- * `attackerId` attaque `targetId` : inflige les dégâts de l'attaquant, dépense son coût en PA.
- * Une cible à 0 PV ou moins quitte le plateau. Sans effet si l'attaque est illégale.
+ * `attackerId` attaque `targetId` : inflige les dégâts de l'attaquant (réduits si la cible
+ * est en garde), dépense son coût en PA. Une cible à 0 PV ou moins quitte le plateau.
+ * Sans effet si l'attaque est illégale.
  */
 export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
   if (!canAttack(state, attackerId, targetId)) return state;
@@ -159,16 +179,43 @@ export function attack(state: CombatState, attackerId: string, targetId: string)
   const units = state.units
     .map((u) => {
       if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost };
-      if (u.id === targetId) return { ...u, hp: u.hp - attacker.damage };
+      if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, attacker.damage) };
       return u;
     })
     .filter((u) => u.hp > 0);
   return { ...state, units };
 }
 
+// ─────────────────────── Garde / Défendre ────────────────────────────────────
+
+/**
+ * La pièce `unitId` peut-elle se mettre en garde ? Pièce du camp actif, dotée de la
+ * capacité `guard`, pas déjà en garde, et assez de PA pour le coût de la garde.
+ */
+export function canDefend(state: CombatState, unitId: string): boolean {
+  const u = unitById(state, unitId);
+  if (!u || u.owner !== state.active) return false;
+  if (!u.guard || u.guarding) return false;
+  return u.ap >= u.guard.cost;
+}
+
+/**
+ * `unitId` se met en garde : dépense le coût de sa garde et passe en posture défensive
+ * jusqu'au début de son prochain tour (où `endTurn` la lève). Sans effet si illégal.
+ */
+export function defend(state: CombatState, unitId: string): CombatState {
+  if (!canDefend(state, unitId)) return state;
+  const u = unitById(state, unitId)!;
+  return {
+    ...state,
+    units: state.units.map((x) =>
+      x.id === unitId ? { ...x, ap: x.ap - u.guard!.cost, guarding: true } : x),
+  };
+}
+
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
-/** Passe la main au camp suivant (encore en vie) et recharge SES PA. */
+/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; sa garde expire. */
 export function endTurn(state: CombatState, apPerTurn: number): CombatState {
   const owners = liveOwners(state);
   const i = owners.indexOf(state.active);
@@ -177,6 +224,6 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     ...state,
     active: next,
     turn: state.turn + 1,
-    units: state.units.map((u) => (u.owner === next ? { ...u, ap: apPerTurn } : u)),
+    units: state.units.map((u) => (u.owner === next ? { ...u, ap: apPerTurn, guarding: false } : u)),
   };
 }

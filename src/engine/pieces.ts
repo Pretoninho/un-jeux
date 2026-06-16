@@ -7,7 +7,7 @@
 // Tous les archétypes vivent sur cette même droite : aucun n'est strictement meilleur,
 // tout est positionnel. Les valeurs ci-dessous sont des LEVIERS, à affiner au jeu.
 
-import type { Unit } from './combat';
+import type { GuardProfile, Unit } from './combat';
 
 export interface Profile {
   range: number;      // portée d'attaque (cases)
@@ -27,6 +27,7 @@ export interface Archetype {
   name: string;
   glyph: string;     // marqueur affiché sur la pièce
   rangeTier: number; // position sur la droite de calibrage
+  guard?: GuardProfile; // 2ᵉ verbe « se défendre » — propre aux CAC ; nombres par perso
 }
 
 /**
@@ -34,8 +35,9 @@ export interface Archetype {
  * les exotiques (2/3, 3/2) restent prêts à brancher mais ne sont pas placés.
  */
 export const ARCHETYPES: Record<string, Archetype> = {
-  lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1 }, // 1/4 — mêlée-tank
-  tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4 }, // 4/1 — distance-verre
+  // La Lourde (CAC) sait se garder : 3 PA (→ pas d'attaque le même tour) pour ×0.5 dégâts subis.
+  lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1, guard: { cost: 3, damageTakenMul: 0.5 } }, // 1/4 — mêlée-tank
+  tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4 }, // 4/1 — distance-verre (aucune garde)
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
@@ -49,5 +51,6 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
     hp: p.maxHp, maxHp: p.maxHp,
     range: p.range, damage: p.damage, attackCost: p.attackCost,
     kind: archetype.key,
+    guard: archetype.guard, guarding: false,
   };
 }

@@ -10,7 +10,7 @@
   import { makeBoard } from './engine/board';
   import { makeOctaBoard } from './engine/octaboard';
   import {
-    makeCombatState, reachable, moveUnit, attack, canAttack, endTurn, winner,
+    makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend, endTurn, winner,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
@@ -111,6 +111,14 @@
     }
   }
 
+  const canGuard = $derived(!!selected && !over && canDefend(combat, selected.id));
+
+  function defendSelected() {
+    if (!selected || !canDefend(combat, selected.id)) return;
+    history = [...history, combat];
+    combat = defend(combat, selected.id);
+  }
+
   function undo() {
     if (history.length === 0) return;
     combat = history[history.length - 1]!;
@@ -150,6 +158,11 @@
       <button class:on={boardShape === 'hex'} onclick={() => setShape('hex')}>⬡ Hexagone</button>
       <button class:on={boardShape === 'octa'} onclick={() => setShape('octa')}>⯃ Octogone</button>
     </div>
+    {#if !over && selected?.guard}
+      <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}>
+        {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
+      </button>
+    {/if}
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
@@ -190,6 +203,7 @@
           <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
+          {#if occ.guarding}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🛡</text>{/if}
           {#if attackable}<text x={t.cx} y={t.cy - r - 3} class="atkmark">⚔</text>{/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
@@ -206,6 +220,7 @@
       <b>T</b> = Tireur (distance, fragile, dégâts faibles, portée 4).
       Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b>, puis une case
       verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse à portée</b> pour <b>frapper</b>.
+      La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque). Le Tireur, lui, se protège par la distance.
       {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
     {/if}
   </div>
@@ -222,6 +237,10 @@
   .shape { margin-left: auto; display: flex; gap: .3rem; }
   .shape button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .7rem; cursor: pointer; font-size: .8rem; }
   .shape button.on { border-color: #5a70b0; color: #cfe0ff; background: #20283a; }
+  .defend { background: #1c2436; border: 1px solid #3f5a8a; color: #aec6f0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .defend:hover:not(:disabled) { border-color: #6f90c8; }
+  .defend.on { background: #243456; border-color: #6f90c8; color: #d6e6ff; font-weight: 600; }
+  .defend:disabled { opacity: .4; cursor: not-allowed; }
   .undo { background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .undo:hover:not(:disabled) { border-color: #8a6075; }
   .undo:disabled { opacity: .35; cursor: not-allowed; }
@@ -240,6 +259,7 @@
   .utxt { fill: #0e1015; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
+  .guardmark { font-size: 11px; text-anchor: middle; pointer-events: none; }
   .atkmark { fill: #ff8a6a; font-size: 12px; text-anchor: middle; pointer-events: none; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }

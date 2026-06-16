@@ -30,4 +30,13 @@ describe('pieces/calibrage — droite portée + robustesse = 5', () => {
     expect(ARCHETYPES.lourde!.rangeTier).toBe(1);
     expect(ARCHETYPES.tireur!.rangeTier).toBe(4);
   });
+
+  it('la Lourde (CAC) sait se garder, pas le Tireur (distance)', () => {
+    expect(ARCHETYPES.lourde!.guard).toEqual({ cost: 3, damageTakenMul: 0.5 });
+    expect(ARCHETYPES.tireur!.guard).toBeUndefined();
+    const l = makeUnit('a1', 'alice', 'X', ARCHETYPES.lourde!, 4);
+    expect(l.guard).toEqual({ cost: 3, damageTakenMul: 0.5 });
+    expect(l.guarding).toBe(false);
+    expect(makeUnit('a2', 'alice', 'Y', ARCHETYPES.tireur!, 4).guard).toBeUndefined();
+  });
 });
