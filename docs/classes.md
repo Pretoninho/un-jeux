@@ -43,7 +43,11 @@ Les capacités sont des **verbes** portés par la pièce ; leurs **nombres** viv
   (et qu'elle survit au coup). Le contre rend les dégâts propres de la pièce, puis la posture
   est consommée. Un attaquant **à distance n'est pas contré**. (Duelliste : 2 PA.)
 
-## Réactions en chaîne (synergies d'escouade)
+## Résonance (réactions en chaîne, synergies d'escouade)
+
+Le système de synergies s'appelle la **Résonance** : les pièces *résonnent* entre elles, une
+frappe se propage en chaîne par sympathie. Dans l'UI, le panneau d'une pièce affiche un badge
+`✦ {effet}` avec son cooldown (et un `?` pour le détail).
 
 Au-delà des verbes actifs, des **passifs** font **communiquer les pièces** : un événement de
 combat émet un **signal typé**, les alliés dont un passif **écoute** ce signal **réagissent** —

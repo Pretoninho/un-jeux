@@ -12,6 +12,7 @@
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
     reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
+    type Unit,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
@@ -26,6 +27,9 @@
   // Nom et glyphe d'affichage dérivés du registre → aucune dérive quand on ajoute un archétype.
   const KIND_NAME: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
+  // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées' };
+  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché' };
 
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
@@ -89,6 +93,8 @@
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
   let selectedId = $state<string>('a1');
   let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
+  let resonAlly = $state(false);          // détail « Résonance » déplié (panneau allié)
+  let resonFoe = $state(false);           // détail « Résonance » déplié (panneau adverse)
   const acted = $derived(history.length > 0);
 
   // ── Navigation de la carte (zoom + pan) — pur SVG via le viewBox, sans dépendance ──
@@ -372,6 +378,28 @@
     </div>
 
     <aside class="info">
+    {#snippet reson(unit: Unit, open: boolean, toggle: () => void)}
+      {#if unit.reactions?.length}
+        <div class="reson">
+          {#each unit.reactions as rx}
+            <span class="resbadge">✦ {RESON_LABEL[rx.kind] ?? 'Résonance'}
+              {#if (unit.cooldowns?.[rx.id] ?? 0) > 0}<span class="cd">⏳{unit.cooldowns?.[rx.id]}</span>{:else}<span class="rdy">prêt</span>{/if}
+            </span>
+          {/each}
+          <button class="qbtn" class:on={open} onclick={toggle} title="Détail de la Résonance">?</button>
+        </div>
+        {#if open}
+          <div class="resdetail">
+            {#each unit.reactions as rx}
+              <div><b>{RESON_LABEL[rx.kind] ?? rx.id}</b> — {SIGNAL_LABEL[rx.on] ?? rx.on}
+                · {'radius' in rx.scope ? `rayon ${rx.scope.radius}` : 'escouade'} · CD {rx.cooldown} tours
+                <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon source : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    {/snippet}
     {#if !over}
       <div class="panels">
       <div class="panel ally" style="--c:{COLORS[combat.active]}">
@@ -384,6 +412,7 @@
           {#if selected.guarding || selected.watching || selected.riposting}
             <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if selected.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
+          {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
             {#if selected.guard}
               <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}>
@@ -416,6 +445,7 @@
           {#if foe.guarding || foe.watching || foe.riposting}
             <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if foe.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
+          {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
             <div class="chainwarn">
               {#each chainPreview as p}
@@ -533,6 +563,15 @@
   .reason { font-size: .76rem; color: #8a93a5; }
   .chainwarn { display: flex; flex-direction: column; gap: .15rem; margin: .1rem 0 .3rem; font-size: .74rem; color: #e2c66a; }
   .chainwarn b { color: #f0d886; }
+  .reson { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin: .2rem 0; }
+  .resbadge { font-size: .72rem; padding: .12rem .45rem; border-radius: 4px; background: #2c2640; color: #cbb6ec; display: inline-flex; gap: .3rem; align-items: center; }
+  .resbadge .cd { color: #e2c66a; }
+  .resbadge .rdy { color: #7fcf9e; }
+  .qbtn { width: 1.25rem; height: 1.25rem; line-height: 1; padding: 0; border-radius: 50%; border: 1px solid #4a4368; background: #221d33; color: #b7a6e0; cursor: pointer; font-size: .72rem; }
+  .qbtn:hover, .qbtn.on { border-color: #9a7cc8; color: #e2d6ff; }
+  .resdetail { font-size: .72rem; color: #b9afd0; background: #1d1930; border: 1px solid #352f4e; border-radius: 5px; padding: .35rem .5rem; margin: .1rem 0 .3rem; display: flex; flex-direction: column; gap: .25rem; }
+  .resdetail b { color: #d8c9f5; }
+  .resdetail .amt { color: #8d84a8; margin-top: .1rem; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
   .hint { padding: 0 .2rem; }
