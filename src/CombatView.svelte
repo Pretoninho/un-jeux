@@ -27,7 +27,7 @@
 
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
-  interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; viewBox: string }
+  interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; bounds: { x: number; y: number; w: number; h: number } }
 
   // Construit la géométrie ET la topologie d'un plateau (le moteur ne lit que `map`).
   function buildBoard(shape: Shape): Geo {
@@ -53,7 +53,7 @@
       });
     }
     const b = genBounds(tiles.map((t) => [t.cx, t.cy] as [number, number]));
-    return { map, corners, tiles, viewBox: `${b.minX.toFixed(1)} ${b.minY.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}` };
+    return { map, corners, tiles, bounds: { x: b.minX, y: b.minY, w: b.w, h: b.h } };
   }
 
   // Chaque camp aligne la paire polaire : une Lourde (mêlée-tank) + un Tireur (distance-verre).
@@ -78,6 +78,66 @@
   let selectedId = $state<string>('a1');
   let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
   const acted = $derived(history.length > 0);
+
+  // ── Navigation de la carte (zoom + pan) — pur SVG via le viewBox, sans dépendance ──
+  const MAXZOOM = 8;
+  let svgEl: SVGSVGElement | undefined;
+  let view = $state({ ...startGeo.bounds }); // fenêtre visible (x, y, w, h)
+  function resetView() { view = { ...geo.bounds }; }
+
+  // Garde la fenêtre à l'intérieur du plateau (jamais de vide hors-carte).
+  function clampPan(x: number, y: number, w: number, h: number) {
+    const nx = Math.min(geo.bounds.x + geo.bounds.w - w, Math.max(geo.bounds.x, x));
+    const ny = Math.min(geo.bounds.y + geo.bounds.h - h, Math.max(geo.bounds.y, y));
+    return { nx, ny };
+  }
+  // Zoom centré sur un point écran : le point sous le curseur reste fixe.
+  function zoomAt(clientX: number, clientY: number, factor: number) {
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    const fx = (clientX - rect.left) / rect.width;
+    const fy = (clientY - rect.top) / rect.height;
+    const px = view.x + fx * view.w, py = view.y + fy * view.h;
+    const zoom = geo.bounds.w / view.w;
+    const nz = Math.min(MAXZOOM, Math.max(1, zoom * factor));
+    const nw = geo.bounds.w / nz, nh = geo.bounds.h / nz;
+    const { nx, ny } = clampPan(px - fx * nw, py - fy * nh, nw, nh);
+    view = { x: nx, y: ny, w: nw, h: nh };
+  }
+  function zoomCenter(factor: number) {
+    if (!svgEl) return;
+    const r = svgEl.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+  }
+  function onWheel(e: WheelEvent) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.pow(1.0015, -e.deltaY));
+  }
+
+  // Pan au glisser : on ne capture le pointeur qu'au-delà d'un seuil → un clic simple
+  // passe normalement à la tuile (onHex) ; un vrai glissé déplace la carte et annule le clic.
+  let dragging = false, dragMoved = false, lastX = 0, lastY = 0, startX = 0, startY = 0, pointerId = -1;
+  function onPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    dragging = true; dragMoved = false;
+    lastX = startX = e.clientX; lastY = startY = e.clientY; pointerId = e.pointerId;
+  }
+  function onPointerMove(e: PointerEvent) {
+    if (!dragging || !svgEl) return;
+    if (!dragMoved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+    if (!dragMoved) { dragMoved = true; try { svgEl.setPointerCapture(pointerId); } catch { /* noop */ } }
+    const rect = svgEl.getBoundingClientRect();
+    const dx = (e.clientX - lastX) * (view.w / rect.width);
+    const dy = (e.clientY - lastY) * (view.h / rect.height);
+    lastX = e.clientX; lastY = e.clientY;
+    const { nx, ny } = clampPan(view.x - dx, view.y - dy, view.w, view.h);
+    view = { ...view, x: nx, y: ny };
+  }
+  function onPointerUp(e: PointerEvent) {
+    if (!dragging) return;
+    dragging = false;
+    if (svgEl) try { svgEl.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  }
 
   const champ = $derived(winner(combat));
   const over = $derived(champ !== null);
@@ -131,6 +191,7 @@
   }
 
   function onHex(hexId: string) {
+    if (dragMoved) { dragMoved = false; return; } // glissé en cours → on n'interprète pas le clic
     if (over) return;
     const occ = unitAt(combat, hexId);
     // Clic sur une de mes pièces → la sélectionner.
@@ -197,6 +258,7 @@
   function setShape(s: Shape) {
     boardShape = s;
     geo = buildBoard(s);
+    resetView();
     restart();
   }
 </script>
@@ -213,6 +275,11 @@
       <button class:on={boardShape === 'hex'} onclick={() => setShape('hex')}>⬡ Hexagone</button>
       <button class:on={boardShape === 'octa'} onclick={() => setShape('octa')}>⯃ Octogone</button>
     </div>
+    <div class="zoom">
+      <button onclick={() => zoomCenter(1 / 1.3)} title="Dézoomer" aria-label="Dézoomer">−</button>
+      <button onclick={() => zoomCenter(1.3)} title="Zoomer" aria-label="Zoomer">+</button>
+      <button onclick={resetView} title="Ajuster à l'écran" aria-label="Ajuster à l'écran">⤢</button>
+    </div>
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
@@ -225,7 +292,10 @@
     </div>
   {/if}
 
-  <svg viewBox={geo.viewBox} class="map">
+  <svg bind:this={svgEl} viewBox="{view.x} {view.y} {view.w} {view.h}" class="map"
+       role="application" aria-label="Plateau de jeu — molette pour zoomer, glisser pour déplacer"
+       onwheel={onWheel} onpointerdown={onPointerDown} onpointermove={onPointerMove}
+       onpointerup={onPointerUp} onpointercancel={onPointerUp}>
     {#each geo.tiles as t (t.id)}
       {@const occ = unitAt(combat, t.id)}
       {@const d = reach.get(t.id)}
@@ -326,6 +396,7 @@
       Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b> (sa <b style="color:#5ab0a0">portée</b> s'affiche) puis une case
       verte pour <b>bouger</b>. Clique une <b style="color:#e0604a">pièce adverse</b> pour l'inspecter
       (panneau + <b style="color:#e0604a">sa portée</b>), puis <b>⚔ Attaquer</b> si elle est à portée.
+      <br/>🔍 <b>Molette</b> pour zoomer, <b>glisse</b> pour déplacer la carte, <b>⤢</b> pour tout réafficher.
       La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
       Le <b>Tireur</b> peut <b style="color:#f0c0a0">🎯 Réserver (3 PA)</b> son tir : il <b>tire en réflexe</b> sur la première pièce qui s'arrête dans sa <b style="color:#c07a6a">zone de menace</b> (teintée pendant ton tour).
       {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
@@ -361,7 +432,11 @@
   .banner { background: #1e2435; border: 1px solid var(--c); border-radius: 8px; padding: .6rem 1rem; display: flex; align-items: center; gap: 1rem; }
   .banner b { color: var(--c); }
   .rematch { margin-left: auto; background: #1a2030; border: 1px solid var(--c); color: #e6ebf5; border-radius: 5px; padding: .35rem .8rem; cursor: pointer; }
-  .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; }
+  .map { width: 100%; background: #0f1117; border: 1px solid #2a2f3a; border-radius: 8px; cursor: grab; touch-action: none; }
+  .map:active { cursor: grabbing; }
+  .zoom { display: flex; gap: .3rem; }
+  .zoom button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .6rem; cursor: pointer; font-size: .9rem; min-width: 32px; line-height: 1; }
+  .zoom button:hover { border-color: #5a70b0; color: #cfe0ff; }
   .hex { cursor: default; }
   .hex.reach, .hex.attackable, .hex.mine { cursor: pointer; }
   .hex.reach:hover polygon { stroke: #b9f5cf; stroke-width: 3.5; }
