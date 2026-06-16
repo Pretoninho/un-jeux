@@ -43,6 +43,26 @@ Les capacités sont des **verbes** portés par la pièce ; leurs **nombres** viv
   (et qu'elle survit au coup). Le contre rend les dégâts propres de la pièce, puis la posture
   est consommée. Un attaquant **à distance n'est pas contré**. (Duelliste : 2 PA.)
 
+## Réactions en chaîne (synergies d'escouade)
+
+Au-delà des verbes actifs, des **passifs** font **communiquer les pièces** : un événement de
+combat émet un **signal typé**, les alliés dont un passif **écoute** ce signal **réagissent** —
+et l'effet peut dépendre de **qui** a déclenché (archétype de la source). On obtient ainsi une
+**matrice « possesseur × déclencheur »** qui *émerge* (on n'écrit que les cellules utiles, jamais
+les N²). Source de vérité : `resolveReactions`/`pendingReactions` dans `engine/combat.ts`.
+
+Garde-fous (déterminisme + terminaison, esprit échecs) :
+- **Lisibilité** : tout est déterministe et **pré-visualisable** — `previewReactions` rejoue la
+  frappe sans la committer ; l'UI annonce la cascade avant le coup.
+- **Portée** par réaction : `scope = { radius: n }` (rayon autour de la source) ou `{ squad: true }`
+  (toute l'escouade — réservé aux rares passifs « commandement »).
+- **Cooldown** par passif (en tours du possesseur), décompté à `endTurn`.
+- **Terminaison** : file FIFO bornée + « un passif au plus une fois par cascade ».
+
+**Première cellule livrée** — *Épines relayées* (Duelliste) : quand un allié **en garde** (rayon 2)
+**encaisse** un coup, le Duelliste **pince l'attaquant** ; dégâts selon la source (Lourde → 2,
+défaut 1), CD 2 tours. À terme, `overwatch` et `riposte` passeront par ce même canal.
+
 ## Effectif déployé (hotseat)
 
 Équipe **visée : 4 pièces/camp**. Composition cible : **Lourde + Tireur + Duelliste + Soigneur**.

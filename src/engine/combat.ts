@@ -45,6 +45,36 @@ export interface RiposteProfile {
 }
 
 /**
+ * RÉACTIONS EN CHAÎNE — synergies d'escouade. Un événement de combat émet un SIGNAL typé ;
+ * les alliés dont un passif ÉCOUTE ce type réagissent. La spécificité « possesseur × déclencheur »
+ * vit dans l'effet : `amountBySource` module selon l'archétype de la SOURCE — on n'écrit que les
+ * cellules utiles, jamais les N². Données PURES (sérialisables) ; le moteur dispatch sur `kind`.
+ */
+export type SignalType = 'garde_encaissee';
+export interface Signal {
+  type: SignalType;
+  sourceId: string;   // la pièce qui émet (ex. la Lourde qui a encaissé en garde)
+  attackerId: string; // l'ennemi à l'origine du coup (cible des effets « épines »)
+}
+export type Scope = { radius: number } | { squad: true };
+export interface ReactionSpec {
+  id: string;                              // identifiant du passif (clé de cooldown)
+  on: SignalType;                          // type de signal écouté
+  scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
+  cooldown: number;                        // en tours du possesseur (0 = sans CD)
+  kind: 'epines';                          // effet (le moteur dispatch dessus)
+  amount?: number;                         // valeur par défaut de l'effet
+  amountBySource?: Record<string, number>; // override selon l'archétype de la SOURCE
+}
+/** Une réaction prête à partir, résolue depuis un signal (sert résolution ET prévisualisation). */
+export interface PendingReaction {
+  listenerId: string;
+  spec: ReactionSpec;
+  targetId: string;
+  amount: number;
+}
+
+/**
  * Une pièce : à qui elle est, où elle est, ses PV/PA, et son PROFIL d'attaque
  * (portée/dégâts/coût). Le profil vit sur la pièce — voir engine/pieces.ts pour
  * la dérivation depuis le palier de portée (calibrage « portée + robustesse = 5 »).
@@ -66,6 +96,8 @@ export interface Unit {
   watching?: boolean;   // tir réservé armé, jusqu'au début de son prochain tour
   riposte?: RiposteProfile; // capacité de riposte (absente = pas de contre possible)
   riposting?: boolean;  // riposte armée, jusqu'au prochain tour OU jusqu'au premier contre
+  reactions?: ReactionSpec[];          // passifs en chaîne (écouteurs de signaux) — synergies d'escouade
+  cooldowns?: Record<string, number>;  // CD restant par passif (clé = ReactionSpec.id), en tours
 }
 
 export interface CombatState {
@@ -192,14 +224,12 @@ export function damageTaken(target: Unit, raw: number): number {
 }
 
 /**
- * `attackerId` attaque `targetId` : inflige les dégâts de l'attaquant (réduits si la cible
- * est en garde), dépense son coût en PA. Une cible à 0 PV ou moins quitte le plateau.
- * RIPOSTE : si la cible SURVIT au coup, était en posture de riposte, et que l'attaquant est
- * à SA portée (mêlée), elle rend aussitôt un coup (dégâts propres, réduits si l'attaquant est
- * en garde) et sa posture est consommée. Sans effet si l'attaque est illégale.
+ * La FRAPPE nue (pure) : dégâts (réduits si la cible est en garde) + riposte éventuelle, et le
+ * SIGNAL qu'elle émet le cas échéant — une pièce qui ENCAISSE en garde et survit émet
+ * `garde_encaissee`. Séparer la frappe de ses réactions permet de prévisualiser une cascade
+ * sans la committer (voir `previewReactions`).
  */
-export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
-  if (!canAttack(state, attackerId, targetId)) return state;
+function strike(state: CombatState, attackerId: string, targetId: string): { state: CombatState; signal: Signal | null } {
   const attacker = unitById(state, attackerId)!;
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
@@ -217,7 +247,116 @@ export function attack(state: CombatState, attackerId: string, targetId: string)
       return u;
     });
   }
-  return { ...state, units: units.filter((u) => u.hp > 0) };
+  const next: CombatState = { ...state, units: units.filter((u) => u.hp > 0) };
+  const absorber = unitById(next, targetId);
+  const signal: Signal | null =
+    absorber && absorber.guarding && absorber.guard
+      ? { type: 'garde_encaissee', sourceId: targetId, attackerId }
+      : null;
+  return { state: next, signal };
+}
+
+/**
+ * `attackerId` attaque `targetId` : la frappe (coup réduit si la cible est en garde + riposte
+ * éventuelle), PUIS les RÉACTIONS EN CHAÎNE — si la cible a encaissé en garde, elle émet un
+ * signal que ses alliés relaient (voir `resolveReactions`). Sans effet si l'attaque est illégale.
+ */
+export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
+  if (!canAttack(state, attackerId, targetId)) return state;
+  const { state: s, signal } = strike(state, attackerId, targetId);
+  return signal ? resolveReactions(s, signal) : s;
+}
+
+/**
+ * Prévisualisation (lisibilité) : les réactions qui PARTIRAIENT si `attackerId` frappait
+ * `targetId`, sans rien committer. Pur — rejoue la frappe puis liste les écouteurs éligibles.
+ */
+export function previewReactions(state: CombatState, attackerId: string, targetId: string): PendingReaction[] {
+  if (!canAttack(state, attackerId, targetId)) return [];
+  const { state: s, signal } = strike(state, attackerId, targetId);
+  return signal ? pendingReactions(s, signal) : [];
+}
+
+// ─────────────────────── Réactions en chaîne (synergies d'escouade) ───────────
+
+const REACTION_CHAIN_CAP = 64; // garde-fou dur, en plus du « un passif au plus une fois par chaîne »
+
+function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): boolean {
+  return 'squad' in scope ? true : graphDistance(map, source.hex, listener.hex) <= scope.radius;
+}
+
+/** Valeur de l'effet selon l'archétype de la SOURCE (la matrice possesseur×déclencheur). */
+function reactionAmount(spec: ReactionSpec, sourceKind: string): number {
+  return spec.amountBySource?.[sourceKind] ?? spec.amount ?? 1;
+}
+
+/**
+ * Écouteurs éligibles à `signal` : alliés de la source (pas elle-même), dont un passif écoute
+ * ce type, à portée (`scope`), hors cooldown, et pas déjà déclenchés dans la chaîne (`fired`).
+ * Pur — sert à la fois la résolution et la prévisualisation.
+ */
+export function pendingReactions(state: CombatState, signal: Signal, fired: Set<string> = new Set()): PendingReaction[] {
+  const source = unitById(state, signal.sourceId);
+  const target = unitById(state, signal.attackerId);
+  if (!source || !target) return [];
+  const out: PendingReaction[] = [];
+  for (const u of state.units) {
+    if (u.owner !== source.owner || u.id === source.id) continue; // synergies alliées (pas soi)
+    for (const spec of u.reactions ?? []) {
+      if (spec.on !== signal.type) continue;
+      if (fired.has(`${u.id}:${spec.id}`)) continue;
+      if ((u.cooldowns?.[spec.id] ?? 0) > 0) continue;
+      if (!inScope(state.map, source, u, spec.scope)) continue;
+      out.push({ listenerId: u.id, spec, targetId: target.id, amount: reactionAmount(spec, source.kind) });
+    }
+  }
+  return out;
+}
+
+/** Applique une réaction (pur) : pose son cooldown sur l'écouteur puis joue son effet. */
+function applyReaction(state: CombatState, p: PendingReaction): CombatState {
+  if (!unitById(state, p.listenerId)) return state;
+  const arm = (u: Unit): Unit => ({ ...u, cooldowns: { ...(u.cooldowns ?? {}), [p.spec.id]: p.spec.cooldown } });
+  switch (p.spec.kind) {
+    case 'epines': { // relaie des dégâts sur l'attaquant (réduits s'il est en garde)
+      const target = unitById(state, p.targetId);
+      const dmg = target ? damageTaken(target, p.amount) : 0;
+      const units = state.units
+        .map((u) => {
+          if (u.id === p.listenerId) return arm(u);
+          if (target && u.id === p.targetId) return { ...u, hp: u.hp - dmg };
+          return u;
+        })
+        .filter((u) => u.hp > 0);
+      return { ...state, units };
+    }
+    default:
+      return state;
+  }
+}
+
+/**
+ * Résout une cascade depuis `signal` : file FIFO bornée ; chaque passif se déclenche au plus une
+ * fois (`fired`) → terminaison garantie (+ garde-fou dur `REACTION_CHAIN_CAP`). Déterministe
+ * (ordre des pièces stable ; on recalcule après chaque effet pour suivre morts et cooldowns).
+ * Les effets peuvent émettre de nouveaux signaux (empilés) — aucun ne le fait encore en v1.
+ */
+export function resolveReactions(state: CombatState, signal: Signal): CombatState {
+  const fired = new Set<string>();
+  const queue: Signal[] = [signal];
+  let s = state;
+  let steps = 0;
+  while (queue.length && steps < REACTION_CHAIN_CAP) {
+    const sig = queue.shift()!;
+    let pend = pendingReactions(s, sig, fired);
+    while (pend.length && steps++ < REACTION_CHAIN_CAP) {
+      const p = pend[0]!;
+      fired.add(`${p.listenerId}:${p.spec.id}`);
+      s = applyReaction(s, p);
+      pend = pendingReactions(s, sig, fired); // l'état a changé (morts, cooldowns) → on recalcule
+    }
+  }
+  return s;
 }
 
 // ─────────────────────── Garde / Défendre ────────────────────────────────────
@@ -331,7 +470,18 @@ export function riposte(state: CombatState, unitId: string): CombatState {
 
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
-/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde, guet et riposte expirent. */
+/** Décrémente d'un tour tous les cooldowns d'une pièce (plancher 0). */
+function tickCooldowns(cd: Record<string, number> | undefined): Record<string, number> | undefined {
+  if (!cd) return cd;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(cd)) out[k] = Math.max(0, v - 1);
+  return out;
+}
+
+/**
+ * Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde, guet et riposte
+ * expirent, et les cooldowns de réaction du camp entrant décomptent d'un tour.
+ */
 export function endTurn(state: CombatState, apPerTurn: number): CombatState {
   const owners = liveOwners(state);
   const i = owners.indexOf(state.active);
@@ -341,6 +491,8 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     active: next,
     turn: state.turn + 1,
     units: state.units.map((u) =>
-      u.owner === next ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false } : u),
+      u.owner === next
+        ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+        : u),
   };
 }

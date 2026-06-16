@@ -7,7 +7,7 @@
 // Tous les archétypes vivent sur cette même droite : aucun n'est strictement meilleur,
 // tout est positionnel. Les valeurs ci-dessous sont des LEVIERS, à affiner au jeu.
 
-import type { GuardProfile, OverwatchProfile, RiposteProfile, Unit } from './combat';
+import type { GuardProfile, OverwatchProfile, RiposteProfile, ReactionSpec, Unit } from './combat';
 
 export interface Profile {
   range: number;      // portée d'attaque (cases)
@@ -31,6 +31,7 @@ export interface Archetype {
   guard?: GuardProfile;         // verbe « se défendre » — propre aux CAC ; nombres par perso
   overwatch?: OverwatchProfile; // verbe « tir réservé » — propre aux pièces à distance
   riposte?: RiposteProfile;     // verbe « riposte » — atypique (Duelliste) ; contre en mêlée
+  reactions?: ReactionSpec[];   // passifs en chaîne (synergies d'escouade) ; déclenchés par signaux
 }
 
 /**
@@ -45,7 +46,18 @@ export const ARCHETYPES: Record<string, Archetype> = {
   // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
   // en échange d'une attaque à 1 PA → frappe deux fois par tour. Verbe atypique : Riposte (2 PA →
   // contre tout attaquant adjacent jusqu'au prochain coup). Escarmouche/harcèlement.
-  duelliste: { key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1, profile: { maxHp: 9, damage: 2, attackCost: 1 }, riposte: { cost: 2 } },
+  // PASSIF « Épines relayées » : quand un allié en garde (rayon 2) ENCAISSE un coup, le Duelliste
+  // pince l'attaquant — dégâts selon la SOURCE (Lourde → 2, défaut 1). Première cellule de la
+  // matrice de synergies ; CD 2 tours.
+  duelliste: {
+    key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1,
+    profile: { maxHp: 9, damage: 2, attackCost: 1 },
+    riposte: { cost: 2 },
+    reactions: [{
+      id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+      kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
+    }],
+  },
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
@@ -63,5 +75,6 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
     guard: archetype.guard, guarding: false,
     overwatch: archetype.overwatch, watching: false,
     riposte: archetype.riposte, riposting: false,
+    reactions: archetype.reactions, cooldowns: {},
   };
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
-  reserve, canReserve, resolveOverwatch, riposte, canRiposte, endTurn, winner,
+  reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
@@ -378,6 +378,90 @@ describe('combat — riposte / contre', () => {
       u({ id: 'b', owner: 'bob', hex: 'C', ap: 4 }),
     ], 'alice'), 'a');
     expect(canRiposte(armed, 'a')).toBe(false); // déjà armée
+  });
+});
+
+describe('combat — réactions en chaîne (synergies)', () => {
+  // Un « tank » (kind lourde) en garde, et un allié porteur du passif « épines » (rayon 2, CD 2 ;
+  // dégâts 3 si la source est une lourde, 1 sinon).
+  const guarder = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, ...over });
+  const listener = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
+        kind: 'epines', amount: 1, amountBySource: { lourde: 3 } }], cooldowns: {}, ...over });
+
+  it('garde encaissée → un allié à portée relaie des épines sur l\'attaquant (dégâts selon la source)', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      listener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'a')!.hp).toBe(14);            // 16 − floor(4·0.5) = 2 (encaissé en garde)
+    expect(unitById(s, 'b')!.hp).toBe(7);             // épines 3 (source = lourde)
+    expect(unitById(s, 'c')!.cooldowns!.ep).toBe(2);  // passif mis en cooldown
+  });
+
+  it('pas de chaîne si l\'écouteur est hors du rayon', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      listener({ id: 'c', owner: 'alice', hex: 'E', hp: 10 }), // E..B = 3 > rayon 2
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'b')!.hp).toBe(10);
+    expect(unitById(s, 'c')!.cooldowns!.ep ?? 0).toBe(0);
+  });
+
+  it('pas de chaîne si la cible n\'était pas en garde (aucun signal émis)', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, guarding: false }),
+      listener({ id: 'c', owner: 'alice', hex: 'A', hp: 10 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'b')!.hp).toBe(10);
+  });
+
+  it('le passif ne part pas s\'il est en cooldown', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      listener({ id: 'c', owner: 'alice', hex: 'A', hp: 10, cooldowns: { ep: 1 } }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10);
+  });
+
+  it('le cooldown décompte au retour du camp du possesseur', () => {
+    const st = makeCombatState(LINE, [
+      listener({ id: 'c', owner: 'alice', hex: 'A', cooldowns: { ep: 2 } }),
+      u({ id: 'b', owner: 'bob', hex: 'E' }),
+    ], 'bob');
+    const a1 = endTurn(st, 4);                  // alice redevient active → décompte
+    expect(unitById(a1, 'c')!.cooldowns!.ep).toBe(1);
+    const a2 = endTurn(endTurn(a1, 4), 4);      // bob puis alice → re-décompte
+    expect(unitById(a2, 'c')!.cooldowns!.ep).toBe(0);
+  });
+
+  it('synergie alliée seulement : un ennemi ne réagit pas à la garde adverse', () => {
+    const base = makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      listener({ id: 'c', owner: 'bob', hex: 'A', hp: 10 }), // écouteur du camp de l'attaquant
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10);
+  });
+
+  it('previewReactions annonce la cascade sans muter l\'état', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'x', owner: 'alice', hex: 'B', ap: 4, damage: 4 }),  // ton attaquant
+      guarder({ id: 'g', owner: 'bob', hex: 'C', ap: 4 }),         // tank adverse en garde
+      listener({ id: 'l', owner: 'bob', hex: 'D', hp: 10 }),       // allié adverse réactif
+    ], 'alice');
+    const pv = previewReactions(base, 'x', 'g');
+    expect(pv).toHaveLength(1);
+    expect(pv[0]).toMatchObject({ listenerId: 'l', targetId: 'x', amount: 3 });
+    expect(unitById(base, 'x')!.hp).toBe(10); // état d'origine intact (dry-run pur)
   });
 });
 

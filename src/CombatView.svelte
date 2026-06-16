@@ -11,7 +11,7 @@
   import { makeOctaBoard } from './engine/octaboard';
   import {
     makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
-    reserve, canReserve, resolveOverwatch, riposte, canRiposte, endTurn, winner,
+    reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
@@ -171,6 +171,10 @@
   // Pièce adverse inspectée (clic sur une pièce ennemie) — alimente le panneau adverse.
   const foe = $derived(combat.units.find((u) => u.id === inspectedId && u.owner !== combat.active));
   const canHitFoe = $derived(!!selected && !!foe && !over && canAttack(combat, selected.id, foe.id));
+  // Lisibilité : si frapper ce foe déclenchait une cascade (ex. son tank en garde → un allié
+  // relaie des épines sur TA pièce), on l'annonce avant le coup (dry-run pur, rien n'est committé).
+  const chainPreview = $derived(
+    selected && foe && canHitFoe ? previewReactions(combat, selected.id, foe.id) : []);
   const attackBlock = $derived.by(() => {
     if (!foe || over) return '';
     if (!selected) return 'Sélectionne une de tes pièces.';
@@ -412,6 +416,13 @@
           {#if foe.guarding || foe.watching || foe.riposting}
             <div class="ptags">{#if foe.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if foe.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if foe.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
+          {#if chainPreview.length}
+            <div class="chainwarn">
+              {#each chainPreview as p}
+                <span>⚡ En chaîne : le <b>{KIND_NAME[combat.units.find((u) => u.id === p.listenerId)?.kind ?? '']}</b> adverse pince ta pièce (−{p.amount})</span>
+              {/each}
+            </div>
+          {/if}
           <div class="pacts">
             <button class="attack" onclick={attackFoe} disabled={!canHitFoe}>⚔ Attaquer{#if selected} ({selected.attackCost} PA){/if}</button>
             {#if attackBlock}<span class="reason">{attackBlock}</span>{/if}
@@ -520,6 +531,8 @@
   .attack:hover:not(:disabled) { border-color: #e0604a; background: #3a2226; }
   .attack:disabled { opacity: .4; cursor: not-allowed; }
   .reason { font-size: .76rem; color: #8a93a5; }
+  .chainwarn { display: flex; flex-direction: column; gap: .15rem; margin: .1rem 0 .3rem; font-size: .74rem; color: #e2c66a; }
+  .chainwarn b { color: #f0d886; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
   .hint { padding: 0 .2rem; }
