@@ -424,6 +424,32 @@ describe('combat — réactions en chaîne (synergies)', () => {
     expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(7); // 10 − 3 (repli sur lourde)
   });
 
+  it('duo gâté par héros (fromCharacter) : ne réagit QUE pour ce héros source', () => {
+    const reac = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+      u({ reactions: [{ id: 'duo', on: 'garde_encaissee', fromCharacter: 'bastion',
+          scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2 }], cooldowns: {}, ...over });
+    const withSrc = (cid: string) => makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4, characterId: cid }),
+      reac({ id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(withSrc('bastion'), 'b', 'a'), 'b')!.hp).toBe(8);  // 10 − 2 : le duo part
+    expect(unitById(attack(withSrc('rempart'), 'b', 'a'), 'b')!.hp).toBe(10); // autre héros : rien
+  });
+
+  it('duo gâté par classe (fromKind) : ne réagit QUE pour cet archétype source', () => {
+    const reac = (k: string, over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+      u({ reactions: [{ id: 'duo', on: 'garde_encaissee', fromKind: k,
+          scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2 }], cooldowns: {}, ...over });
+    const base = (k: string) => makeCombatState(LINE, [
+      guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }), // source = lourde
+      reac(k, { id: 'c', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base('lourde'), 'b', 'a'), 'b')!.hp).toBe(8);  // source lourde = match → 2
+    expect(unitById(attack(base('tireur'), 'b', 'a'), 'b')!.hp).toBe(10); // source ≠ tireur → rien
+  });
+
   it('pas de chaîne si l\'écouteur est hors du rayon', () => {
     const base = makeCombatState(LINE, [
       guarder({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),

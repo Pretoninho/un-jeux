@@ -64,10 +64,21 @@ export const ARCHETYPES: Record<string, Archetype> = {
 // fusionne avec le socle de classe PAR `id` (elle l'étend ou l'écrase). Les deux camps alignent
 // des héros DISTINCTS (noms propres) mais aux stats MIROIR → équité préservée (esprit échecs).
 
-/** Résonance signature partagée par les deux Duellistes (mêmes nombres → miroir équitable). */
+/**
+ * Résonance DUO « Estoc × Bastion » — un duo = sa propre Résonance (gâtée à la source par
+ * `fromCharacter`). Quand Bastion (en garde, rayon 2) encaisse, Estoc pince l'attaquant pour 2.
+ * Ne se déclenche QUE pour Bastion (`a_lourde`), pas un tank quelconque. CD 2 tours.
+ */
+const EPINES_ESTOC_BASTION: ReactionSpec = {
+  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'a_lourde',
+  scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2,
+};
+
+/**
+ * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
+ * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
+ */
 const EPINES_RELAYEES: ReactionSpec = {
-  // Quand un allié en garde (rayon 2) ENCAISSE un coup, le Duelliste pince l'attaquant —
-  // dégâts selon la SOURCE (Lourde → 2, défaut 1). Première cellule de la matrice ; CD 2 tours.
   id: 'epines_relayees', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2,
   kind: 'epines', amount: 1, amountBySource: { lourde: 2 },
 };
@@ -88,7 +99,7 @@ export const CHARACTERS: Record<string, Character> = {
   // Camp A (Alice)
   a_lourde:    { id: 'a_lourde',    name: 'Bastion', archetype: 'lourde' },
   a_tireur:    { id: 'a_tireur',    name: 'Mireille', archetype: 'tireur' },
-  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_RELAYEES] },
+  a_duelliste: { id: 'a_duelliste', name: 'Estoc', archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION] },
   // Camp B (Bob)
   b_lourde:    { id: 'b_lourde',    name: 'Rempart', archetype: 'lourde' },
   b_tireur:    { id: 'b_tireur',    name: 'Orso', archetype: 'tireur' },

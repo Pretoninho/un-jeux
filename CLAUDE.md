@@ -91,8 +91,18 @@
   (décompté à `endTurn`) ; **terminaison** (file FIFO bornée + un passif au plus une fois/cascade).
   `attack()` scindé en `strike()` (frappe nue + signal) + résolution → permettra de rebrancher
   `overwatch`/`riposte` sur ce canal plus tard.
-  - **1ʳᵉ cellule livrée** — *Épines relayées* (Duelliste) : un allié **en garde** (rayon 2)
-    qui **encaisse** → le Duelliste pince l'attaquant (Lourde→2, défaut 1), CD 2 tours.
+  - **MODÈLE PAR-DUO (décidé 2026-06-16)** — *« un duo de héros = sa propre Résonance »*. Filtre
+    de source `ReactionSpec.fromCharacter` / `fromKind` : une Résonance peut ne réagir QU'À une
+    source précise (héros ou archétype). Chaque binôme porte alors **sa** `ReactionSpec` distincte
+    (id/effet/portée/CD propres), pas un effet partagé scalé. `amountBySource`/`amountByCharacter`
+    restent pour le cas léger « même effet, magnitude variable ». **Contrainte** : un duo n'existe
+    que s'il a un **signal que le partenaire émet** (aujourd'hui seul `garde_encaissee`, émis par
+    la Garde → seuls les duos avec un tank sont déclenchables sans nouveau signal).
+  - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`a_lourde`, en garde, rayon 2)
+    encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'a_lourde'`), CD 2 tours. Fil
+    garde la Résonance générique *Épines relayées* en attendant son propre façonnage.
+  - **Duo *Estoc × Mireille* EN ATTENTE** : nécessite un **nouveau signal** émis par une action
+    de Tireur (déclencheur + effet à définir).
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

@@ -80,6 +80,34 @@ l'ennemi, jamais la source elle-même). L'effet vise l'attaquant.
 **Lookup de la valeur** (priorité, du plus spécifique au plus général) :
 `amountByCharacter[characterId]` → `amountBySource[kind]` → `amount` → `1`.
 
+### 4.0 Modèle PAR-DUO — « un duo de héros = sa propre Résonance »
+
+C'est l'intention de fond : chaque **binôme** (possesseur × déclencheur) a **sa** Résonance,
+potentiellement un **effet distinct** — pas un effet partagé dont seul le nombre change.
+
+Pour ça, `ReactionSpec` a un **filtre de source** :
+
+```ts
+fromKind?: string;       // ne réagit QU'À une source de cet archétype
+fromCharacter?: string;  // ne réagit QU'À une source = ce héros précis
+```
+
+→ un héros porte alors **une `ReactionSpec` par duo** (chacune son `id`, son `kind`/effet, sa
+portée, son CD), gâtée à son partenaire. `amountBySource`/`amountByCharacter` restent l'option
+**légère** (même effet, magnitude variable).
+
+> **Contrainte forte** : un duo n'existe que s'il a un **signal que le partenaire émet**.
+> Aujourd'hui seul `garde_encaissee` existe (émis par la Garde) → seuls les duos **avec un tank**
+> sont déclenchables sans créer de nouveau signal (lot moteur).
+
+**Exemple livré — *Estoc × Bastion*** :
+```ts
+const EPINES_ESTOC_BASTION: ReactionSpec = {
+  id: 'epines_estoc_bastion', on: 'garde_encaissee', fromCharacter: 'a_lourde',
+  scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 2,
+};
+```
+
 > ⚠️ **Piège `id`** : la fusion socle+signature dédoublonne **par `id`**. Pour **cumuler** deux
 > Résonances → `id` **distincts**. Réutiliser un `id` = **remplacer** (override, voulu).
 

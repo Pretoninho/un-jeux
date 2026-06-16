@@ -66,6 +66,8 @@ export interface ReactionSpec {
   amount?: number;                         // valeur par défaut de l'effet
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
   amountByCharacter?: Record<string, number>; // override selon le HÉROS de la source (Unit.characterId) — plus spécifique
+  fromKind?: string;      // ne réagit QU'À une source de cet archétype (duo par classe)
+  fromCharacter?: string; // ne réagit QU'À une source = ce héros précis (duo par personnage) — « un duo = sa Résonance »
 }
 /** Une réaction prête à partir, résolue depuis un signal (sert résolution ET prévisualisation). */
 export interface PendingReaction {
@@ -315,6 +317,8 @@ export function pendingReactions(state: CombatState, signal: Signal, fired: Set<
     if (u.owner !== source.owner || u.id === source.id) continue; // synergies alliées (pas soi)
     for (const spec of u.reactions ?? []) {
       if (spec.on !== signal.type) continue;
+      if (spec.fromCharacter !== undefined && source.characterId !== spec.fromCharacter) continue; // duo gâté au héros
+      if (spec.fromKind !== undefined && source.kind !== spec.fromKind) continue;                  // duo gâté à la classe
       if (fired.has(`${u.id}:${spec.id}`)) continue;
       if ((u.cooldowns?.[spec.id] ?? 0) > 0) continue;
       if (!inScope(state.map, source, u, spec.scope)) continue;
