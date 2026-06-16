@@ -21,9 +21,13 @@
 ## État du jeu (décisions de design en vigueur)
 - **Mode actuel : hotseat local** (Alice et Bob à tour de rôle sur le même écran). Pas
   encore de multijoueur en réseau.
-- **Plateau octogonal porté à `OCTA_N = 19`** (685 cases : `n² + (n-1)²`) : board volontairement
+- **Plateau octogonal porté à `OCTA_N = 23`** (1013 cases : `n² + (n-1)²`) : board volontairement
   vaste (priorité = plus d'octogones, pas l'affichage), centre dégagé réservé aux futurs
   camps/objectifs. Le plateau hexagonal reste dispo (toggle).
+- **Disposition en 3 colonnes** (grid) : **contrôles à gauche** (tour, forme, zoom, annuler,
+  finir le tour, recommencer), **board au centre**, **panneaux d'info à droite** (alliée puis
+  adverse, empilés). La légende d'aide reste **en bas, pleine largeur**. Repasse en une colonne
+  sous 980px.
 - **Carte à l'écran** : plus de plafond `720px` (App `max-width: min(1440px, 98vw)`) ; le SVG
   est dimensionné à la hauteur du navigateur (`width: min(100%, ratio·88vh)`, ratio du plateau)
   → carré centré un peu plus large. Le grossissement fin passe par la navigation : molette =
@@ -31,8 +35,8 @@
 - **Inspection au clic** : cliquer une pièce affiche sa portée d'attaque — la tienne
   (sélection, teinte teal pointillée) et celle de l'adverse (inspection, rouge). Les deux
   coexistent à l'écran.
-- **Deux panneaux d'info sous la carte** : pièce alliée sélectionnée (gauche) + pièce
-  adverse inspectée (droite). Y vivent les PV chiffrés (ex. `12/16`), PA, portée, dégâts,
+- **Deux panneaux d'info à droite du board** : pièce alliée sélectionnée (en haut) + pièce
+  adverse inspectée (en bas). Y vivent les PV chiffrés (ex. `12/16`), PA, portée, dégâts,
   états (garde/tir réservé) et les boutons d'action.
 - **Attaque = inspecter puis bouton ⚔ Attaquer** (mode A validé) : le clic sur un ennemi
   l'inspecte, il n'attaque plus directement. L'attaque part du panneau adverse.

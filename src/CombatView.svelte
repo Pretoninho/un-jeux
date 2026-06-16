@@ -18,7 +18,7 @@
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;
-  const OCTA_N = 19;
+  const OCTA_N = 23;
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -271,7 +271,8 @@
 </script>
 
 <div class="combat">
-  <div class="topbar">
+  <div class="layout">
+    <aside class="controls">
     <div class="turn">Tour <b>{combat.turn}</b></div>
     {#if !over}
       <div class="active" style="--c:{COLORS[combat.active]}">
@@ -290,16 +291,17 @@
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
-  </div>
+    </aside>
 
-  {#if over}
-    <div class="banner" style="--c:{COLORS[champ!]}">
-      🏁 <b>{NAMES[champ!]}</b> remporte le duel.
-      <button class="rematch" onclick={restart}>Revanche</button>
-    </div>
-  {/if}
+    <div class="board">
+    {#if over}
+      <div class="banner" style="--c:{COLORS[champ!]}">
+        🏁 <b>{NAMES[champ!]}</b> remporte le duel.
+        <button class="rematch" onclick={restart}>Revanche</button>
+      </div>
+    {/if}
 
-  <svg bind:this={svgEl} viewBox="{view.x} {view.y} {view.w} {view.h}" class="map" style={mapStyle}
+    <svg bind:this={svgEl} viewBox="{view.x} {view.y} {view.w} {view.h}" class="map" style={mapStyle}
        role="application" aria-label="Plateau de jeu — molette pour zoomer, glisser pour déplacer"
        onwheel={onWheel} onpointerdown={onPointerDown} onpointermove={onPointerMove}
        onpointerup={onPointerUp} onpointercancel={onPointerUp}>
@@ -343,9 +345,11 @@
       </g>
     {/each}
   </svg>
+    </div>
 
-  {#if !over}
-    <div class="panels">
+    <aside class="info">
+    {#if !over}
+      <div class="panels">
       <div class="panel ally" style="--c:{COLORS[combat.active]}">
         {#if selected}
           <div class="phead"><span class="pdot"></span>{KIND_NAME[selected.kind]} <span class="powner">· {NAMES[selected.owner]}</span></div>
@@ -392,7 +396,9 @@
         {/if}
       </div>
     </div>
-  {/if}
+    {/if}
+    </aside>
+  </div>
 
   <div class="hint muted small">
     {#if over}
@@ -413,12 +419,20 @@
 
 <style>
   .combat { display: flex; flex-direction: column; gap: .7rem; }
-  .topbar { display: flex; align-items: center; gap: 1rem; background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; padding: .55rem .9rem; flex-wrap: wrap; }
+  /* 3 colonnes : contrôles à gauche, board au centre, panneaux d'info à droite. */
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr) 264px; gap: .8rem; align-items: start; }
+  .controls { display: flex; flex-direction: column; gap: .55rem; background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; padding: .7rem .8rem; }
+  .controls > button { width: 100%; }
+  .controls .shape button, .controls .zoom button { flex: 1; }
+  .board { min-width: 0; }
+  .board .banner { margin-bottom: .7rem; }
+  .info { display: flex; flex-direction: column; gap: .7rem; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
   .turn { font-size: .9rem; color: #9aa3b5; }
   .turn b { color: #e6ebf5; font-size: 1.05rem; }
   .active { font-size: .85rem; color: #9aa3b5; border-left: 3px solid var(--c); padding-left: .55rem; display: flex; gap: .6rem; align-items: baseline; }
   .active b { color: #e6ebf5; }
-  .shape { margin-left: auto; display: flex; gap: .3rem; }
+  .shape { display: flex; gap: .3rem; }
   .shape button { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .4rem .7rem; cursor: pointer; font-size: .8rem; }
   .shape button.on { border-color: #5a70b0; color: #cfe0ff; background: #20283a; }
   .defend { background: #1c2436; border: 1px solid #3f5a8a; color: #aec6f0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
@@ -455,7 +469,7 @@
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
   /* Panneaux d'info — pièce alliée sélectionnée (gauche) et pièce adverse inspectée (droite). */
-  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+  .panels { display: grid; grid-template-columns: 1fr; gap: .7rem; }
   .panel { background: #14161c; border: 1px solid #2a2f3a; border-left: 3px solid var(--c); border-radius: 8px; padding: .6rem .85rem; min-height: 96px; }
   .phead { display: flex; align-items: center; gap: .45rem; font-weight: 700; color: #e6ebf5; font-size: .95rem; }
   .pdot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
