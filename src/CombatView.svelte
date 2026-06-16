@@ -10,8 +10,9 @@
   import { makeBoard } from './engine/board';
   import { makeOctaBoard } from './engine/octaboard';
   import {
-    makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend, endTurn, winner,
-    unitAt, type CombatState,
+    makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
+    reserve, canReserve, resolveOverwatch, endTurn, winner,
+    unitAt, graphDistance, type CombatState,
   } from './engine/combat';
   import { makeUnit, ARCHETYPES } from './engine/pieces';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
@@ -104,19 +105,37 @@
       combat = attack(combat, selected.id, occ.id);
       return;
     }
-    // Clic sur une case atteignable → s'y déplacer.
+    // Clic sur une case atteignable → s'y déplacer (puis tirs réflexes des guetteurs adverses).
     if (reach.has(hexId)) {
       history = [...history, combat];
-      combat = moveUnit(combat, selected.id, hexId);
+      combat = resolveOverwatch(moveUnit(combat, selected.id, hexId), selected.id);
     }
   }
 
   const canGuard = $derived(!!selected && !over && canDefend(combat, selected.id));
+  const canWatch = $derived(!!selected && !over && canReserve(combat, selected.id));
+
+  // Cases sous le feu d'un guetteur ADVERSE (zone de menace affichée pendant ton tour).
+  const threat = $derived.by(() => {
+    const set = new Set<string>();
+    if (over) return set;
+    for (const w of combat.units) {
+      if (!w.watching || w.owner === combat.active) continue;
+      for (const t of geo.tiles) if (graphDistance(combat.map, w.hex, t.id) <= w.range) set.add(t.id);
+    }
+    return set;
+  });
 
   function defendSelected() {
     if (!selected || !canDefend(combat, selected.id)) return;
     history = [...history, combat];
     combat = defend(combat, selected.id);
+  }
+
+  function reserveSelected() {
+    if (!selected || !canReserve(combat, selected.id)) return;
+    history = [...history, combat];
+    combat = reserve(combat, selected.id);
   }
 
   function undo() {
@@ -163,6 +182,11 @@
         {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
       </button>
     {/if}
+    {#if !over && selected?.overwatch}
+      <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}>
+        {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
+      </button>
+    {/if}
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
@@ -181,15 +205,16 @@
       {@const d = reach.get(t.id)}
       {@const inReach = d !== undefined}
       {@const attackable = isAttackable(t.id)}
+      {@const threatened = threat.has(t.id)}
       {@const mine = !!occ && occ.owner === combat.active && !over}
       <g class="hex" class:reach={inReach} class:attackable class:mine role="button" tabindex="0"
          onclick={() => onHex(t.id)}
          onkeydown={(e) => e.key === 'Enter' && onHex(t.id)}>
         <polygon
           points={t.points}
-          fill={inReach ? '#1f3340' : t.small ? '#10131a' : '#161a22'}
-          stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : t.small ? '#222734' : '#272c37'}
-          stroke-width={attackable ? 3.5 : inReach ? 2.5 : 1.5} />
+          fill={inReach ? '#1f3340' : threatened ? '#2a1a1e' : t.small ? '#10131a' : '#161a22'}
+          stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : threatened ? '#7a3c44' : t.small ? '#222734' : '#272c37'}
+          stroke-width={attackable ? 3.5 : inReach ? 2.5 : threatened ? 2 : 1.5} />
         {#if occ}
           {@const isSel = occ.id === selectedId && occ.owner === combat.active && !over}
           {@const frac = occ.hp / occ.maxHp}
@@ -204,6 +229,7 @@
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
           {#if occ.guarding}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🛡</text>{/if}
+          {#if occ.watching}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🎯</text>{/if}
           {#if attackable}<text x={t.cx} y={t.cy - r - 3} class="atkmark">⚔</text>{/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
@@ -220,7 +246,8 @@
       <b>T</b> = Tireur (distance, fragile, dégâts faibles, portée 4).
       Clique une de <b style="color:{COLORS[combat.active]}">tes pièces</b>, puis une case
       verte pour <b>bouger</b> ou une <b style="color:#e0604a">⚔ adverse à portée</b> pour <b>frapper</b>.
-      La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque). Le Tireur, lui, se protège par la distance.
+      La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
+      Le <b>Tireur</b> peut <b style="color:#f0c0a0">🎯 Réserver (3 PA)</b> son tir : il <b>tire en réflexe</b> sur la première pièce qui s'arrête dans sa <b style="color:#c07a6a">zone de menace</b> (teintée pendant ton tour).
       {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
     {/if}
   </div>
@@ -241,6 +268,10 @@
   .defend:hover:not(:disabled) { border-color: #6f90c8; }
   .defend.on { background: #243456; border-color: #6f90c8; color: #d6e6ff; font-weight: 600; }
   .defend:disabled { opacity: .4; cursor: not-allowed; }
+  .watch { background: #2a2230; border: 1px solid #8a5a44; color: #f0c0a0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .watch:hover:not(:disabled) { border-color: #c08056; }
+  .watch.on { background: #3a2a22; border-color: #c08056; color: #ffd9b8; font-weight: 600; }
+  .watch:disabled { opacity: .4; cursor: not-allowed; }
   .undo { background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .undo:hover:not(:disabled) { border-color: #8a6075; }
   .undo:disabled { opacity: .35; cursor: not-allowed; }

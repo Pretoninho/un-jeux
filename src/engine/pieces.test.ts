@@ -39,4 +39,13 @@ describe('pieces/calibrage — droite portée + robustesse = 5', () => {
     expect(l.guarding).toBe(false);
     expect(makeUnit('a2', 'alice', 'Y', ARCHETYPES.tireur!, 4).guard).toBeUndefined();
   });
+
+  it('le Tireur (distance) sait réserver son tir, pas la Lourde (CAC)', () => {
+    expect(ARCHETYPES.tireur!.overwatch).toEqual({ cost: 3 });
+    expect(ARCHETYPES.lourde!.overwatch).toBeUndefined();
+    const t = makeUnit('a2', 'alice', 'Y', ARCHETYPES.tireur!, 4);
+    expect(t.overwatch).toEqual({ cost: 3 });
+    expect(t.watching).toBe(false);
+    expect(makeUnit('a1', 'alice', 'X', ARCHETYPES.lourde!, 4).overwatch).toBeUndefined();
+  });
 });

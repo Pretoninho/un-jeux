@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend, endTurn, winner,
+  makeCombatState, reachable, moveUnit, attack, canAttack, defend, canDefend,
+  reserve, canReserve, resolveOverwatch, endTurn, winner,
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
@@ -193,6 +194,86 @@ describe('combat — garde / défendre', () => {
       u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
     ], 'alice'), 'a');
     expect(canDefend(ok, 'a')).toBe(false); // déjà en garde
+  });
+});
+
+describe('combat — tir réservé / overwatch', () => {
+  // Pièce dotée du tir réservé (3 PA), comme le Tireur ; portée 4, dégâts 2 par défaut.
+  const watcher = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, ...over });
+
+  it('reserve arme le guet et dépense le coût en PA', () => {
+    const s0 = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    const s = reserve(s0, 'a');
+    expect(unitById(s, 'a')!.watching).toBe(true);
+    expect(unitById(s, 'a')!.ap).toBe(1); // 4 − 3
+  });
+
+  it('un ennemi qui s\'arrête à portée d\'un guetteur se prend un tir réflexe', () => {
+    const base = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 7 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'a'), 4);      // alice en guet, bob actif
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b'); // E→C = 2 ≤ portée 4
+    expect(unitById(s, 'b')!.hp).toBe(5);                // 7 − 2
+    expect(unitById(s, 'a')!.watching).toBe(false);      // réserve consommée
+  });
+
+  it('pas de réflexe si l\'ennemi reste hors de portée', () => {
+    const base = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4, range: 1 }), // portée 1
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 7 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'a'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b'); // C à dist 2 > portée 1
+    expect(unitById(s, 'b')!.hp).toBe(7);
+    expect(unitById(s, 'a')!.watching).toBe(true);       // toujours en guet
+  });
+
+  it('le tir réflexe peut être létal', () => {
+    const base = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4, damage: 5 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 2 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'a'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'B'), 'b'); // B à dist 1
+    expect(unitById(s, 'b')).toBeUndefined();
+    expect(winner(s)).toBe('alice');
+  });
+
+  it('la réserve protège pendant le tour adverse puis expire au retour du tireur', () => {
+    const base = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'a'), 4);
+    expect(unitById(bobTurn, 'a')!.watching).toBe(true);
+    expect(unitById(endTurn(bobTurn, 4), 'a')!.watching).toBe(false);
+  });
+
+  it('refus : sans capacité, sans PA, ou déjà en guet', () => {
+    const noCap = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }), // pas d'`overwatch`
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    expect(canReserve(noCap, 'a')).toBe(false);
+    expect(reserve(noCap, 'a')).toBe(noCap);
+
+    const lowAp = makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 2 }), // 2 < coût 3
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    expect(canReserve(lowAp, 'a')).toBe(false);
+
+    const armed = reserve(makeCombatState(LINE, [
+      watcher({ id: 'a', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice'), 'a');
+    expect(canReserve(armed, 'a')).toBe(false); // déjà en guet
   });
 });
 

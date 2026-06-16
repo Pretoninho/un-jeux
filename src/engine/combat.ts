@@ -26,6 +26,15 @@ export interface GuardProfile {
 }
 
 /**
+ * Capacité de TIR RÉSERVÉ (overwatch) — le verbe « réflexe », propre aux pièces à distance.
+ * Comme `guard`, les nombres vivent sur la pièce → personnalisables perso par perso.
+ * Une pièce sans `overwatch` (ex. la Lourde) ne peut pas réserver son tir.
+ */
+export interface OverwatchProfile {
+  cost: number; // PA pour réserver son tir
+}
+
+/**
  * Une pièce : à qui elle est, où elle est, ses PV/PA, et son PROFIL d'attaque
  * (portée/dégâts/coût). Le profil vit sur la pièce — voir engine/pieces.ts pour
  * la dérivation depuis le palier de portée (calibrage « portée + robustesse = 5 »).
@@ -43,6 +52,8 @@ export interface Unit {
   kind: string;       // clé d'archétype (affichage)
   guard?: GuardProfile; // capacité de garde (absente = pièce qui ne peut pas se défendre)
   guarding?: boolean;   // posture de garde active, jusqu'au début de son prochain tour
+  overwatch?: OverwatchProfile; // capacité de tir réservé (absente = pas de réflexe possible)
+  watching?: boolean;   // tir réservé armé, jusqu'au début de son prochain tour
 }
 
 export interface CombatState {
@@ -213,9 +224,63 @@ export function defend(state: CombatState, unitId: string): CombatState {
   };
 }
 
+// ─────────────────────── Tir réservé / Overwatch ─────────────────────────────
+
+/**
+ * La pièce `unitId` peut-elle réserver son tir ? Pièce du camp actif, dotée de la capacité
+ * `overwatch`, pas déjà en guet, et assez de PA pour le coût.
+ */
+export function canReserve(state: CombatState, unitId: string): boolean {
+  const u = unitById(state, unitId);
+  if (!u || u.owner !== state.active) return false;
+  if (!u.overwatch || u.watching) return false;
+  return u.ap >= u.overwatch.cost;
+}
+
+/**
+ * `unitId` réserve son tir : dépense le coût et s'arme jusqu'au début de son prochain tour.
+ * Le tir part en réaction quand un ennemi s'arrête à portée — voir `resolveOverwatch`.
+ */
+export function reserve(state: CombatState, unitId: string): CombatState {
+  if (!canReserve(state, unitId)) return state;
+  const u = unitById(state, unitId)!;
+  return {
+    ...state,
+    units: state.units.map((x) =>
+      x.id === unitId ? { ...x, ap: x.ap - u.overwatch!.cost, watching: true } : x),
+  };
+}
+
+/**
+ * À appeler APRÈS un déplacement : les guetteurs ADVERSES (en `watching`) qui ont désormais
+ * `movedUnitId` à portée tirent chacun UN coup (dégâts normaux), puis leur réserve est
+ * consommée. Une cible à 0 PV quitte le plateau ; si elle meurt, les guetteurs restants
+ * gardent leur tir. Module pur.
+ */
+export function resolveOverwatch(state: CombatState, movedUnitId: string): CombatState {
+  const mover = unitById(state, movedUnitId);
+  if (!mover) return state;
+  let units = state.units;
+  for (const w of state.units) {
+    if (!w.watching || w.owner === mover.owner) continue;
+    const cur = units.find((u) => u.id === movedUnitId);
+    if (!cur) break; // la cible a déjà été abattue
+    if (graphDistance(state.map, w.hex, cur.hex) > w.range) continue;
+    const dmg = damageTaken(cur, w.damage);
+    units = units
+      .map((u) => {
+        if (u.id === w.id) return { ...u, watching: false };
+        if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg };
+        return u;
+      })
+      .filter((u) => u.hp > 0);
+  }
+  return units === state.units ? state : { ...state, units };
+}
+
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
-/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; sa garde expire. */
+/** Passe la main au camp suivant (encore en vie) et recharge SES PA ; garde et guet expirent. */
 export function endTurn(state: CombatState, apPerTurn: number): CombatState {
   const owners = liveOwners(state);
   const i = owners.indexOf(state.active);
@@ -224,6 +289,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     ...state,
     active: next,
     turn: state.turn + 1,
-    units: state.units.map((u) => (u.owner === next ? { ...u, ap: apPerTurn, guarding: false } : u)),
+    units: state.units.map((u) =>
+      u.owner === next ? { ...u, ap: apPerTurn, guarding: false, watching: false } : u),
   };
 }
