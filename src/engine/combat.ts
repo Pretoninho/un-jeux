@@ -62,7 +62,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage';             // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -80,6 +80,17 @@ export interface Mark {
   owner: string;     // camp du marqueur (sert le décompte d'expiration)
   bonus: number;     // dégâts ajoutés au 1er coup du marqueur sur la cible
   expiresIn: number; // tours du marqueur restants avant disparition
+}
+
+/**
+ * Statut « estropié » : malus de DÉPLACEMENT subi par une pièce (ex. l'attaquant d'un allié en
+ * garde, via Estoc × Rempart). Réduit la portée de mouvement de `amount` SANS toucher aux attaques.
+ * Décompté en tours de la pièce touchée (`owner`), disparaît à `expiresIn` 0.
+ */
+export interface Cripple {
+  amount: number;    // pas de déplacement en moins (les attaques ne sont pas affectées)
+  owner: string;     // camp de la pièce touchée (sert le décompte d'expiration)
+  expiresIn: number; // tours de la pièce touchée restants avant disparition
 }
 
 /** Une réaction prête à partir, résolue depuis un signal (sert résolution ET prévisualisation). */
@@ -117,6 +128,7 @@ export interface Unit {
   reactions?: ReactionSpec[];          // passifs en chaîne (écouteurs de signaux) — synergies d'escouade
   cooldowns?: Record<string, number>;  // CD restant par passif (clé = ReactionSpec.id), en tours
   mark?: Mark;                         // statut « marqué » subi (posé par un allié adverse, ex. Estoc)
+  cripple?: Cripple;                   // statut « estropié » subi : malus de déplacement (ex. Estoc × Rempart)
 }
 
 export interface CombatState {
@@ -186,11 +198,19 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
   return dist;
 }
 
+/**
+ * Pas de déplacement disponibles pour une pièce : ses PA, moins l'éventuel malus « estropié »
+ * (plancher 0). Les attaques restent payées sur les PA pleins — seul le mouvement est bridé.
+ */
+export function moveBudget(unit: Unit): number {
+  return Math.max(0, unit.ap - (unit.cripple?.amount ?? 0));
+}
+
 /** Déplace une pièce du camp actif vers `dest` si atteignable ; déduit la distance de SES PA. */
 export function moveUnit(state: CombatState, unitId: string, dest: HexId): CombatState {
   const unit = unitById(state, unitId);
   if (!unit || unit.owner !== state.active) return state;
-  const d = reachable(state, unitId, unit.ap).get(dest);
+  const d = reachable(state, unitId, moveBudget(unit)).get(dest);
   if (d === undefined) return state;
   return {
     ...state,
@@ -373,6 +393,17 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       });
       return { ...state, units };
     }
+    case 'estropier': { // bride le déplacement de l'ennemi pendant `duration` de SES tours
+      const target = unitById(state, p.targetId);
+      if (!target) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.targetId)
+          return { ...u, cripple: { amount: p.amount, owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
     default:
       return state;
   }
@@ -526,14 +557,14 @@ function tickCooldowns(cd: Record<string, number> | undefined): Record<string, n
 }
 
 /**
- * Vieillit une marque au tour QUI S'ACHÈVE : on ne décompte qu'à la fin du tour de SON marqueur
- * (`endingOwner === mark.owner`) → la cible reste marquée pendant `expiresIn` tours pleins du
- * marqueur. Renvoie `undefined` quand la marque expire (à 0).
+ * Vieillit un statut borné (marque, estropie…) au tour QUI S'ACHÈVE : on ne décompte qu'à la fin
+ * du tour de SON `owner` → le statut tient pendant `expiresIn` tours pleins de cet owner. Renvoie
+ * `undefined` quand il expire (à 0).
  */
-function tickMark(mark: Mark | undefined, endingOwner: string): Mark | undefined {
-  if (!mark || mark.owner !== endingOwner) return mark;
-  const left = mark.expiresIn - 1;
-  return left > 0 ? { ...mark, expiresIn: left } : undefined;
+function tickStatus<T extends { owner: string; expiresIn: number }>(st: T | undefined, endingOwner: string): T | undefined {
+  if (!st || st.owner !== endingOwner) return st;
+  const left = st.expiresIn - 1;
+  return left > 0 ? { ...st, expiresIn: left } : undefined;
 }
 
 /**
@@ -549,12 +580,15 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     active: next,
     turn: state.turn + 1,
     units: state.units.map((u) => {
-      const mark = tickMark(u.mark, state.active); // le tour de `state.active` s'achève
-      const base =
+      const mark = tickStatus(u.mark, state.active);       // le tour de `state.active` s'achève
+      const cripple = tickStatus(u.cripple, state.active);
+      let out =
         u.owner === next
           ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
-      return mark === u.mark ? base : { ...base, mark };
+      if (mark !== u.mark) out = { ...out, mark };
+      if (cripple !== u.cripple) out = { ...out, cripple };
+      return out;
     }),
   };
 }

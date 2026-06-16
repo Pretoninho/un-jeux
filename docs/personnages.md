@@ -123,7 +123,11 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `marquage` — effet **persistant** : pose un `Unit.mark` (statut) → +`amount` au **1ᵉʳ coup** du
   possesseur sur la cible, pendant `duration` tours, puis s'efface ou se consomme. Consommé dans
   `strike()`, décompté dans `endTurn()`.
-- Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant) + **lot moteur**.
+- `estropier` — effet **persistant** : pose un `Unit.cripple` → **−`amount` en déplacement** sur la
+  cible (les attaques ne sont pas touchées), pendant `duration` de SES tours. Appliqué via
+  `moveBudget()` (= `ap − cripple`), décompté dans `endTurn()`.
+- Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant : statut sur
+  `Unit`, tick dans `endTurn` via `tickStatus`, lecture à l'endroit concerné) + **lot moteur**.
 
 > Un personnage **« né résonant »** réutilise un signal et un effet **existants** ; inventer un
 > nouveau signal/effet est un chantier moteur amont (sous-lot B de la matrice : faire varier

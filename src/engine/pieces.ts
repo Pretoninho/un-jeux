@@ -86,6 +86,15 @@ const MARQUAGE_ESTOC_MIREILLE: ReactionSpec = {
 };
 
 /**
+ * Résonance DUO « Estoc × Rempart » — si Estoc est à portée 2 de Rempart quand celui-ci (en garde)
+ * encaisse, Estoc ESTROPIE l'attaquant : −2 en déplacement pendant 2 de ses tours. CD 2 tours.
+ */
+const ESTROPIER_ESTOC_REMPART: ReactionSpec = {
+  id: 'estropier_estoc_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { radius: 2 }, cooldown: 2, kind: 'estropier', amount: 2, duration: 2,
+};
+
+/**
  * Résonance générique (provisoire) de Fil, en attendant son propre façonnage : tout allié en
  * garde (rayon 2) qui encaisse → Fil pince l'attaquant (Lourde → 2, défaut 1). CD 2 tours.
  */
@@ -110,7 +119,7 @@ export interface Character {
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur' },
-  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE] },
+  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [EPINES_RELAYEES] },

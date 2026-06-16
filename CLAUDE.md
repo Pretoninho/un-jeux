@@ -113,6 +113,11 @@
     **+1** puis la marque tombe. Durée 2 tours d'Estoc (statut `Unit.mark`, décompté à `endTurn`),
     CD 2. **1ᵉʳ effet PERSISTANT** + 1ᵉʳ signal hors-garde. Portée escouade voulue (Mireille tire de
     loin, Estoc au contact → jamais côte à côte).
+  - **3ᵉ duo livré — *Estoc × Rempart*** : si Estoc est à **portée 2** de Rempart quand celui-ci
+    (en garde) encaisse, Estoc **ESTROPIE** l'attaquant (`fromCharacter: 'rempart'`, `kind: 'estropier'`,
+    amount 2, duration 2, CD 2) : **−2 en déplacement** pendant 2 de ses tours, **sans toucher ses
+    attaques** (statut `Unit.cripple`, lu via `moveBudget = ap − cripple`, décompté à `endTurn`). 2ᵉ
+    effet persistant ; `tickStatus` généralise le décompte (marque + estropie).
   - **UI** : badge `RÉSONANCE ✦ {effet}` + cooldown (⏳n/prêt) dans les panneaux d'info, bouton
     `?` pour déplier le détail (déclencheur, portée, CD, dégâts par source).
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
