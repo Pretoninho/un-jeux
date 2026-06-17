@@ -147,6 +147,17 @@ const RUEE_FIL_ORSO: ReactionSpec = {
   scope: { squad: true }, cooldown: 2, kind: 'ruee', amount: 1,
 };
 
+/**
+ * Résonance DUO « Mireille × Bastion » (1ᵉʳ Tireur-possesseur) — quand Bastion (en garde) encaisse,
+ * Mireille **SILENCE** l'attaquant : il ne peut plus QUE se déplacer (ni attaque, ni verbe, ni
+ * Résonance, ni élan Némésis). Portée escouade (Mireille tire de loin). `duration: 2` = immédiat +
+ * son prochain tour plein. CD 3 (= 2 tours pleins).
+ */
+const SILENCE_MIREILLE_BASTION: ReactionSpec = {
+  id: 'silence_mireille_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
+  scope: { squad: true }, cooldown: 3, kind: 'silence', duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -162,7 +173,7 @@ export interface Character {
  */
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
-  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur' },
+  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },

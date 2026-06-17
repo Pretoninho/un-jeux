@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -138,6 +138,7 @@ export interface Unit {
   stun?: { owner: string; expiresIn: number };  // étourdi : PA forcés à 0 + Résonances silencées tant qu'actif
   lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (Némésis, primes…)
   elan?: number;                       // bonus de PA en attente, appliqué au PROCHAIN rechargement (récompense Némésis)
+  silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance, ni élan)
 }
 
 export interface CombatState {
@@ -256,10 +257,16 @@ export function graphDistance(map: GameMap, from: HexId, to: HexId): number {
  * `attackerId` (du camp actif) peut-il attaquer `targetId` ? Cible adverse, dans la portée
  * DE L'ATTAQUANT, et assez de PA pour son coût d'attaque.
  */
+/** Silencée ? — ne peut QUE se déplacer (attaque, verbes, Résonances, élan Némésis coupés). */
+export function isSilenced(u: Unit): boolean {
+  return (u.silence?.expiresIn ?? 0) > 0;
+}
+
 export function canAttack(state: CombatState, attackerId: string, targetId: string): boolean {
   const attacker = unitById(state, attackerId);
   const target = unitById(state, targetId);
   if (!attacker || attacker.owner !== state.active) return false;
+  if (isSilenced(attacker)) return false; // silencée : pas d'attaque
   if (!target || target.owner === state.active) return false;
   if (attacker.ap < attacker.attackCost) return false;
   return graphDistance(state.map, attacker.hex, target.hex) <= attacker.range;
@@ -297,7 +304,7 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   });
   // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
   const tgt = units.find((u) => u.id === targetId)!;
-  if (tgt.hp > 0 && tgt.riposting && graphDistance(state.map, tgt.hex, attacker.hex) <= tgt.range) {
+  if (tgt.hp > 0 && tgt.riposting && !isSilenced(tgt) && graphDistance(state.map, tgt.hex, attacker.hex) <= tgt.range) {
     const back = damageTaken(attacker, tgt.damage);
     units = units.map((u) => {
       if (u.id === targetId) return { ...u, riposting: false };
@@ -343,7 +350,7 @@ const REACTION_CHAIN_CAP = 64; // garde-fou dur, en plus du « un passif au plus
 
 // Effets OFFENSIFS : ils visent un ennemi (`targetId`) → ne partent pas si la cible a disparu.
 // (Les effets de soutien/soi — `vendetta`, `ralliement` — n'ont pas besoin de cible.)
-const NEEDS_TARGET = new Set<ReactionSpec['kind']>(['epines', 'marquage', 'estropier', 'provocation', 'ruee']);
+const NEEDS_TARGET = new Set<ReactionSpec['kind']>(['epines', 'marquage', 'estropier', 'provocation', 'ruee', 'silence']);
 
 /**
  * Retrait CENTRALISÉ des pièces mortes (hp ≤ 0). Pour CHAQUE mort, fait émettre le signal `rale`
@@ -376,6 +383,7 @@ const NEMESIS_CD = 2; // cooldown de la récompense Némésis (revival-ready : a
 function resolveNemesis(state: CombatState, dead: Unit): CombatState {
   const killer = dead.lastHitBy ? unitById(state, dead.lastHitBy) : undefined;
   if (!killer || killer.kind !== dead.kind || killer.owner === dead.owner) return state; // pas son Némésis
+  if (isSilenced(killer)) return state;                                                   // silencé : pas d'élan
   if ((killer.cooldowns?.['nemesis'] ?? 0) > 0) return state;                              // récompense en CD
   const bonus = Math.max(1, Math.round(dead.maxHp / 8)); // Lourde 16→+2, Duelliste 9→+1, Tireur 7→+1
   const units = state.units.map((u) => {
@@ -430,7 +438,7 @@ export function pendingReactions(state: CombatState, signal: Signal, fired: Set<
   const out: PendingReaction[] = [];
   for (const u of state.units) {
     if (u.hp <= 0) continue;                                       // morts en attente de retrait : ignorés
-    if ((u.stun?.expiresIn ?? 0) > 0) continue;                    // étourdi : ne réagit à rien
+    if ((u.stun?.expiresIn ?? 0) > 0 || isSilenced(u)) continue;   // étourdi ou silencé : ne réagit à rien
     if (u.owner !== source.owner || u.id === source.id) continue;  // synergies alliées (pas soi)
     for (const spec of u.reactions ?? []) {
       if (spec.on !== signal.type) continue;
@@ -520,6 +528,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       });
       return { ...state, units };
     }
+    case 'silence': { // SILENCE l'attaquant : ne peut plus QUE se déplacer (durée bornée)
+      const target = unitById(state, p.targetId);
+      if (!target) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.targetId) return { ...u, silence: { owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
     case 'ruee': { // le POSSESSEUR avance d'1 case VERS la cible (inverse de la provocation) ; CD posé même sans case libre
       const listener = unitById(state, p.listenerId);
       const target = unitById(state, p.targetId);
@@ -568,6 +586,7 @@ export function resolveReactions(state: CombatState, signal: Signal): CombatStat
 export function canDefend(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (isSilenced(u)) return false;
   if (!u.guard || u.guarding) return false;
   return u.ap >= u.guard.cost;
 }
@@ -595,6 +614,7 @@ export function defend(state: CombatState, unitId: string): CombatState {
 export function canReserve(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (isSilenced(u)) return false;
   if (!u.overwatch || u.watching) return false;
   return u.ap >= u.overwatch.cost;
 }
@@ -625,7 +645,7 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
     const watcher = unitById(s, w.id);
     const mover = unitById(s, movedUnitId);
     if (!watcher || !mover) break; // plus de tireur ou cible déjà abattue
-    if (!watcher.watching || watcher.owner === mover.owner) continue;
+    if (!watcher.watching || isSilenced(watcher) || watcher.owner === mover.owner) continue; // silencé : pas de tir réflexe
     if (graphDistance(s.map, watcher.hex, mover.hex) > watcher.range) continue;
     const dmg = damageTaken(mover, watcher.damage);
     const units = s.units.map((u) => {
@@ -651,6 +671,7 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
 export function canRiposte(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (isSilenced(u)) return false;
   if (!u.riposte || u.riposting) return false;
   return u.ap >= u.riposte.cost;
 }
@@ -709,6 +730,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const block = tickStatus(u.block, state.active);
       const stun = tickStatus(u.stun, state.active);
       const stunCharge = tickStatus(u.stunCharge, state.active);
+      const silence = tickStatus(u.silence, state.active);
       let out =
         u.owner === next
           // recharge SES PA (+ élan Némésis éventuel, consommé) — sauf si étourdie : PA forcés à 0 (gel).
@@ -719,6 +741,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (block !== u.block) out = { ...out, block };
       if (stun !== u.stun) out = { ...out, stun };
       if (stunCharge !== u.stunCharge) out = { ...out, stunCharge };
+      if (silence !== u.silence) out = { ...out, silence };
       return out;
     }),
   };

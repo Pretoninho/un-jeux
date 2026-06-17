@@ -994,6 +994,57 @@ describe('combat — Némésis (tuer un ennemi du même archétype → élan d\'
   });
 });
 
+describe('combat — Résonance Mireille × Bastion (silence — déplacement uniquement)', () => {
+  const bastion = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'bastion', ...over });
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'sil', on: 'garde_encaissee', fromCharacter: 'bastion', scope: { squad: true },
+        cooldown: 3, kind: 'silence', duration: 2 }], cooldowns: {}, ...over });
+
+  it('Bastion encaisse + Mireille à portée → l\'attaquant est silencé (+ CD)', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'r');
+    expect(unitById(s, 'b')!.silence).toMatchObject({ owner: 'bob', expiresIn: 2 });
+    expect(unitById(s, 'm')!.cooldowns!.sil).toBe(3);
+  });
+
+  it('un silencé ne peut PAS attaquer ni utiliser de verbe, mais peut se déplacer', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, overwatch: { cost: 3 }, silence: { owner: 'bob', expiresIn: 2 } }),
+      u({ id: 'x', owner: 'alice', hex: 'D', hp: 10 }),
+    ], 'bob');
+    expect(canAttack(st, 'b', 'x')).toBe(false);             // pas d'attaque
+    expect(canReserve(st, 'b')).toBe(false);                 // pas de verbe
+    expect(attack(st, 'b', 'x')).toBe(st);                   // sans effet
+    expect(unitAt(moveUnit(st, 'b', 'B'), 'B')?.id).toBe('b'); // mais se déplace (C→B)
+  });
+
+  it('un silencé ne déclenche aucune Résonance', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'bastion' }),
+      u({ id: 'c', owner: 'alice', hex: 'A', hp: 10, silence: { owner: 'alice', expiresIn: 2 },
+         reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 3 }], cooldowns: {} }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10); // 'c' silencé → pas d'épines
+  });
+
+  it('le silence se décompte au fil des tours et finit par tomber', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, damage: 4, silence: { owner: 'bob', expiresIn: 1 } }),
+      u({ id: 'x', owner: 'alice', hex: 'D', hp: 10 }),
+    ], 'bob');
+    expect(canAttack(st, 'b', 'x')).toBe(false);
+    const back = endTurn(endTurn(st, 4), 4);                 // bob finit (silence tombe) → … → bob actif
+    expect(unitById(back, 'b')!.silence).toBeUndefined();
+    expect(canAttack(back, 'b', 'x')).toBe(true);            // de nouveau capable d'attaquer
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

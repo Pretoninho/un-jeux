@@ -152,6 +152,13 @@
     (`tir_reserve`, `fromCharacter: 'orso'`, escouade), **Fil avance d'1 case VERS la cible** touchée
     (`kind: 'ruee'`, gap-closer). CD 2. `provocation` (cible→possesseur) et `ruee` (possesseur→cible)
     partagent le helper `stepToward`. **Fil a ses 4 duos** (Bastion, Mireille, Rempart, Orso).
+  - **Duo livré — *Mireille × Bastion*** (1ᵉʳ **Tireur-possesseur** → on remplit l'autre sens de la
+    matrice) : quand Bastion (en garde) encaisse, Mireille **SILENCE** l'attaquant (`kind: 'silence'`,
+    `fromCharacter: 'bastion'`, escouade, CD 3, `duration: 2`) : il ne peut plus QUE **se déplacer** —
+    attaque, **verbes** (garde/tir réservé/riposte), **Résonances** et **élan Némésis** tous coupés.
+    « **Stun adouci** » (l'étourdissement gèle tout, le silence laisse marcher). Helper `isSilenced`
+    branché dans `canAttack`/`canDefend`/`canReserve`/`canRiposte`/`resolveOverwatch`/`strike`(riposte)/
+    `pendingReactions`/`resolveNemesis`.
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

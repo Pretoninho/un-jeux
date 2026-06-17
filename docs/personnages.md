@@ -133,6 +133,9 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
   redéclenche pas l'overwatch ; CD posé même si aucune case n'est libre.
 - `ruee` — **inverse de `provocation`** : le POSSESSEUR avance d'1 case VERS la cible (même
   `stepToward`, rôles inversés). Gap-closer ; mêmes garde-fous.
+- `silence` — **« stun adouci »** : pose `Unit.silence` sur la cible → elle ne peut QUE se déplacer.
+  Bloque attaque (`canAttack`), verbes (`canDefend/canReserve/canRiposte` + tir réflexe + riposte),
+  Résonances (`pendingReactions` l'ignore) et l'élan Némésis (`resolveNemesis`). Lu via `isSilenced`.
 - `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
   l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
   consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).

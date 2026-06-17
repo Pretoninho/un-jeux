@@ -29,10 +29,10 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
-  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃' };
+  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃', silence: '🔇' };
   const HEROES = Object.values(CHARACTERS);
   let showMatrix = $state(false);
 
@@ -50,6 +50,7 @@
     if (u.stunCharge) s.push({ icon: '💫', label: `Coup étourdissant armé — sa prochaine attaque étourdit (${u.stunCharge.expiresIn} t.)` });
     if (u.stun) s.push({ icon: '😵', label: `Étourdi — ne peut rien faire ce tour` });
     if (u.elan) s.push({ icon: '⚡', label: `Élan (Némésis) — +${u.elan} PA au prochain tour` });
+    if (u.silence) s.push({ icon: '🔇', label: `Silencé — déplacement uniquement` });
     return s;
   }
   function pieceTitle(u: Unit): string {
@@ -455,6 +456,8 @@
                   <div class="amt">arme l'allié : sa prochaine attaque étourdit la cible {rx.amount ?? 1} tour · charge {rx.duration ?? 3} tours</div>
                 {:else if rx.kind === 'ruee'}
                   <div class="amt">le possesseur avance de {rx.amount ?? 1} case vers la cible</div>
+                {:else if rx.kind === 'silence'}
+                  <div class="amt">silence la cible : déplacement uniquement (ni attaque/verbe/Résonance/élan) · {rx.duration ?? 2} tours</div>
                 {:else}
                   <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
                 {/if}
@@ -499,6 +502,9 @@
           {/if}
           {#if selected.elan}
             <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{selected.elan} PA au prochain tour</span></div>
+          {/if}
+          {#if selected.silence}
+            <div class="ptags"><span class="tag s">🔇 Silencé — déplacement uniquement (⏳{selected.silence.expiresIn})</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -557,12 +563,15 @@
           {#if foe.elan}
             <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{foe.elan} PA au prochain tour</span></div>
           {/if}
+          {#if foe.silence}
+            <div class="ptags"><span class="tag s">🔇 Silencé — déplacement uniquement (⏳{foe.silence.expiresIn})</span></div>
+          {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
             <div class="chainwarn">
               {#each chainPreview as p}
                 {@const lst = combat.units.find((u) => u.id === p.listenerId)}
-                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) {#if p.spec.kind === 'estropier'}estropie ta pièce (−{p.amount} dépl.){:else if p.spec.kind === 'vendetta'}renforce son tank (+{p.amount} à sa prochaine attaque){:else if p.spec.kind === 'etourdir'}arme son tank (prochaine attaque étourdissante){:else}pince ta pièce (−{p.amount}){/if}</span>
+                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) {#if p.spec.kind === 'estropier'}estropie ta pièce (−{p.amount} dépl.){:else if p.spec.kind === 'vendetta'}renforce son tank (+{p.amount} à sa prochaine attaque){:else if p.spec.kind === 'etourdir'}arme son tank (prochaine attaque étourdissante){:else if p.spec.kind === 'silence'}silence ta pièce (déplacement seul){:else}pince ta pièce (−{p.amount}){/if}</span>
               {/each}
             </div>
           {/if}
