@@ -1,0 +1,7 @@
+# Propriété du code → revue requise du propriétaire sur toute modification.
+# GitHub assigne automatiquement ces relecteurs aux Pull Requests qui touchent les fichiers visés.
+# (Pour rendre la revue OBLIGATOIRE : Settings → Branches/Rules → protéger `main` →
+#  « Require a pull request before merging » + « Require review from Code Owners ».)
+
+# Tout le dépôt :
+* @pretoninho

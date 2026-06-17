@@ -1,0 +1,26 @@
+# Intégration continue : lance les garde-fous (tests + types + build) sur chaque PR vers `main`.
+# Activer ensuite, côté navigateur : Settings → Branches (ou Rules) → protéger `main` →
+# « Require status checks to pass » → cocher le job « gates ». Une PR rouge devient non-mergeable.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build
