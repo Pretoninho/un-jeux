@@ -157,6 +157,21 @@
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
   (`allie_a_terre`, `pres_de_mourir`…), nouvelles cellules sur pièces existantes, nouveaux
   effets `kind`, puis **spécialistes** (Soigneur/Hallebardier/Saboteur) « nés résonants ».
+- **NÉMÉSIS (concept posé le 2026-06-17, à construire)** — *système FRÈRE de la Résonance, mais
+  antagoniste*. Comme une escouade = **1 de chaque archétype**, deux héros du **même archétype** sont
+  **toujours ennemis** → ils sont **Némésis**. **Automatique** : tout couple même-archétype l'est
+  (aujourd'hui Estoc↔Fil, Bastion↔Rempart, Mireille↔Orso ; plus quand le vivier grandit).
+  - **Déclenchement** : **tuer son Némésis** → effet sur le **tueur**. « Tuer » = avoir infligé les
+    **derniers dégâts** au défunt (`Unit.lastHitBy`), **peu importe la cause** (attaque, tir réservé,
+    réaction). Réutilise le signal de mort `rale`.
+  - **Nouveau SENS de réaction** (vs Résonance) : la Résonance vise les **alliés** du mort
+    (`owner === source.owner`) ; la Némésis vise le **tueur** (un **ennemi** du mort). → 2ᵉ direction
+    dans le moteur + **attribution du kill** (`lastHitBy`, brique réutilisable « à l'élimination »).
+    Donc **lot FONDATEUR**, pas un simple duo.
+  - **Décidé** : (1) kill = derniers dégâts ; (2) Némésis = automatique (même archétype). **AJOURNÉ** :
+    l'**effet** (buff permanent ? one-shot ? thématique par couple), et **dirigé vs réciproque**
+    (comme les duos). Méthode proposée : commencer petit — poser `lastHitBy` + **1** effet (ex.
+    Estoc tue Fil) — puis généraliser.
 - **REVUE DE CONCEPTION — points retenus (2026-06-16)** : forces du système = fort effet de levier
   (on n'écrit que les cellules utiles), profondeur de draft (synergies mutuellement exclusives →
   « pas d'escouade strictement meilleure »), couches nettes (`kind`/`ReactionSpec`/roster). Points
