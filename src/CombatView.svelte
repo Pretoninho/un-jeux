@@ -97,14 +97,14 @@
     const [a2, a3] = spots(c0);
     const [b2, b3] = spots(c1);
     // Line-up par défaut (vivier plat) : Lourde au coin, Tireur puis Duelliste autour.
-    //   Alice = Rempart + Orso + Estoc · Bob = Bastion + Mireille + Fil.
-    //   → seule la Résonance Estoc × Rempart est vivante (Bastion et Mireille sont en face).
+    //   Alice = Bastion + Mireille + Estoc · Bob = Rempart + Orso + Fil.
+    //   → vivants : Estoc × Bastion, Estoc × Mireille (camp Alice) ; Fil × Rempart, Fil × Orso (camp Bob).
     return makeCombatState(geo.map, [
-      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.rempart!, AP_PER_TURN),
-      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.orso!, AP_PER_TURN),
+      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.bastion!, AP_PER_TURN),
+      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.mireille!, AP_PER_TURN),
       makeUnitFromCharacter('a3', 'alice', a3, CHARACTERS.estoc!, AP_PER_TURN),
-      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.bastion!, AP_PER_TURN),
-      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.mireille!, AP_PER_TURN),
+      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.rempart!, AP_PER_TURN),
+      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.orso!, AP_PER_TURN),
       makeUnitFromCharacter('b3', 'bob', b3, CHARACTERS.fil!, AP_PER_TURN),
     ], 'alice');
   }

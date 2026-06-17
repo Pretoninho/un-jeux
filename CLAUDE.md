@@ -74,10 +74,12 @@
   (plus de pool a_/b_ couplé au camp).
   - **VIVIER PLAT LIVRÉ (2026-06-16)** : `CHARACTERS` découplé des camps, ids = **noms neutres**
     (`bastion, mireille, estoc, rempart, orso, fil`) ; le déploiement (`CombatView`) assigne
-    librement les héros aux camps. Line-up par défaut : **Alice = Rempart + Orso + Estoc**, **Bob =
-    Bastion + Mireille + Fil** (→ seule *Estoc × Rempart* est vivante ; *× Bastion* et *× Mireille*
-    dormantes, leurs partenaires sont en face). **Une seule Lourde/escouade** → les duos-tank d'Estoc
-    sont **mutuellement exclusifs** (selon le tank fieldé). Le **draft** reste ajourné.
+    librement les héros aux camps. Line-up par défaut : **Alice = Bastion + Mireille + Estoc**, **Bob =
+    Rempart + Orso + Fil** (→ vivants : *Estoc × Bastion*, *Estoc × Mireille* côté Alice ; *Fil × Rempart*,
+    *Fil × Orso* côté Bob). **Une seule Lourde/escouade** → les duos-tank d'un héros sont **mutuellement
+    exclusifs** (selon le tank fieldé). **Escouade = 1 de chaque archétype** (Lourde+Tireur+Duelliste) →
+    deux héros du **même archétype** ne sont jamais coéquipiers : **tous les duos sont inter-archétypes**
+    (un Fil × Estoc, 2 Duellistes, est impossible à fielder). Le **draft** reste ajourné.
   - **Deux couches séparables** : (1) **les héros eux-mêmes** = la fondation, déjà en place,
     qu'on enrichit *sans* toucher au reste ; (2) **le draft** (comment on les choisit) = couche
     au-dessus, ajoutée plus tard.
