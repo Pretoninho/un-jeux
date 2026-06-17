@@ -196,6 +196,8 @@
 
   const champ = $derived(winner(combat));
   const over = $derived(champ !== null);
+  // Némésis = ennemi(s) du MÊME archétype présent(s) sur le plateau (rivalité automatique).
+  const nemesisOf = (u: Unit): Unit[] => combat.units.filter((x) => x.kind === u.kind && x.owner !== u.owner);
   const selected = $derived(combat.units.find((u) => u.id === selectedId && u.owner === combat.active));
   const reach = $derived(over || !selected ? new Map<string, number>() : reachable(combat, selected.id, moveBudget(selected)));
 
@@ -465,6 +467,8 @@
       <div class="panel ally" style="--c:{COLORS[combat.active]}">
         {#if selected}
           <div class="phead"><span class="pdot"></span>{selected.name ?? KIND_NAME[selected.kind]} <span class="powner">· {KIND_NAME[selected.kind]} · {NAMES[selected.owner]}</span></div>
+          {@const nem = nemesisOf(selected)}
+          <div class="nemesis small">⚔ Némésis : <b>{nem.length ? nem.map((n) => n.name ?? KIND_NAME[n.kind]).join(', ') : '—'}</b></div>
           <div class="pv">PV <b>{selected.hp}/{selected.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -520,6 +524,8 @@
       <div class="panel foe" style="--c:{foe ? COLORS[foe.owner] : '#3a4150'}">
         {#if foe}
           <div class="phead"><span class="pdot"></span>{foe.name ?? KIND_NAME[foe.kind]} <span class="powner">· {KIND_NAME[foe.kind]} · {NAMES[foe.owner]}</span></div>
+          {@const nem = nemesisOf(foe)}
+          <div class="nemesis small">⚔ Némésis : <b>{nem.length ? nem.map((n) => n.name ?? KIND_NAME[n.kind]).join(', ') : '—'}</b></div>
           <div class="pv">PV <b>{foe.hp}/{foe.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * foe.hp / foe.maxHp)}%; background:{foe.hp / foe.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -727,6 +733,8 @@
   .resdetail .amt { color: #8d84a8; margin-top: .1rem; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
+  .nemesis { color: #c98a8a; margin: .15rem 0 .35rem; }
+  .nemesis b { color: #e0a0a0; }
   .hint { padding: 0 .2rem; }
 
   /* Matrice de Résonance (panneau dépliable, pleine largeur) */
