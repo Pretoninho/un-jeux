@@ -32,6 +32,25 @@
   const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
 
+  // États actifs d'une pièce (postures + statuts de Résonance) : une icône + une description chacun.
+  // Servent à la fois les petites icônes SUR la pièce et le tooltip au survol (`<title>` natif).
+  function pieceStates(u: Unit): { icon: string; label: string }[] {
+    const s: { icon: string; label: string }[] = [];
+    if (u.guarding) s.push({ icon: '🛡', label: 'En garde — dégâts subis réduits' });
+    if (u.watching) s.push({ icon: '🎯', label: 'Tir réservé armé' });
+    if (u.riposting) s.push({ icon: '🗡', label: 'Riposte armée' });
+    if (u.block) s.push({ icon: '🔆', label: `Bloqué — immunité totale aux dégâts (${u.block.expiresIn} t.)` });
+    if (u.mark) s.push({ icon: '✖', label: `Marqué — +${u.mark.bonus} au 1ᵉʳ coup adverse (${u.mark.expiresIn} t.)` });
+    if (u.cripple) s.push({ icon: '🦿', label: `Estropié — −${u.cripple.amount} déplacement (${u.cripple.expiresIn} t.)` });
+    if (u.vendetta) s.push({ icon: '⚔', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
+    return s;
+  }
+  function pieceTitle(u: Unit): string {
+    const head = `${u.name ?? KIND_NAME[u.kind] ?? u.kind} · ${KIND_NAME[u.kind] ?? u.kind} · PV ${u.hp}/${u.maxHp}`;
+    const st = pieceStates(u).map((e) => `${e.icon} ${e.label}`);
+    return st.length ? `${head}\n${st.join('\n')}` : head;
+  }
+
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
   interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; bounds: { x: number; y: number; w: number; h: number } }
@@ -372,6 +391,8 @@
           {@const r = t.small ? 9 : 12}
           {@const w = t.small ? 16 : 22}
           {@const by = t.small ? 9 : 12}
+          {@const states = pieceStates(occ)}
+          <title>{pieceTitle(occ)}</title>
           <circle cx={t.cx} cy={t.cy - 3} {r} fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
           <text x={t.cx} y={t.cy + 1} class="utxt">{KIND_GLYPH[occ.kind] ?? '?'}</text>
           <!-- barre de PV (couleur = joueur, lettre = archétype) -->
@@ -379,9 +400,10 @@
           <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
-          {#if occ.guarding}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🛡</text>{/if}
-          {#if occ.watching}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🎯</text>{/if}
-          {#if occ.riposting}<text x={t.cx - r - 2} y={t.cy - 6} class="guardmark">🗡</text>{/if}
+          <!-- icônes d'état (postures + statuts de Résonance), en rangée au-dessus de la pièce -->
+          {#each states as st, i}
+            <text x={t.cx + (i - (states.length - 1) / 2) * 9} y={t.cy - 6 - r} class="statemark">{st.icon}</text>
+          {/each}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
@@ -450,7 +472,7 @@
             <div class="ptags"><span class="tag v">⚔ Vendetta (+{selected.vendetta} à la prochaine attaque)</span></div>
           {/if}
           {#if selected.block}
-            <div class="ptags"><span class="tag b">🛡 Bloqué — immunisé (⏳{selected.block.expiresIn})</span></div>
+            <div class="ptags"><span class="tag b">🔆 Bloqué — immunisé (⏳{selected.block.expiresIn})</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -496,7 +518,7 @@
             <div class="ptags"><span class="tag v">⚔ Vendetta (+{foe.vendetta} à la prochaine attaque)</span></div>
           {/if}
           {#if foe.block}
-            <div class="ptags"><span class="tag b">🛡 Bloqué — immunisé (⏳{foe.block.expiresIn})</span></div>
+            <div class="ptags"><span class="tag b">🔆 Bloqué — immunisé (⏳{foe.block.expiresIn})</span></div>
           {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
@@ -589,7 +611,7 @@
   .utxt { fill: #0e1015; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .guardmark { font-size: 11px; text-anchor: middle; pointer-events: none; }
+  .statemark { font-size: 9px; text-anchor: middle; pointer-events: none; }
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
   /* Panneaux d'info — pièce alliée sélectionnée (gauche) et pièce adverse inspectée (droite). */

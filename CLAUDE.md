@@ -156,8 +156,9 @@
   2. **Équilibrage par PLAYTEST**, au niveau **matchup/draft** (héros uniques fieldés une fois →
      asymétrie structurelle assumée). Pas d'équilibrage cellule par cellule en amont ; le test est
      indispensable, pas optionnel.
-  3. **Lisibilité — lot UI identifié (à faire)** : afficher les **états directement sur la pièce du
-     plateau** + **tooltip au survol** décrivant l'état (pas seulement dans les panneaux latéraux).
+  3. **Lisibilité — lot UI LIVRÉ** : icônes d'état **sur la pièce du plateau** (postures + statuts
+     de Résonance, rangée au-dessus du pion) + **tooltip au survol** (`<title>` SVG natif, via
+     `pieceStates`/`pieceTitle`) décrivant nom/PV + chaque état actif.
   4. **État caché OK si affichage parlant** (précédent Divinity assumé).
   5. **« Duo » = arête DIRIGÉE** aujourd'hui (le possesseur réagit au signal du partenaire). La
      **réciprocité émerge** en remplissant les deux sens de la matrice → cap : matrice dense quand
