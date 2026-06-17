@@ -29,8 +29,8 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta' };
-  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement' };
+  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
 
   type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
@@ -416,6 +416,8 @@
                   <div class="amt">tire la cible de {rx.amount ?? 1} case vers le possesseur</div>
                 {:else if rx.kind === 'vendetta'}
                   <div class="amt">+{rx.amount ?? 1} à la prochaine attaque de l'allié touché</div>
+                {:else if rx.kind === 'ralliement'}
+                  <div class="amt">à la mort de l'allié : se téléporte sur sa case · immunité totale {rx.duration ?? 1} tours</div>
                 {:else}
                   <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
                 {/if}
@@ -446,6 +448,9 @@
           {/if}
           {#if selected.vendetta}
             <div class="ptags"><span class="tag v">⚔ Vendetta (+{selected.vendetta} à la prochaine attaque)</span></div>
+          {/if}
+          {#if selected.block}
+            <div class="ptags"><span class="tag b">🛡 Bloqué — immunisé (⏳{selected.block.expiresIn})</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -489,6 +494,9 @@
           {/if}
           {#if foe.vendetta}
             <div class="ptags"><span class="tag v">⚔ Vendetta (+{foe.vendetta} à la prochaine attaque)</span></div>
+          {/if}
+          {#if foe.block}
+            <div class="ptags"><span class="tag b">🛡 Bloqué — immunisé (⏳{foe.block.expiresIn})</span></div>
           {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
@@ -604,6 +612,7 @@
   .tag.m { background: #4a2230; color: #ffc8d6; }
   .tag.c { background: #2a3a2a; color: #c8e6c0; }
   .tag.v { background: #3a3320; color: #ffe0a0; }
+  .tag.b { background: #20303a; color: #a0d8ff; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }

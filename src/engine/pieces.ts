@@ -115,6 +115,17 @@ const VENDETTA_FIL_BASTION: ReactionSpec = {
   scope: { radius: 2 }, cooldown: 3, kind: 'vendetta', amount: 2,
 };
 
+/**
+ * Résonance DUO « Fil × Mireille » — quand Mireille **meurt** (signal `rale`), Fil RALLIE : il se
+ * téléporte sur sa case et reçoit `block` (immunité TOTALE aux dégâts) 4 tours (≈ 3 pleins). Portée
+ * escouade. CD 3 (cosmétique pour un déclencheur de mort — Mireille ne meurt qu'une fois — mais prêt
+ * si une réapparition arrive un jour). 1ᵉʳ signal de mort + 1ᵉʳ effet qui vise le possesseur.
+ */
+const RALLIEMENT_FIL_MIREILLE: ReactionSpec = {
+  id: 'ralliement_fil_mireille', on: 'rale', fromCharacter: 'mireille',
+  scope: { squad: true }, cooldown: 3, kind: 'ralliement', duration: 4,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -134,7 +145,7 @@ export const CHARACTERS: Record<string, Character> = {
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
-  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION] },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

@@ -130,6 +130,15 @@
     frapper (statut `Unit.vendetta`, sans expiration, consommé dans `strike()`). **1ᵉʳ effet de SOUTIEN**
     (buff d'un allié) → `PendingReaction.sourceId` ajouté (l'effet vise l'allié émetteur, pas l'attaquant).
     Dans le line-up courant, Fil et Bastion sont alliés (Bob) → ce duo est **vivant**.
+  - **Duo livré — *Fil × Mireille*** (1ᵉʳ **signal de mort**) : nouveau signal `rale`, émis à CHAQUE
+    mort par `reap` (retrait centralisé des pièces à hp≤0 ; porte un **snapshot** du défunt car il est
+    déjà retiré). Quand **Mireille** meurt, Fil **RALLIE** (`kind: 'ralliement'`, `fromCharacter: 'mireille'`,
+    portée escouade) : il se **téléporte** sur la case de Mireille (`PendingReaction.sourceHex`) et reçoit
+    `Unit.block` = **immunité TOTALE** (`damageTaken` → 0) `duration: 4` (≈ 3 tours pleins). CD 3
+    (cosmétique pour une mort unique, mais **revival-ready**). **1ᵉʳ effet qui vise le POSSESSEUR lui-même**.
+    *Refactor associé* : la mort est désormais un **événement de 1ʳᵉ classe** (centralisée dans `reap`,
+    appelée par `attack`/`resolveOverwatch`) → un futur **cimetière/réapparition** n'a qu'à consommer la
+    liste des défunts (décision de design ajournée : impacte la condition de victoire).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

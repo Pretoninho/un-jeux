@@ -50,11 +50,12 @@ export interface RiposteProfile {
  * vit dans l'effet : `amountBySource` module selon l'archétype de la SOURCE — on n'écrit que les
  * cellules utiles, jamais les N². Données PURES (sérialisables) ; le moteur dispatch sur `kind`.
  */
-export type SignalType = 'garde_encaissee' | 'tir_reserve';
+export type SignalType = 'garde_encaissee' | 'tir_reserve' | 'rale';
 export interface Signal {
   type: SignalType;
-  sourceId: string;   // la pièce alliée qui émet (Lourde qui encaisse en garde ; Tireur dont l'OW part)
-  attackerId: string; // l'ennemi ciblé par les effets (attaquant des épines ; cible touchée du tir réservé)
+  sourceId: string;    // la pièce alliée qui émet (Lourde en garde ; Tireur dont l'OW part ; défunt pour 'rale')
+  attackerId?: string; // l'ennemi ciblé par les effets offensifs ; ABSENT pour 'rale'
+  sourceUnit?: Unit;   // snapshot du défunt (signal 'rale' uniquement, car il est retiré du plateau)
 }
 export type Scope = { radius: number } | { squad: true };
 export interface ReactionSpec {
@@ -62,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -97,8 +98,9 @@ export interface Cripple {
 export interface PendingReaction {
   listenerId: string;
   spec: ReactionSpec;
-  sourceId: string; // l'allié qui a émis le signal (cible des effets de SOUTIEN, ex. vendetta)
-  targetId: string; // l'ennemi visé (cible des effets OFFENSIFS : épines, marquage, estropie, provocation)
+  sourceId: string;     // l'allié qui a émis le signal (cible des effets de SOUTIEN, ex. vendetta)
+  sourceHex: HexId;     // case de la source (cible des effets de déplacement vers elle, ex. ralliement)
+  targetId: string;     // l'ennemi visé (cible des effets OFFENSIFS : épines, marquage, estropie, provocation)
   amount: number;
 }
 
@@ -131,6 +133,7 @@ export interface Unit {
   mark?: Mark;                         // statut « marqué » subi (posé par un allié adverse, ex. Estoc)
   cripple?: Cripple;                   // statut « estropié » subi : malus de déplacement (ex. Estoc × Rempart)
   vendetta?: number;                   // bonus de dégâts en attente sur SA prochaine attaque (ex. Fil × Bastion)
+  block?: { owner: string; expiresIn: number }; // immunité TOTALE aux dégâts, bornée (ex. Fil × Mireille)
 }
 
 export interface CombatState {
@@ -258,8 +261,9 @@ export function canAttack(state: CombatState, attackerId: string, targetId: stri
   return graphDistance(state.map, attacker.hex, target.hex) <= attacker.range;
 }
 
-/** Dégâts effectivement subis par `target` : réduits (plancher 1) si la pièce est en garde. */
+/** Dégâts effectivement subis par `target` : 0 si « bloqué » (immunité), sinon réduits si en garde. */
 export function damageTaken(target: Unit, raw: number): number {
+  if (target.block) return 0;
   if (target.guarding && target.guard) return Math.max(1, Math.floor(raw * target.guard.damageTakenMul));
   return raw;
 }
@@ -293,13 +297,13 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
       return u;
     });
   }
-  const next: CombatState = { ...state, units: units.filter((u) => u.hp > 0) };
-  const absorber = unitById(next, targetId);
+  // On ne retire PAS les morts ici : `reap` centralise le retrait + l'émission du signal `rale`.
+  const absorber = units.find((u) => u.id === targetId);
   const signal: Signal | null =
-    absorber && absorber.guarding && absorber.guard
+    absorber && absorber.hp > 0 && absorber.guarding && absorber.guard
       ? { type: 'garde_encaissee', sourceId: targetId, attackerId }
       : null;
-  return { state: next, signal };
+  return { state: { ...state, units }, signal };
 }
 
 /**
@@ -309,8 +313,10 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
  */
 export function attack(state: CombatState, attackerId: string, targetId: string): CombatState {
   if (!canAttack(state, attackerId, targetId)) return state;
-  const { state: s, signal } = strike(state, attackerId, targetId);
-  return signal ? resolveReactions(s, signal) : s;
+  const { state: s0, signal } = strike(state, attackerId, targetId);
+  const s1 = reap(s0);                                     // morts du coup (+ riposte) → signal `rale`
+  const s2 = signal ? resolveReactions(s1, signal) : s1;   // cascade garde (épines…)
+  return reap(s2);                                         // morts des réactions → signal `rale`
 }
 
 /**
@@ -326,6 +332,28 @@ export function previewReactions(state: CombatState, attackerId: string, targetI
 // ─────────────────────── Réactions en chaîne (synergies d'escouade) ───────────
 
 const REACTION_CHAIN_CAP = 64; // garde-fou dur, en plus du « un passif au plus une fois par chaîne »
+
+// Effets OFFENSIFS : ils visent un ennemi (`targetId`) → ne partent pas si la cible a disparu.
+// (Les effets de soutien/soi — `vendetta`, `ralliement` — n'ont pas besoin de cible.)
+const NEEDS_TARGET = new Set<ReactionSpec['kind']>(['epines', 'marquage', 'estropier', 'provocation']);
+
+/**
+ * Retrait CENTRALISÉ des pièces mortes (hp ≤ 0). Pour CHAQUE mort, fait émettre le signal `rale`
+ * (résolu sur l'état déjà nettoyé, avec un snapshot du défunt) → permet les Résonances « à la mort »
+ * (ex. Fil × Mireille). Boucle si des réactions provoquent de nouvelles morts (borne `REACTION_CHAIN_CAP`).
+ * Conçu « revival-ready » : la mort devient un événement de 1ʳᵉ classe (un futur cimetière n'a qu'à
+ * consommer la liste des défunts ici).
+ */
+function reap(state: CombatState): CombatState {
+  let s = state;
+  for (let guard = 0; guard < REACTION_CHAIN_CAP; guard++) {
+    const dead = s.units.filter((u) => u.hp <= 0);
+    if (!dead.length) return s;
+    s = { ...s, units: s.units.filter((u) => u.hp > 0) };
+    for (const d of dead) s = resolveReactions(s, { type: 'rale', sourceId: d.id, sourceUnit: d });
+  }
+  return s;
+}
 
 function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): boolean {
   return 'squad' in scope ? true : graphDistance(map, source.hex, listener.hex) <= scope.radius;
@@ -350,20 +378,22 @@ function reactionAmount(spec: ReactionSpec, source: Unit): number {
  * Pur — sert à la fois la résolution et la prévisualisation.
  */
 export function pendingReactions(state: CombatState, signal: Signal, fired: Set<string> = new Set()): PendingReaction[] {
-  const source = unitById(state, signal.sourceId);
-  const target = unitById(state, signal.attackerId);
-  if (!source || !target) return [];
+  const source = signal.sourceUnit ?? unitById(state, signal.sourceId); // snapshot pour `rale` (défunt retiré)
+  if (!source) return [];
+  const target = signal.attackerId ? unitById(state, signal.attackerId) : undefined;
   const out: PendingReaction[] = [];
   for (const u of state.units) {
-    if (u.owner !== source.owner || u.id === source.id) continue; // synergies alliées (pas soi)
+    if (u.hp <= 0) continue;                                       // morts en attente de retrait : ignorés
+    if (u.owner !== source.owner || u.id === source.id) continue;  // synergies alliées (pas soi)
     for (const spec of u.reactions ?? []) {
       if (spec.on !== signal.type) continue;
+      if (NEEDS_TARGET.has(spec.kind) && !target) continue;        // effet offensif sans cible → ne part pas
       if (spec.fromCharacter !== undefined && source.characterId !== spec.fromCharacter) continue; // duo gâté au héros
       if (spec.fromKind !== undefined && source.kind !== spec.fromKind) continue;                  // duo gâté à la classe
       if (fired.has(`${u.id}:${spec.id}`)) continue;
       if ((u.cooldowns?.[spec.id] ?? 0) > 0) continue;
       if (!inScope(state.map, source, u, spec.scope)) continue;
-      out.push({ listenerId: u.id, spec, sourceId: source.id, targetId: target.id, amount: reactionAmount(spec, source) });
+      out.push({ listenerId: u.id, spec, sourceId: source.id, sourceHex: source.hex, targetId: target?.id ?? '', amount: reactionAmount(spec, source) });
     }
   }
   return out;
@@ -374,16 +404,21 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
   if (!unitById(state, p.listenerId)) return state;
   const arm = (u: Unit): Unit => ({ ...u, cooldowns: { ...(u.cooldowns ?? {}), [p.spec.id]: p.spec.cooldown } });
   switch (p.spec.kind) {
-    case 'epines': { // relaie des dégâts sur l'attaquant (réduits s'il est en garde)
+    case 'epines': { // relaie des dégâts sur l'attaquant (réduits s'il est en garde) ; `reap` nettoiera
       const target = unitById(state, p.targetId);
       const dmg = target ? damageTaken(target, p.amount) : 0;
-      const units = state.units
-        .map((u) => {
-          if (u.id === p.listenerId) return arm(u);
-          if (target && u.id === p.targetId) return { ...u, hp: u.hp - dmg };
-          return u;
-        })
-        .filter((u) => u.hp > 0);
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (target && u.id === p.targetId) return { ...u, hp: u.hp - dmg };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'ralliement': { // SOUTIEN : se téléporte sur la case du défunt + immunité TOTALE (block) bornée
+      const units = state.units.map((u) => {
+        if (u.id !== p.listenerId) return u;
+        return { ...arm(u), hex: p.sourceHex, block: { owner: u.owner, expiresIn: p.spec.duration ?? 1 } };
+      });
       return { ...state, units };
     }
     case 'marquage': { // pose une marque sur l'ennemi : +bonus au 1er coup du possesseur, durée bornée
@@ -534,17 +569,15 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
     if (!watcher.watching || watcher.owner === mover.owner) continue;
     if (graphDistance(s.map, watcher.hex, mover.hex) > watcher.range) continue;
     const dmg = damageTaken(mover, watcher.damage);
-    const units = s.units
-      .map((u) => {
-        if (u.id === watcher.id) return { ...u, watching: false };
-        if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg };
-        return u;
-      })
-      .filter((u) => u.hp > 0);
-    s = { ...s, units };
-    // Le tir réservé est parti : on émet le signal ; si la cible survit, les réactions (ex. marquage) se résolvent.
+    const units = s.units.map((u) => {
+      if (u.id === watcher.id) return { ...u, watching: false };
+      if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg };
+      return u;
+    });
+    s = reap({ ...s, units }); // retire le mover s'il meurt (+ signal `rale`)
+    // Le tir réservé est parti : si la cible survit, les réactions (ex. marquage/provocation) se résolvent.
     if (unitById(s, movedUnitId)) {
-      s = resolveReactions(s, { type: 'tir_reserve', sourceId: watcher.id, attackerId: movedUnitId });
+      s = reap(resolveReactions(s, { type: 'tir_reserve', sourceId: watcher.id, attackerId: movedUnitId }));
     }
   }
   return s;
@@ -614,12 +647,14 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
     units: state.units.map((u) => {
       const mark = tickStatus(u.mark, state.active);       // le tour de `state.active` s'achève
       const cripple = tickStatus(u.cripple, state.active);
+      const block = tickStatus(u.block, state.active);
       let out =
         u.owner === next
           ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };
+      if (block !== u.block) out = { ...out, block };
       return out;
     }),
   };

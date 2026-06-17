@@ -125,7 +125,7 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
       .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });
     expect(a.reactions).not.toEqual(b.reactions);            // duos distincts
     expect(a.reactions!.map((r) => r.id)).toContain('epines_estoc_bastion'); // Estoc × Bastion
-    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion']);  // Fil × Bastion (façonné)
+    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'ralliement_fil_mireille']); // Fil × Bastion + × Mireille
   });
 
   it('un personnage à l\'archétype inconnu est rejeté', () => {

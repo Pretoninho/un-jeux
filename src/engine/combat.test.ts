@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend,
+  makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend, damageTaken,
   reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
@@ -743,6 +743,58 @@ describe('combat — Résonance Fil × Bastion (vendetta)', () => {
       u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
     ], 'bob');
     expect(unitById(attack(base, 'b', 'r'), 'r')!.vendetta).toBeUndefined();
+  });
+});
+
+describe('combat — Résonance Fil × Mireille (râle → ralliement)', () => {
+  // Fil porte la Résonance « à la mort » de Mireille : il se téléporte sur sa case et devient invulnérable.
+  const fil = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'ral', on: 'rale', fromCharacter: 'mireille', scope: { squad: true },
+        cooldown: 3, kind: 'ralliement', duration: 4 }], cooldowns: {}, ...over });
+
+  it('la mort de Mireille téléporte Fil sur sa case et lui donne l\'immunité (block)', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'm', owner: 'alice', hex: 'D', hp: 3, characterId: 'mireille' }), // Mireille, fragile
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),                // Fil, loin (escouade)
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, damage: 4 }),                 // tueur (E adjacent D)
+    ], 'bob');
+    const s = attack(base, 'b', 'm');                       // bob tue Mireille (3 PV, 4 dégâts)
+    expect(unitById(s, 'm')).toBeUndefined();               // Mireille morte, retirée
+    expect(unitById(s, 'f')!.hex).toBe('D');                // Fil rallie sur la case de Mireille
+    expect(unitById(s, 'f')!.block).toMatchObject({ owner: 'alice', expiresIn: 4 });
+    expect(unitById(s, 'f')!.cooldowns!.ral).toBe(3);
+  });
+
+  it('Fil bloqué ne subit AUCUN dégât', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'm', owner: 'alice', hex: 'D', hp: 3, characterId: 'mireille' }),
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'm');                       // bob a encore 2 PA ; Fil est en D (adjacent E)
+    const hit = attack(s, 'b', 'f');                        // bob frappe Fil bloqué
+    expect(unitById(hit, 'f')!.hp).toBe(10);               // immunité totale : 0 dégât
+  });
+
+  it('gâté à Mireille : la mort d\'un autre allié ne déclenche pas le ralliement', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'm', owner: 'alice', hex: 'D', hp: 3, characterId: 'orso' }),     // pas Mireille
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'm');
+    expect(unitById(s, 'f')!.hex).toBe('A');                // pas de téléportation
+    expect(unitById(s, 'f')!.block).toBeUndefined();        // pas d'immunité
+  });
+
+  it('le block se décompte au fil des tours de Fil et finit par tomber', () => {
+    const blocked = u({ id: 'f', owner: 'alice', hex: 'A', hp: 10, block: { owner: 'alice', expiresIn: 2 } });
+    const st = makeCombatState(LINE, [blocked, u({ id: 'b', owner: 'bob', hex: 'E' })], 'alice');
+    expect(damageTaken(blocked, 9)).toBe(0);                // immunité tant qu'actif
+    const a2 = endTurn(st, 4);                               // alice finit → décompte : 1
+    expect(unitById(a2, 'f')!.block!.expiresIn).toBe(1);
+    const a3 = endTurn(endTurn(a2, 4), 4);                   // bob puis alice finit → 0 → disparaît
+    expect(unitById(a3, 'f')!.block).toBeUndefined();
   });
 });
 

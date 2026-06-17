@@ -115,6 +115,8 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 
 - `garde_encaissee` — émis par un allié qui **encaisse en garde** (la Lourde).
 - `tir_reserve` — émis par `resolveOverwatch` quand le **Tir Réservé** d'un allié part (le Tireur).
+- `rale` — émis à la **mort** d'une pièce, par `reap` (retrait centralisé des morts). Porte un
+  **snapshot** du défunt (`Signal.sourceUnit`) car il est déjà retiré du plateau. Entendu par son escouade.
 - Ajouter un signal = un **lot moteur séparé** (type + point d'émission + tests), pas une donnée de perso.
 
 ### 4.2 Effets disponibles (`kind`, `applyReaction`)
@@ -132,9 +134,13 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
   l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
   consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).
+- `ralliement` — vise le **possesseur lui-même** (`p.listenerId`) : il se **téléporte** sur la case
+  du défunt (`p.sourceHex`) et reçoit `Unit.block` (immunité TOTALE, `damageTaken` → 0) `duration`
+  tours. Déclenché par `rale`.
 
-> **Offensif vs soutien** : `PendingReaction` porte `targetId` (l'ennemi, cible des effets
-> offensifs) **et** `sourceId` (l'allié émetteur, cible des effets de soutien). Choisis selon l'effet.
+> **Cible de l'effet** : `PendingReaction` porte `targetId` (l'ennemi → effets offensifs),
+> `sourceId` (l'allié émetteur → soutien, ex. vendetta) **et** `sourceHex` (sa case → déplacement
+> vers elle, ex. ralliement) ; le possesseur lui-même = `listenerId`. Choisis selon l'effet.
 - Ajouter un `kind` = case `switch` dans `applyReaction` (+ câblage si persistant : statut sur
   `Unit`, tick dans `endTurn` via `tickStatus`, lecture à l'endroit concerné) + **lot moteur**.
 
