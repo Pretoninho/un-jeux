@@ -798,6 +798,59 @@ describe('combat — Résonance Fil × Mireille (râle → ralliement)', () => {
   });
 });
 
+describe('combat — Résonance Fil × Rempart (coup étourdissant → stun)', () => {
+  const rempart = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'rempart', ...over });
+  const fil = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'et', on: 'garde_encaissee', fromCharacter: 'rempart', scope: { radius: 2 },
+        cooldown: 3, kind: 'etourdir', amount: 1, duration: 3 }], cooldowns: {}, ...over });
+
+  it('Rempart encaisse + Fil à portée → Rempart est armé du Coup étourdissant', () => {
+    const base = makeCombatState(LINE, [
+      rempart({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      fil({ id: 'f', owner: 'alice', hex: 'A', hp: 10, ap: 4 }),  // A..B = 1 ≤ rayon 2
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'r');
+    expect(unitById(s, 'r')!.stunCharge).toMatchObject({ owner: 'alice', expiresIn: 3, stun: 1 });
+    expect(unitById(s, 'f')!.cooldowns!.et).toBe(3);
+  });
+
+  it('Rempart consomme la charge à son attaque → la cible est étourdie (et la charge tombe)', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'r', owner: 'alice', hex: 'B', ap: 4, damage: 4, stunCharge: { owner: 'alice', expiresIn: 3, stun: 1 } }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10 }),
+    ], 'alice');
+    const hit = attack(st, 'r', 'b');
+    expect(unitById(hit, 'b')!.hp).toBe(6);                       // 10 − 4 (le stun ne change pas les dégâts)
+    expect(unitById(hit, 'b')!.stun).toMatchObject({ owner: 'bob', expiresIn: 1 });
+    expect(unitById(hit, 'r')!.stunCharge).toBeUndefined();       // charge consommée
+  });
+
+  it('l\'étourdi a ses PA forcés à 0 son prochain tour, puis se recharge normalement', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 0, stun: { owner: 'bob', expiresIn: 1 } }),
+      u({ id: 'a', owner: 'alice', hex: 'A' }),
+    ], 'alice');
+    const frozen = endTurn(st, 4);                                // → bob actif : gelé
+    expect(unitById(frozen, 'b')!.ap).toBe(0);
+    expect(unitById(frozen, 'b')!.stun!.expiresIn).toBe(1);       // stun actif pendant le tour gelé
+    const back = endTurn(endTurn(frozen, 4), 4);                  // bob finit (stun tombe) → … → bob actif
+    expect(unitById(back, 'b')!.ap).toBe(4);                      // recharge normale
+    expect(unitById(back, 'b')!.stun).toBeUndefined();
+  });
+
+  it('un écouteur étourdi ne déclenche aucune Résonance (silence)', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'bastion' }),
+      u({ id: 'c', owner: 'alice', hex: 'A', hp: 10, stun: { owner: 'alice', expiresIn: 1 },
+         reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 3 }], cooldowns: {} }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'a'), 'b')!.hp).toBe(10);   // 'c' étourdi → pas d'épines
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

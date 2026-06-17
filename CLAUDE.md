@@ -141,6 +141,13 @@
     *Refactor associé* : la mort est désormais un **événement de 1ʳᵉ classe** (centralisée dans `reap`,
     appelée par `attack`/`resolveOverwatch`) → un futur **cimetière/réapparition** n'a qu'à consommer la
     liste des défunts (décision de design ajournée : impacte la condition de victoire).
+  - **Duo livré — *Fil × Rempart*** (1ᵉʳ **stun**) : quand Rempart (en garde, rayon 2) encaisse et que
+    Fil est à portée, Fil arme un **COUP ÉTOURDISSANT** sur Rempart (`kind: 'etourdir'`, `fromCharacter:
+    'rempart'`, CD 3) : sa **prochaine attaque** (consommée dans `strike`) **ÉTOURDIT** la cible 1 tour.
+    Étourdi = `Unit.stun` → **PA forcés à 0** au prochain tour (`endTurn`) **+ Résonances silencées**
+    (`pendingReactions` ignore les étourdis). Effet **à deux temps** : `Unit.stunCharge` (sur Rempart,
+    `expiresIn 3`, consommée à l'attaque) → `Unit.stun` (sur la cible). `amount` = durée du stun,
+    `duration` = persistance de la charge.
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

@@ -29,10 +29,10 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
-  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩' };
+  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫' };
   const HEROES = Object.values(CHARACTERS);
   let showMatrix = $state(false);
 
@@ -47,6 +47,8 @@
     if (u.mark) s.push({ icon: '✖', label: `Marqué — +${u.mark.bonus} au 1ᵉʳ coup adverse (${u.mark.expiresIn} t.)` });
     if (u.cripple) s.push({ icon: '🦿', label: `Estropié — −${u.cripple.amount} déplacement (${u.cripple.expiresIn} t.)` });
     if (u.vendetta) s.push({ icon: '⚔', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
+    if (u.stunCharge) s.push({ icon: '💫', label: `Coup étourdissant armé — sa prochaine attaque étourdit (${u.stunCharge.expiresIn} t.)` });
+    if (u.stun) s.push({ icon: '😵', label: `Étourdi — ne peut rien faire ce tour` });
     return s;
   }
   function pieceTitle(u: Unit): string {
@@ -444,6 +446,8 @@
                   <div class="amt">+{rx.amount ?? 1} à la prochaine attaque de l'allié touché</div>
                 {:else if rx.kind === 'ralliement'}
                   <div class="amt">à la mort de l'allié : se téléporte sur sa case · immunité totale {rx.duration ?? 1} tours</div>
+                {:else if rx.kind === 'etourdir'}
+                  <div class="amt">arme l'allié : sa prochaine attaque étourdit la cible {rx.amount ?? 1} tour · charge {rx.duration ?? 3} tours</div>
                 {:else}
                   <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
                 {/if}
@@ -477,6 +481,12 @@
           {/if}
           {#if selected.block}
             <div class="ptags"><span class="tag b">🔆 Bloqué — immunisé (⏳{selected.block.expiresIn})</span></div>
+          {/if}
+          {#if selected.stunCharge}
+            <div class="ptags"><span class="tag s">💫 Coup étourdissant armé (⏳{selected.stunCharge.expiresIn})</span></div>
+          {/if}
+          {#if selected.stun}
+            <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
           {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
@@ -524,12 +534,18 @@
           {#if foe.block}
             <div class="ptags"><span class="tag b">🔆 Bloqué — immunisé (⏳{foe.block.expiresIn})</span></div>
           {/if}
+          {#if foe.stunCharge}
+            <div class="ptags"><span class="tag s">💫 Coup étourdissant armé (⏳{foe.stunCharge.expiresIn})</span></div>
+          {/if}
+          {#if foe.stun}
+            <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
+          {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
             <div class="chainwarn">
               {#each chainPreview as p}
                 {@const lst = combat.units.find((u) => u.id === p.listenerId)}
-                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) {#if p.spec.kind === 'estropier'}estropie ta pièce (−{p.amount} dépl.){:else if p.spec.kind === 'vendetta'}renforce son tank (+{p.amount} à sa prochaine attaque){:else}pince ta pièce (−{p.amount}){/if}</span>
+                <span>⚡ En chaîne : <b>{lst?.name ?? KIND_NAME[lst?.kind ?? '']}</b> (adverse) {#if p.spec.kind === 'estropier'}estropie ta pièce (−{p.amount} dépl.){:else if p.spec.kind === 'vendetta'}renforce son tank (+{p.amount} à sa prochaine attaque){:else if p.spec.kind === 'etourdir'}arme son tank (prochaine attaque étourdissante){:else}pince ta pièce (−{p.amount}){/if}</span>
               {/each}
             </div>
           {/if}
@@ -679,6 +695,8 @@
   .tag.c { background: #2a3a2a; color: #c8e6c0; }
   .tag.v { background: #3a3320; color: #ffe0a0; }
   .tag.b { background: #20303a; color: #a0d8ff; }
+  .tag.s { background: #3a3320; color: #ffd98a; }
+  .tag.k { background: #3a2030; color: #ffaecb; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }

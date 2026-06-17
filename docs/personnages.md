@@ -137,6 +137,10 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `ralliement` — vise le **possesseur lui-même** (`p.listenerId`) : il se **téléporte** sur la case
   du défunt (`p.sourceHex`) et reçoit `Unit.block` (immunité TOTALE, `damageTaken` → 0) `duration`
   tours. Déclenché par `rale`.
+- `etourdir` — **SOUTIEN à deux temps** : pose `Unit.stunCharge` sur l'allié **source** → sa
+  PROCHAINE attaque (consommée dans `strike()`) pose `Unit.stun` sur la cible. Étourdi = **PA forcés
+  à 0** au prochain tour (`endTurn`) **+ Résonances silencées** (`pendingReactions` l'ignore).
+  `amount` = durée du stun (tours), `duration` = persistance de la charge.
 
 > **Cible de l'effet** : `PendingReaction` porte `targetId` (l'ennemi → effets offensifs),
 > `sourceId` (l'allié émetteur → soutien, ex. vendetta) **et** `sourceHex` (sa case → déplacement

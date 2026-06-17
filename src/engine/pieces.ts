@@ -126,6 +126,17 @@ const RALLIEMENT_FIL_MIREILLE: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'ralliement', duration: 4,
 };
 
+/**
+ * Résonance DUO « Fil × Rempart » — quand Rempart (en garde, rayon 2) encaisse et que Fil est à
+ * portée, Fil arme un **COUP ÉTOURDISSANT** sur Rempart : sa PROCHAINE attaque ÉTOURDIT la cible
+ * `amount` tour (PA à 0 + Résonances silencées). La charge dure `duration` tours puis se dissipe.
+ * CD 3 (= 2 tours pleins). Effet à deux temps (charge puis stun).
+ */
+const ETOURDIR_FIL_REMPART: ReactionSpec = {
+  id: 'etourdir_fil_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { radius: 2 }, cooldown: 3, kind: 'etourdir', amount: 1, duration: 3,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -145,7 +156,7 @@ export const CHARACTERS: Record<string, Character> = {
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
-  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE] },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

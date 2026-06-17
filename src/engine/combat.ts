@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -134,6 +134,8 @@ export interface Unit {
   cripple?: Cripple;                   // statut « estropié » subi : malus de déplacement (ex. Estoc × Rempart)
   vendetta?: number;                   // bonus de dégâts en attente sur SA prochaine attaque (ex. Fil × Bastion)
   block?: { owner: string; expiresIn: number }; // immunité TOTALE aux dégâts, bornée (ex. Fil × Mireille)
+  stunCharge?: { owner: string; expiresIn: number; stun: number }; // « Coup étourdissant » armé : SA prochaine attaque étourdit `stun` tour(s) (ex. Fil × Rempart)
+  stun?: { owner: string; expiresIn: number };  // étourdi : PA forcés à 0 + Résonances silencées tant qu'actif
 }
 
 export interface CombatState {
@@ -281,10 +283,11 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   const marked = !!target0.mark && target0.mark.by === attackerId;
   // Bonus de dégâts : marque (sur cette cible) + vendetta en attente (sur SON attaque) ; consommés.
   const raw = attacker.damage + (marked ? target0.mark!.bonus : 0) + (attacker.vendetta ?? 0);
+  const stunning = attacker.stunCharge; // « Coup étourdissant » : consommé, étourdit la cible
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
-    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, ...(attacker.vendetta ? { vendetta: undefined } : {}) };
-    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, raw), ...(marked ? { mark: undefined } : {}) };
+    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, ...(attacker.vendetta ? { vendetta: undefined } : {}), ...(stunning ? { stunCharge: undefined } : {}) };
+    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, raw), ...(marked ? { mark: undefined } : {}), ...(stunning ? { stun: { owner: u.owner, expiresIn: stunning.stun } } : {}) };
     return u;
   });
   // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
@@ -384,6 +387,7 @@ export function pendingReactions(state: CombatState, signal: Signal, fired: Set<
   const out: PendingReaction[] = [];
   for (const u of state.units) {
     if (u.hp <= 0) continue;                                       // morts en attente de retrait : ignorés
+    if ((u.stun?.expiresIn ?? 0) > 0) continue;                    // étourdi : ne réagit à rien
     if (u.owner !== source.owner || u.id === source.id) continue;  // synergies alliées (pas soi)
     for (const spec of u.reactions ?? []) {
       if (spec.on !== signal.type) continue;
@@ -446,6 +450,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       const units = state.units.map((u) => {
         if (u.id === p.listenerId) return arm(u);
         if (u.id === p.sourceId) return { ...u, vendetta: p.amount };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'etourdir': { // SOUTIEN : arme l'allié SOURCE (ex. Rempart) → sa prochaine attaque étourdit `amount` tour(s)
+      const source = unitById(state, p.sourceId);
+      if (!source) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.sourceId) return { ...u, stunCharge: { owner: source.owner, expiresIn: p.spec.duration ?? 3, stun: p.amount } };
         return u;
       });
       return { ...state, units };
@@ -648,13 +662,18 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const mark = tickStatus(u.mark, state.active);       // le tour de `state.active` s'achève
       const cripple = tickStatus(u.cripple, state.active);
       const block = tickStatus(u.block, state.active);
+      const stun = tickStatus(u.stun, state.active);
+      const stunCharge = tickStatus(u.stunCharge, state.active);
       let out =
         u.owner === next
-          ? { ...u, ap: apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          // recharge SES PA — sauf si elle est étourdie : ce tour-là, PA forcés à 0 (gel total).
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };
       if (block !== u.block) out = { ...out, block };
+      if (stun !== u.stun) out = { ...out, stun };
+      if (stunCharge !== u.stunCharge) out = { ...out, stunCharge };
       return out;
     }),
   };
