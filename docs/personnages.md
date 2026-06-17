@@ -55,6 +55,8 @@ Un héros **sans** le verbe ne peut pas l'utiliser (absence = capacité indispon
 
 ## 4. Concevoir la/les Résonance(s) signature
 
+> **Procédé détaillé + référence des clés → `docs/resonances.md`.** Ci-dessous, l'essentiel.
+
 Une Résonance = un `ReactionSpec` (donnée **pure**, sérialisable) :
 
 ```ts
