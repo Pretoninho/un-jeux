@@ -1045,6 +1045,44 @@ describe('combat — Résonance Mireille × Bastion (silence — déplacement un
   });
 });
 
+describe('combat — Résonance Mireille × Estoc (tir réplique sur la riposte)', () => {
+  const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'duelliste', hp: 9, maxHp: 9, damage: 2, riposte: { cost: 2 }, riposting: true, characterId: 'estoc', ...over });
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'rep', on: 'riposte', fromCharacter: 'estoc', scope: { squad: true },
+        cooldown: 3, kind: 'epines', amount: 1 }], cooldowns: {}, ...over });
+
+  it('quand la riposte d\'Estoc part, Mireille la soutient d\'1 dégât sur l\'attaquant', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'B' }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'e');
+    expect(unitById(s, 'e')!.hp).toBe(5);              // Estoc encaisse l'attaque (9 − 4)
+    expect(unitById(s, 'b')!.hp).toBe(7);              // riposte 2 + tir réplique 1 = 3 (10 − 3)
+    expect(unitById(s, 'm')!.cooldowns!.rep).toBe(3);
+  });
+
+  it('gâté à Estoc : la riposte d\'un autre Duelliste ne déclenche pas le soutien', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'B', characterId: 'fil' }), // pas Estoc
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'e'), 'b')!.hp).toBe(8); // riposte 2 seulement
+  });
+
+  it('pas de riposte (non armée) → aucun signal, pas de soutien', () => {
+    const base = makeCombatState(LINE, [
+      estoc({ id: 'e', owner: 'alice', hex: 'B', riposting: false }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'e'), 'b')!.hp).toBe(10);
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

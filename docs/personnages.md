@@ -117,6 +117,9 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `tir_reserve` — émis par `resolveOverwatch` quand le **Tir Réservé** d'un allié part (le Tireur).
 - `rale` — émis à la **mort** d'une pièce, par `reap` (retrait centralisé des morts). Porte un
   **snapshot** du défunt (`Signal.sourceUnit`) car il est déjà retiré du plateau. Entendu par son escouade.
+- `riposte` — émis dans `strike()` quand la **Riposte** d'une pièce part (le Duelliste contre). 1ᵉʳ
+  signal émis par une action de **Duelliste** → ouvre les duos « × Duelliste ». (Garde/Riposte exclusifs :
+  un coup émet au plus un de `garde_encaissee`/`riposte`.)
 - Ajouter un signal = un **lot moteur séparé** (type + point d'émission + tests), pas une donnée de perso.
 
 ### 4.2 Effets disponibles (`kind`, `applyReaction`)

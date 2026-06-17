@@ -30,7 +30,7 @@
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
   const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence' };
-  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
+  const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué', riposte: 'Riposte déclenchée' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
   const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃', silence: '🔇' };
   const HEROES = Object.values(CHARACTERS);

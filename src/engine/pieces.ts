@@ -158,6 +158,16 @@ const SILENCE_MIREILLE_BASTION: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'silence', duration: 2,
 };
 
+/**
+ * Résonance DUO « Mireille × Estoc » — 1ᵉʳ duo sur un signal de DUELLISTE. Quand la Riposte d'Estoc
+ * part (signal `riposte`), Mireille la **soutient d'un tir** : 1 dégât sur l'attaquant (réutilise
+ * `kind: 'epines'`). Portée escouade (Mireille tire de loin). Effet immédiat. CD 3 (= 2 tours pleins).
+ */
+const REPLIQUE_MIREILLE_ESTOC: ReactionSpec = {
+  id: 'replique_mireille_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 3, kind: 'epines', amount: 1,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -173,7 +183,7 @@ export interface Character {
  */
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
-  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION] },
+  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },

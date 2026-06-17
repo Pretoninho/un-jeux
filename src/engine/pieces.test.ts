@@ -128,6 +128,11 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'ralliement_fil_mireille', 'etourdir_fil_rempart', 'ruee_fil_orso']); // Fil × Bastion, × Mireille, × Rempart, × Orso
   });
 
+  it('Mireille (Tireuse) a ses Résonances de possesseur (silence + tir réplique)', () => {
+    const m = makeUnitFromCharacter('a2', 'alice', 'Z', CHARACTERS.mireille!, 4);
+    expect(m.reactions!.map((r) => r.id)).toEqual(['silence_mireille_bastion', 'replique_mireille_estoc']);
+  });
+
   it('un personnage à l\'archétype inconnu est rejeté', () => {
     expect(() => makeUnitFromCharacter('x', 'alice', 'Z', { id: 'x', name: 'X', archetype: 'nope' }, 4)).toThrow();
   });

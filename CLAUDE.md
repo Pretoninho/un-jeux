@@ -159,6 +159,11 @@
     « **Stun adouci** » (l'étourdissement gèle tout, le silence laisse marcher). Helper `isSilenced`
     branché dans `canAttack`/`canDefend`/`canReserve`/`canRiposte`/`resolveOverwatch`/`strike`(riposte)/
     `pendingReactions`/`resolveNemesis`.
+  - **Duo livré — *Mireille × Estoc*** (1ᵉʳ signal émis par un **DUELLISTE** → ouvre les duos « × Duelliste ») :
+    nouveau signal `riposte`, émis dans `strike()` quand la Riposte d'Estoc part ; Mireille la **soutient**
+    (`fromCharacter: 'estoc'`, escouade, CD 3) en infligeant **1 dégât** à l'attaquant (réutilise `kind:
+    'epines'` — pas de nouvel effet). Effet immédiat. Garde/Riposte exclusifs → `strike` émet au plus un
+    signal. **Mireille a ses 2 duos** (Bastion, Estoc).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

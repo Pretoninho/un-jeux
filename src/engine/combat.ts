@@ -50,7 +50,7 @@ export interface RiposteProfile {
  * vit dans l'effet : `amountBySource` module selon l'archétype de la SOURCE — on n'écrit que les
  * cellules utiles, jamais les N². Données PURES (sérialisables) ; le moteur dispatch sur `kind`.
  */
-export type SignalType = 'garde_encaissee' | 'tir_reserve' | 'rale';
+export type SignalType = 'garde_encaissee' | 'tir_reserve' | 'rale' | 'riposte';
 export interface Signal {
   type: SignalType;
   sourceId: string;    // la pièce alliée qui émet (Lourde en garde ; Tireur dont l'OW part ; défunt pour 'rale')
@@ -304,7 +304,9 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   });
   // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
   const tgt = units.find((u) => u.id === targetId)!;
+  let riposted = false;
   if (tgt.hp > 0 && tgt.riposting && !isSilenced(tgt) && graphDistance(state.map, tgt.hex, attacker.hex) <= tgt.range) {
+    riposted = true;
     const back = damageTaken(attacker, tgt.damage);
     units = units.map((u) => {
       if (u.id === targetId) return { ...u, riposting: false };
@@ -313,10 +315,14 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
     });
   }
   // On ne retire PAS les morts ici : `reap` centralise le retrait + l'émission du signal `rale`.
+  // Un même coup émet AU PLUS un signal : garde (la cible encaisse en garde) OU riposte (elle contre)
+  // — jamais les deux (Garde = Lourde, Riposte = Duelliste).
   const absorber = units.find((u) => u.id === targetId);
   const signal: Signal | null =
     absorber && absorber.hp > 0 && absorber.guarding && absorber.guard
       ? { type: 'garde_encaissee', sourceId: targetId, attackerId }
+      : riposted
+      ? { type: 'riposte', sourceId: targetId, attackerId }
       : null;
   return { state: { ...state, units }, signal };
 }
