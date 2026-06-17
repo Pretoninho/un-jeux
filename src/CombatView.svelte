@@ -31,6 +31,10 @@
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
   const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué' };
+  // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
+  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩' };
+  const HEROES = Object.values(CHARACTERS);
+  let showMatrix = $state(false);
 
   // États actifs d'une pièce (postures + statuts de Résonance) : une icône + une description chacun.
   // Servent à la fois les petites icônes SUR la pièce et le tooltip au survol (`<title>` natif).
@@ -542,6 +546,46 @@
     </aside>
   </div>
 
+  <div class="matrixbar">
+    <button class="matrix-toggle" class:on={showMatrix} onclick={() => (showMatrix = !showMatrix)}>
+      ✦ Matrice de Résonance {showMatrix ? '▲' : '▼'}
+    </button>
+    {#if showMatrix}
+      <div class="matrix-panel">
+        <p class="muted small">Lignes = <b>qui réagit</b> (possesseur) · Colonnes = <b>qui déclenche</b> (partenaire). Une cellule = un duo. Survole pour le détail.</p>
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th class="corner">réagit ↓ / déclenché par →</th>
+              {#each HEROES as col}
+                <th title={KIND_NAME[col.archetype]}>{col.name}<span class="mk">{KIND_GLYPH[col.archetype]}</span></th>
+              {/each}
+            </tr>
+          </thead>
+          <tbody>
+            {#each HEROES as row}
+              <tr>
+                <th class="rowhead" title={KIND_NAME[row.archetype]}><span class="mk">{KIND_GLYPH[row.archetype]}</span> {row.name}</th>
+                {#each HEROES as col}
+                  {@const duo = row.id === col.id ? undefined : row.reactions?.find((r) => r.fromCharacter === col.id)}
+                  <td class:self={row.id === col.id} class:has={!!duo}>
+                    {#if row.id === col.id}<span class="diag">·</span>
+                    {:else if duo}<span class="cell" title={`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}>{EFFECT_ICON[duo.kind] ?? '✦'}</span>{/if}
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <div class="matrix-legend small muted">
+          {#each Object.entries(EFFECT_ICON) as [kind, icon]}
+            <span><b>{icon}</b> {RESON_LABEL[kind] ?? kind}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  </div>
+
   <div class="hint muted small">
     {#if over}
       Clique <b>Revanche</b> ou change de plateau pour rejouer.
@@ -656,4 +700,22 @@
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
   .hint { padding: 0 .2rem; }
+
+  /* Matrice de Résonance (panneau dépliable, pleine largeur) */
+  .matrixbar { margin: .6rem .2rem 0; }
+  .matrix-toggle { background: #2c2640; color: #cbb6ec; border: 1px solid #3a3356; border-radius: 6px; padding: .35rem .7rem; font-size: .82rem; font-weight: 700; cursor: pointer; }
+  .matrix-toggle.on, .matrix-toggle:hover { background: #3a3356; }
+  .matrix-panel { margin-top: .5rem; padding: .6rem; background: #15171f; border: 1px solid #272c37; border-radius: 8px; overflow-x: auto; }
+  .matrix-panel p { margin: 0 0 .5rem; }
+  table.matrix { border-collapse: collapse; font-size: .8rem; }
+  table.matrix th, table.matrix td { border: 1px solid #272c37; padding: .25rem .4rem; text-align: center; }
+  table.matrix .corner { color: #7a8294; font-weight: 400; font-size: .68rem; text-align: right; }
+  table.matrix thead th { color: #cdd3df; white-space: nowrap; }
+  table.matrix .rowhead { color: #cdd3df; text-align: left; white-space: nowrap; }
+  table.matrix .mk { color: #8a93a6; font-size: .72rem; }
+  table.matrix td.self { background: #0e1015; }
+  table.matrix td.has { background: #221d33; }
+  table.matrix .cell { font-size: 1rem; cursor: help; }
+  table.matrix .diag { color: #3a4150; }
+  .matrix-legend { display: flex; flex-wrap: wrap; gap: .2rem 1rem; margin-top: .5rem; }
 </style>
