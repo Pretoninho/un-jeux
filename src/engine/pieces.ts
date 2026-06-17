@@ -137,6 +137,16 @@ const ETOURDIR_FIL_REMPART: ReactionSpec = {
   scope: { radius: 2 }, cooldown: 3, kind: 'etourdir', amount: 1, duration: 3,
 };
 
+/**
+ * Résonance DUO « Fil × Orso » — INVERSE de la Provocation (Estoc × Orso) : quand le Tir Réservé
+ * d'Orso part, **Fil avance d'1 case VERS la cible** touchée (gap-closer, déplacement forcé de soi).
+ * Portée escouade. CD 2 (= 1 tour plein réel). CD posé même si Fil ne peut pas avancer.
+ */
+const RUEE_FIL_ORSO: ReactionSpec = {
+  id: 'ruee_fil_orso', on: 'tir_reserve', fromCharacter: 'orso',
+  scope: { squad: true }, cooldown: 2, kind: 'ruee', amount: 1,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -156,7 +166,7 @@ export const CHARACTERS: Record<string, Character> = {
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
-  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART] },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

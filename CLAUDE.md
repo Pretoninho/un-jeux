@@ -148,6 +148,10 @@
     (`pendingReactions` ignore les étourdis). Effet **à deux temps** : `Unit.stunCharge` (sur Rempart,
     `expiresIn 3`, consommée à l'attaque) → `Unit.stun` (sur la cible). `amount` = durée du stun,
     `duration` = persistance de la charge.
+  - **Duo livré — *Fil × Orso*** (INVERSE de Estoc × Orso) : quand le Tir Réservé d'Orso part
+    (`tir_reserve`, `fromCharacter: 'orso'`, escouade), **Fil avance d'1 case VERS la cible** touchée
+    (`kind: 'ruee'`, gap-closer). CD 2. `provocation` (cible→possesseur) et `ruee` (possesseur→cible)
+    partagent le helper `stepToward`. **Fil a ses 4 duos** (Bastion, Mireille, Rempart, Orso).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

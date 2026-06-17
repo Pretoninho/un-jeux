@@ -129,8 +129,10 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
   cible (les attaques ne sont pas touchées), pendant `duration` de SES tours. Appliqué via
   `moveBudget()` (= `ap − cripple`), décompté dans `endTurn()`.
 - `provocation` — **déplacement forcé** (instantané) : tire la cible d'1 case VERS le possesseur
-  (voisin libre le plus proche, départage déterministe). Agnostique à la forme (`neighbors` +
-  `graphDistance`). Ne redéclenche pas l'overwatch ; CD posé même si aucune case n'est libre.
+  (helper `stepToward`, voisin libre le plus proche, déterministe). Agnostique à la forme. Ne
+  redéclenche pas l'overwatch ; CD posé même si aucune case n'est libre.
+- `ruee` — **inverse de `provocation`** : le POSSESSEUR avance d'1 case VERS la cible (même
+  `stepToward`, rôles inversés). Gap-closer ; mêmes garde-fous.
 - `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
   l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
   consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).

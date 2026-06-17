@@ -851,6 +851,51 @@ describe('combat — Résonance Fil × Rempart (coup étourdissant → stun)', (
   });
 });
 
+describe('combat — Résonance Fil × Orso (ruée — inverse de la provocation)', () => {
+  const orso = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ overwatch: { cost: 3 }, range: 4, damage: 2, characterId: 'orso', ...over });
+  const fil = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'ru', on: 'tir_reserve', fromCharacter: 'orso', scope: { squad: true },
+        cooldown: 2, kind: 'ruee', amount: 1 }], cooldowns: {}, ...over });
+
+  it('le tir réservé d\'Orso fait avancer Fil d\'1 case vers la cible (et pose le CD)', () => {
+    const base = makeCombatState(LINE, [
+      fil({ id: 'f', owner: 'alice', hex: 'A', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'D', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b'); // bob D→C (dist 2 ≤ portée 4) → tir
+    expect(unitById(s, 'b')!.hp).toBe(8);                         // 10 − 2 (tir d'Orso)
+    expect(unitById(s, 'f')!.hex).toBe('B');                      // Fil avance de A vers la cible (C)
+    expect(unitById(s, 'f')!.cooldowns!.ru).toBe(2);
+  });
+
+  it('gâté à Orso : un tir d\'un autre tireur ne déclenche pas la ruée', () => {
+    const base = makeCombatState(LINE, [
+      fil({ id: 'f', owner: 'alice', hex: 'A', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4, characterId: 'mireille' }),
+      u({ id: 'b', owner: 'bob', hex: 'D', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b');
+    expect(unitById(s, 'f')!.hex).toBe('A');                      // pas d'avancée
+    expect(unitById(s, 'f')!.cooldowns!.ru ?? 0).toBe(0);
+  });
+
+  it('Fil déjà au contact de la cible : pas d\'avancée mais CD posé quand même', () => {
+    const base = makeCombatState(LINE, [
+      fil({ id: 'f', owner: 'alice', hex: 'B', ap: 4 }),           // adjacent à la case d'arrivée C
+      orso({ id: 'o', owner: 'alice', hex: 'E', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'D', ap: 4, hp: 10 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'o'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'b', 'C'), 'b');
+    expect(unitById(s, 'f')!.hex).toBe('B');                      // aucune case plus proche libre
+    expect(unitById(s, 'f')!.cooldowns!.ru).toBe(2);              // CD posé malgré tout
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [
