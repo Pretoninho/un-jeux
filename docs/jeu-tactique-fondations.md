@@ -5,9 +5,8 @@
 > en gardant délibérément les grandes portes ouvertes.
 >
 > Cadre : on vise un jeu **tour par tour tactique** (inspiration du *gameplay* de Divinity:
-> Original Sin — points d'action, positionnement — **sans le copier**), à **fusionner** plus
-> tard avec l'économie territoriale existante. Les **éléments / surfaces sont mis de côté**
-> pour l'instant. On ne s'occupe que des **règles de base**.
+> Original Sin — points d'action, positionnement — **sans le copier**). Les **éléments / surfaces
+> sont mis de côté** pour l'instant. On ne s'occupe que des **règles de base**.
 
 ---
 
@@ -22,7 +21,7 @@ Into the Breach, Divinity) tient sur **4 atomes + 1** :
 4. **Un verbe qui change l'état** d'une autre pièce ou du plateau (sans conséquence, pas de jeu).
 5. **Une condition de victoire** atteignable en quelques tours.
 
-Tout le reste — héros, classes, compétences, éléments, économie, étiquette « MOBA » — est
+Tout le reste — héros, classes, compétences, éléments/surfaces, étiquette « MOBA » — est
 du **contenu posé sur ces 5 atomes**. Si les 5 atomes ne sont pas amusants, aucun contenu
 ne les sauvera.
 
@@ -77,8 +76,7 @@ des coups ? »*
 Chaque ajout justifié par une question soulevée par la version précédente :
 2. **2ᵉ pièce par camp** → focus-fire, formations, « qui je bouge en premier ».
 3. **2ᵉ verbe** (un choix : frapper *ou* préparer/défendre) → l'arbitrage devient riche.
-4. … seulement après : compétences, puis éléments/surfaces, puis l'accroche économie/
-   territoire, puis l'habillage MOBA.
+4. … seulement après : compétences, puis éléments/surfaces, puis l'habillage MOBA.
 
 ---
 

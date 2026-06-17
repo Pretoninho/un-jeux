@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "4X économique atemporel — allocateur de capital. MVP web.",
+  "description": "Jeu de combat tactique tour par tour (hotseat local) — échecs + Divinity. Web statique.",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

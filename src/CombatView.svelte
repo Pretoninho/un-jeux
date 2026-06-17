@@ -71,7 +71,7 @@
         };
       });
     } else {
-      const hb = makeBoard(RADIUS, 6, 0, 0);
+      const hb = makeBoard(RADIUS);
       map = hb.map; corners = hb.corners;
       tiles = hb.map.hexes.map((h) => {
         const [cx, cy] = axialToPixel(h.coord!.q, h.coord!.r);

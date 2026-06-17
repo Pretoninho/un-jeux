@@ -1,6 +1,5 @@
 <script lang="ts">
-  // Coquille de l'appli. Front de dev courant = le NOYAU TACTIQUE (déplacement).
-  // La vue économique (GameView) reste dans le repo, en attente de FUSION avec le combat.
+  // Coquille de l'appli : elle monte le jeu — le combat tactique (CombatView).
   import CombatView from './CombatView.svelte';
 </script>
 
