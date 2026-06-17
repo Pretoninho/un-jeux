@@ -136,6 +136,7 @@ export interface Unit {
   block?: { owner: string; expiresIn: number }; // immunité TOTALE aux dégâts, bornée (ex. Fil × Mireille)
   stunCharge?: { owner: string; expiresIn: number; stun: number }; // « Coup étourdissant » armé : SA prochaine attaque étourdit `stun` tour(s) (ex. Fil × Rempart)
   stun?: { owner: string; expiresIn: number };  // étourdi : PA forcés à 0 + Résonances silencées tant qu'actif
+  lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (Némésis, primes…)
 }
 
 export interface CombatState {
@@ -287,7 +288,10 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
     if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, ...(attacker.vendetta ? { vendetta: undefined } : {}), ...(stunning ? { stunCharge: undefined } : {}) };
-    if (u.id === targetId) return { ...u, hp: u.hp - damageTaken(u, raw), ...(marked ? { mark: undefined } : {}), ...(stunning ? { stun: { owner: u.owner, expiresIn: stunning.stun } } : {}) };
+    if (u.id === targetId) {
+      const dealt = damageTaken(u, raw);
+      return { ...u, hp: u.hp - dealt, ...(marked ? { mark: undefined } : {}), ...(stunning ? { stun: { owner: u.owner, expiresIn: stunning.stun } } : {}), ...(dealt > 0 ? { lastHitBy: attackerId } : {}) };
+    }
     return u;
   });
   // 2) La riposte : seulement si la cible survit, était armée, et l'attaquant est à sa portée.
@@ -296,7 +300,7 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
     const back = damageTaken(attacker, tgt.damage);
     units = units.map((u) => {
       if (u.id === targetId) return { ...u, riposting: false };
-      if (u.id === attackerId) return { ...u, hp: u.hp - back };
+      if (u.id === attackerId) return { ...u, hp: u.hp - back, ...(back > 0 ? { lastHitBy: targetId } : {}) };
       return u;
     });
   }
@@ -428,7 +432,7 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       const dmg = target ? damageTaken(target, p.amount) : 0;
       const units = state.units.map((u) => {
         if (u.id === p.listenerId) return arm(u);
-        if (target && u.id === p.targetId) return { ...u, hp: u.hp - dmg };
+        if (target && u.id === p.targetId) return { ...u, hp: u.hp - dmg, ...(dmg > 0 ? { lastHitBy: p.listenerId } : {}) };
         return u;
       });
       return { ...state, units };
@@ -602,7 +606,7 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
     const dmg = damageTaken(mover, watcher.damage);
     const units = s.units.map((u) => {
       if (u.id === watcher.id) return { ...u, watching: false };
-      if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg };
+      if (u.id === movedUnitId) return { ...u, hp: u.hp - dmg, ...(dmg > 0 ? { lastHitBy: watcher.id } : {}) };
       return u;
     });
     s = reap({ ...s, units }); // retire le mover s'il meurt (+ signal `rale`)

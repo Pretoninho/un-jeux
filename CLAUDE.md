@@ -170,8 +170,11 @@
     Donc **lot FONDATEUR**, pas un simple duo.
   - **Décidé** : (1) kill = derniers dégâts ; (2) Némésis = automatique (même archétype). **AJOURNÉ** :
     l'**effet** (buff permanent ? one-shot ? thématique par couple), et **dirigé vs réciproque**
-    (comme les duos). Méthode proposée : commencer petit — poser `lastHitBy` + **1** effet (ex.
-    Estoc tue Fil) — puis généraliser.
+    (comme les duos). Méthode : commencer petit — poser `lastHitBy` + **1** effet (ex. Estoc tue Fil) — puis généraliser.
+  - **Lot 1 LIVRÉ (2026-06-17) — `Unit.lastHitBy`** : posé à CHAQUE point de dégât réel (>0) — `strike`
+    (coup + riposte), `resolveOverwatch`, réaction `epines`. Au décès, le tueur = `lastHitBy` (porté par le
+    snapshot `rale`). Pur, sans incidence en jeu ; brique réutilisable « à l'élimination ». **Lot 2 (déclencheur
+    Némésis + 1ᵉʳ effet) EN ATTENTE** : chemin dédié dans `reap` (vise le tueur si même archétype) + design de l'effet.
 - **REVUE DE CONCEPTION — points retenus (2026-06-16)** : forces du système = fort effet de levier
   (on n'écrit que les cellules utiles), profondeur de draft (synergies mutuellement exclusives →
   « pas d'escouade strictement meilleure »), couches nettes (`kind`/`ReactionSpec`/roster). Points

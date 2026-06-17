@@ -896,6 +896,55 @@ describe('combat — Résonance Fil × Orso (ruée — inverse de la provocation
   });
 });
 
+describe('combat — attribution du kill (lastHitBy, fondation Némésis)', () => {
+  it('une attaque marque la cible comme touchée par l\'attaquant', () => {
+    const s = attack(fresh('A', 'B', 4), 'a', 'b');
+    expect(unitById(s, 'b')!.lastHitBy).toBe('a');
+  });
+
+  it('la riposte marque l\'attaquant comme touché par le riposteur', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4, hp: 10 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4, riposting: true, riposte: { cost: 2 } }),
+    ], 'alice');
+    const s = attack(base, 'a', 'b');
+    expect(unitById(s, 'b')!.lastHitBy).toBe('a'); // coup principal
+    expect(unitById(s, 'a')!.lastHitBy).toBe('b'); // riposte
+  });
+
+  it('le tir réservé marque la cible comme touchée par le guetteur', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'w', owner: 'alice', hex: 'A', overwatch: { cost: 3 }, range: 4, damage: 2, ap: 4 }),
+      u({ id: 'm', owner: 'bob', hex: 'E', ap: 4, hp: 7 }),
+    ], 'alice');
+    const bobTurn = endTurn(reserve(base, 'w'), 4);
+    const s = resolveOverwatch(moveUnit(bobTurn, 'm', 'C'), 'm');
+    expect(unitById(s, 'm')!.lastHitBy).toBe('w');
+  });
+
+  it('une réaction qui blesse (épines) compte comme les derniers dégâts', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16 }),
+      u({ id: 'c', owner: 'alice', hex: 'A', hp: 10,
+         reactions: [{ id: 'ep', on: 'garde_encaissee', scope: { radius: 2 }, cooldown: 2, kind: 'epines', amount: 3 }], cooldowns: {} }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'a');
+    expect(unitById(s, 'b')!.lastHitBy).toBe('c'); // pincé par l'épines de 'c' après son coup
+    expect(unitById(s, 'a')!.lastHitBy).toBe('b'); // le tank a été touché par 'b'
+  });
+
+  it('un coup sans dégâts (bloqué) ne change pas lastHitBy', () => {
+    const base = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10, block: { owner: 'bob', expiresIn: 2 }, lastHitBy: 'x' }),
+    ], 'alice');
+    const s = attack(base, 'a', 'b');
+    expect(unitById(s, 'b')!.hp).toBe(10);          // immunité : 0 dégât
+    expect(unitById(s, 'b')!.lastHitBy).toBe('x');  // inchangé
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [
