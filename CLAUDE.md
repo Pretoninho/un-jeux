@@ -173,8 +173,17 @@
     (comme les duos). Méthode : commencer petit — poser `lastHitBy` + **1** effet (ex. Estoc tue Fil) — puis généraliser.
   - **Lot 1 LIVRÉ (2026-06-17) — `Unit.lastHitBy`** : posé à CHAQUE point de dégât réel (>0) — `strike`
     (coup + riposte), `resolveOverwatch`, réaction `epines`. Au décès, le tueur = `lastHitBy` (porté par le
-    snapshot `rale`). Pur, sans incidence en jeu ; brique réutilisable « à l'élimination ». **Lot 2 (déclencheur
-    Némésis + 1ᵉʳ effet) EN ATTENTE** : chemin dédié dans `reap` (vise le tueur si même archétype) + design de l'effet.
+    snapshot `rale`). Pur, sans incidence en jeu ; brique réutilisable « à l'élimination ».
+  - **Lot 2 LIVRÉ (2026-06-17) — déclencheur Némésis + effet ÉLAN** : `resolveNemesis` dans `reap` (à
+    côté de `rale`) — si le tueur (`lastHitBy`) est du **même archétype** ennemi → l'**ÉQUIPE** du tueur
+    gagne `Unit.elan` = **bonus de PA au PROCHAIN tour** (consommé au rechargement dans `endTurn`).
+    **Échelle sur la robustesse du tué** : `bonus = max(1, round(maxHp/8))` → Tireur(7)/Duelliste(9) **+1**,
+    Lourde(16) **+2** (réutilise l'axe portée+robustesse=5 ; future-proof pour stats sur-mesure). **Durée 1
+    tour** (pic d'élan, anti-snowball). **CD 2** sur le tueur (`cooldowns.nemesis`, cosmétique tant que mort
+    unique mais **revival-ready** : anti-farm). UI : badge `⚡ Élan`. **Calibrage : effet UNIFORME** (PA),
+    seule la magnitude varie ; faire varier l'**effet par archétype tué** = enrichissement futur (quand un
+    mode de jeu existera pour l'ancrer). **RÉSURRECTION non construite** (design déjà res-safe : temporaire
+    + échelonné) ; **question ouverte notée** : re-tuer son Némésis re-déclenche-t-il ? (le CD laisse le choix).
 - **REVUE DE CONCEPTION — points retenus (2026-06-16)** : forces du système = fort effet de levier
   (on n'écrit que les cellules utiles), profondeur de draft (synergies mutuellement exclusives →
   « pas d'escouade strictement meilleure »), couches nettes (`kind`/`ReactionSpec`/roster). Points

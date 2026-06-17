@@ -137,6 +137,7 @@ export interface Unit {
   stunCharge?: { owner: string; expiresIn: number; stun: number }; // « Coup étourdissant » armé : SA prochaine attaque étourdit `stun` tour(s) (ex. Fil × Rempart)
   stun?: { owner: string; expiresIn: number };  // étourdi : PA forcés à 0 + Résonances silencées tant qu'actif
   lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (Némésis, primes…)
+  elan?: number;                       // bonus de PA en attente, appliqué au PROCHAIN rechargement (récompense Némésis)
 }
 
 export interface CombatState {
@@ -357,9 +358,32 @@ function reap(state: CombatState): CombatState {
     const dead = s.units.filter((u) => u.hp <= 0);
     if (!dead.length) return s;
     s = { ...s, units: s.units.filter((u) => u.hp > 0) };
-    for (const d of dead) s = resolveReactions(s, { type: 'rale', sourceId: d.id, sourceUnit: d });
+    for (const d of dead) {
+      s = resolveReactions(s, { type: 'rale', sourceId: d.id, sourceUnit: d }); // Résonances ALLIÉES (synergie)
+      s = resolveNemesis(s, d);                                                 // récompense NÉMÉSIS (vise le tueur)
+    }
   }
   return s;
+}
+
+const NEMESIS_CD = 2; // cooldown de la récompense Némésis (revival-ready : anti-farm quand la résurrection arrivera)
+
+/**
+ * NÉMÉSIS — sens *antagoniste* de la Résonance. Si le défunt `dead` a été achevé par son Némésis —
+ * un ENNEMI du MÊME archétype (`lastHitBy`) —, l'ÉQUIPE du tueur gagne un **élan** (bonus de PA au
+ * prochain tour), échelonné sur la robustesse du tué (`maxHp`). CD sur le tueur. Némésis = automatique.
+ */
+function resolveNemesis(state: CombatState, dead: Unit): CombatState {
+  const killer = dead.lastHitBy ? unitById(state, dead.lastHitBy) : undefined;
+  if (!killer || killer.kind !== dead.kind || killer.owner === dead.owner) return state; // pas son Némésis
+  if ((killer.cooldowns?.['nemesis'] ?? 0) > 0) return state;                              // récompense en CD
+  const bonus = Math.max(1, Math.round(dead.maxHp / 8)); // Lourde 16→+2, Duelliste 9→+1, Tireur 7→+1
+  const units = state.units.map((u) => {
+    if (u.id === killer.id) return { ...u, elan: (u.elan ?? 0) + bonus, cooldowns: { ...(u.cooldowns ?? {}), nemesis: NEMESIS_CD } };
+    if (u.owner === killer.owner) return { ...u, elan: (u.elan ?? 0) + bonus }; // toute l'escouade
+    return u;
+  });
+  return { ...state, units };
 }
 
 function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): boolean {
@@ -687,8 +711,8 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const stunCharge = tickStatus(u.stunCharge, state.active);
       let out =
         u.owner === next
-          // recharge SES PA — sauf si elle est étourdie : ce tour-là, PA forcés à 0 (gel total).
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          // recharge SES PA (+ élan Némésis éventuel, consommé) — sauf si étourdie : PA forcés à 0 (gel).
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0), elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };

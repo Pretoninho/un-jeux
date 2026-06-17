@@ -49,6 +49,7 @@
     if (u.vendetta) s.push({ icon: '⚔', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
     if (u.stunCharge) s.push({ icon: '💫', label: `Coup étourdissant armé — sa prochaine attaque étourdit (${u.stunCharge.expiresIn} t.)` });
     if (u.stun) s.push({ icon: '😵', label: `Étourdi — ne peut rien faire ce tour` });
+    if (u.elan) s.push({ icon: '⚡', label: `Élan (Némésis) — +${u.elan} PA au prochain tour` });
     return s;
   }
   function pieceTitle(u: Unit): string {
@@ -490,6 +491,9 @@
           {#if selected.stun}
             <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
           {/if}
+          {#if selected.elan}
+            <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{selected.elan} PA au prochain tour</span></div>
+          {/if}
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
             {#if selected.guard}
@@ -541,6 +545,9 @@
           {/if}
           {#if foe.stun}
             <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
+          {/if}
+          {#if foe.elan}
+            <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{foe.elan} PA au prochain tour</span></div>
           {/if}
           {@render reson(foe, resonFoe, () => (resonFoe = !resonFoe))}
           {#if chainPreview.length}
@@ -699,6 +706,7 @@
   .tag.b { background: #20303a; color: #a0d8ff; }
   .tag.s { background: #3a3320; color: #ffd98a; }
   .tag.k { background: #3a2030; color: #ffaecb; }
+  .tag.e { background: #2a3320; color: #d6ffa0; }
   .pacts { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; flex-wrap: wrap; }
   .pempty { color: #7a8294; font-size: .82rem; padding: .6rem 0; }
   .attack { background: #2a1a1e; border: 1px solid #7a3c44; color: #ffb0a0; border-radius: 5px; padding: .45rem .9rem; cursor: pointer; font-weight: 600; font-size: .85rem; }
