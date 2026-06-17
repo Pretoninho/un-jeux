@@ -141,6 +141,8 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
 - `silence` — **« stun adouci »** : pose `Unit.silence` sur la cible → elle ne peut QUE se déplacer.
   Bloque attaque (`canAttack`), verbes (`canDefend/canReserve/canRiposte` + tir réflexe + riposte),
   Résonances (`pendingReactions` l'ignore) et l'élan Némésis (`resolveNemesis`). Lu via `isSilenced`.
+- `couverture` — **soutien-soi persistant** : pose `Unit.cover` sur le possesseur → +`amount` PA à
+  chaque rechargement pendant `duration` tours (lu dans `endTurn`, comme `elan` mais sur plusieurs tours).
 - `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
   l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
   consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).

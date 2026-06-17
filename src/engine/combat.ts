@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -139,6 +139,7 @@ export interface Unit {
   lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (Némésis, primes…)
   elan?: number;                       // bonus de PA en attente, appliqué au PROCHAIN rechargement (récompense Némésis)
   silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance, ni élan)
+  cover?: { owner: string; expiresIn: number; amount: number }; // « couverture » : +amount PA à chaque rechargement, borné (ex. Mireille × Rempart)
 }
 
 export interface CombatState {
@@ -511,6 +512,13 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       });
       return { ...state, units };
     }
+    case 'couverture': { // SOUTIEN-SOI : le possesseur gagne +amount PA à chaque tour pendant `duration` tours
+      const listener = unitById(state, p.listenerId);
+      if (!listener) return state;
+      const units = state.units.map((u) =>
+        u.id === p.listenerId ? { ...arm(u), cover: { owner: listener.owner, expiresIn: p.spec.duration ?? 2, amount: p.amount } } : u);
+      return { ...state, units };
+    }
     case 'etourdir': { // SOUTIEN : arme l'allié SOURCE (ex. Rempart) → sa prochaine attaque étourdit `amount` tour(s)
       const source = unitById(state, p.sourceId);
       if (!source) return state;
@@ -737,10 +745,11 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const stun = tickStatus(u.stun, state.active);
       const stunCharge = tickStatus(u.stunCharge, state.active);
       const silence = tickStatus(u.silence, state.active);
+      const cover = tickStatus(u.cover, state.active);
       let out =
         u.owner === next
-          // recharge SES PA (+ élan Némésis éventuel, consommé) — sauf si étourdie : PA forcés à 0 (gel).
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0), elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };
@@ -748,6 +757,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (stun !== u.stun) out = { ...out, stun };
       if (stunCharge !== u.stunCharge) out = { ...out, stunCharge };
       if (silence !== u.silence) out = { ...out, silence };
+      if (cover !== u.cover) out = { ...out, cover };
       return out;
     }),
   };

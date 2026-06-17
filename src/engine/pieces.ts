@@ -168,6 +168,16 @@ const REPLIQUE_MIREILLE_ESTOC: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'epines', amount: 1,
 };
 
+/**
+ * Résonance DUO « Mireille × Rempart » — quand Rempart (en garde) encaisse, Mireille entre en
+ * COUVERTURE : +1 PA à chaque tour pendant 2 tours (soutien-soi, statut `Unit.cover` lu au
+ * rechargement). « Le tank tient → Mireille opère plus librement. » Portée escouade. CD 3.
+ */
+const COUVERTURE_MIREILLE_REMPART: ReactionSpec = {
+  id: 'couverture_mireille_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { squad: true }, cooldown: 3, kind: 'couverture', amount: 1, duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -183,7 +193,7 @@ export interface Character {
  */
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
-  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC] },
+  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },

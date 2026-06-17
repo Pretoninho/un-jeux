@@ -1083,6 +1083,48 @@ describe('combat — Résonance Mireille × Estoc (tir réplique sur la riposte)
   });
 });
 
+describe('combat — Résonance Mireille × Rempart (couverture — +PA persistant)', () => {
+  const rempart = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'rempart', ...over });
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'cov', on: 'garde_encaissee', fromCharacter: 'rempart', scope: { squad: true },
+        cooldown: 3, kind: 'couverture', amount: 1, duration: 2 }], cooldowns: {}, ...over });
+
+  it('Rempart encaisse → Mireille reçoit la Couverture (+ CD)', () => {
+    const base = makeCombatState(LINE, [
+      rempart({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'r');
+    expect(unitById(s, 'm')!.cover).toMatchObject({ owner: 'alice', expiresIn: 2, amount: 1 });
+    expect(unitById(s, 'm')!.cooldowns!.cov).toBe(3);
+  });
+
+  it('la Couverture donne +1 PA au rechargement, 2 tours, puis se dissipe', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'm', owner: 'alice', hex: 'A', ap: 0, cover: { owner: 'alice', expiresIn: 2, amount: 1 } }),
+      u({ id: 'b', owner: 'bob', hex: 'E' }),
+    ], 'bob');
+    const t1 = endTurn(st, 4);                       // → alice : 4 + 1 = 5
+    expect(unitById(t1, 'm')!.ap).toBe(5);
+    const t2 = endTurn(endTurn(t1, 4), 4);           // → alice (2ᵉ tour couvert) : encore 5
+    expect(unitById(t2, 'm')!.ap).toBe(5);
+    const t3 = endTurn(endTurn(t2, 4), 4);           // → alice : couverture tombée
+    expect(unitById(t3, 'm')!.ap).toBe(4);
+    expect(unitById(t3, 'm')!.cover).toBeUndefined();
+  });
+
+  it('gâté à Rempart : un autre tank en garde ne couvre pas Mireille', () => {
+    const base = makeCombatState(LINE, [
+      rempart({ id: 'r', owner: 'alice', hex: 'B', ap: 4, characterId: 'bastion' }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'r'), 'm')!.cover).toBeUndefined();
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

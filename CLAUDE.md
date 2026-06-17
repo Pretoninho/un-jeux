@@ -164,7 +164,11 @@
     nouveau signal `riposte`, émis dans `strike()` quand la Riposte d'Estoc part ; Mireille la **soutient**
     (`fromCharacter: 'estoc'`, escouade, CD 3) en infligeant **1 dégât** à l'attaquant (réutilise `kind:
     'epines'` — pas de nouvel effet). Effet immédiat. Garde/Riposte exclusifs → `strike` émet au plus un
-    signal. **Mireille a ses 2 duos** (Bastion, Estoc).
+    signal.
+  - **Duo livré — *Mireille × Rempart*** : quand Rempart (en garde) encaisse, Mireille entre en
+    **COUVERTURE** (`kind: 'couverture'`, `fromCharacter: 'rempart'`, escouade, CD 3, `duration: 2`) :
+    **+1 PA à chaque tour pendant 2 tours** (soutien-soi, statut `Unit.cover` lu au rechargement dans
+    `endTurn`, comme `elan` mais persistant). **Mireille a ses 3 duos** (Bastion, Estoc, Rempart).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
