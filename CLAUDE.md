@@ -135,6 +135,24 @@
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
   (`allie_a_terre`, `pres_de_mourir`…), nouvelles cellules sur pièces existantes, nouveaux
   effets `kind`, puis **spécialistes** (Soigneur/Hallebardier/Saboteur) « nés résonants ».
+- **REVUE DE CONCEPTION — points retenus (2026-06-16)** : forces du système = fort effet de levier
+  (on n'écrit que les cellules utiles), profondeur de draft (synergies mutuellement exclusives →
+  « pas d'escouade strictement meilleure »), couches nettes (`kind`/`ReactionSpec`/roster). Points
+  de vigilance et décisions associées :
+  1. **Signaux = vrai facteur limitant.** Un duo n'existe que si une **action** émet un signal
+     (aujourd'hui 2 : `garde_encaissee`, `tir_reserve`). Élargir le vocabulaire est une **décision
+     active** à chaque nouveau type de déclencheur (riposte, double-frappe, soin, allié à terre…),
+     pas un sous-produit gratuit du façonnage. *Contexte* : concentration tank/tireur actuelle =
+     on n'a fait que les 2 duellistes pour l'instant.
+  2. **Équilibrage par PLAYTEST**, au niveau **matchup/draft** (héros uniques fieldés une fois →
+     asymétrie structurelle assumée). Pas d'équilibrage cellule par cellule en amont ; le test est
+     indispensable, pas optionnel.
+  3. **Lisibilité — lot UI identifié (à faire)** : afficher les **états directement sur la pièce du
+     plateau** + **tooltip au survol** décrivant l'état (pas seulement dans les panneaux latéraux).
+  4. **État caché OK si affichage parlant** (précédent Divinity assumé).
+  5. **« Duo » = arête DIRIGÉE** aujourd'hui (le possesseur réagit au signal du partenaire). La
+     **réciprocité émerge** en remplissant les deux sens de la matrice → cap : matrice dense quand
+     tous les héros auront toutes leurs Résonances.
 
 ## Déploiement (en ligne)
 - **URL publique : https://pretoninho.github.io/un-jeux/** — hébergement **statique**
