@@ -359,6 +359,32 @@
 - Le **conteneur cloud** où tourne l'assistant est éphémère et sans réseau entrant : il ne
   peut PAS servir de lien de preview. Le site publié ne dépend pas de lui.
 
+## Structure du site — landing + pages (orientation, à faire plus tard)
+- **GitHub Pages n'est PAS bloquant** pour un site bien structuré (landing + plusieurs pages) :
+  un site multi-pages = des fichiers **statiques**, exactement ce que Pages sert. Ce que Pages
+  interdit, c'est le **code serveur à la requête** (SSR dynamique, BDD, auth, API) — mais une
+  landing + des pages de contenu n'en ont pas besoin : tout se **pré-rend** en HTML à la build.
+- **Contraintes Pages à garder en tête** : (1) tout statique → pas de backend (le multi réseau,
+  lui, en aura un — cf. section Multijoueur ; indépendant de la structure) ; (2) sous-chemin
+  **`/un-jeux/`** (project page) → liens/routeur doivent en tenir compte (un **domaine perso**
+  via `CNAME` supprime le préfixe) ; (3) **deep-links** : un routing **client `history`** (URLs
+  propres) renvoie un 404 à l'accès direct → astuce `404.html → index.html` ; les approches
+  **pré-rendues** ou **multi-HTML** n'ont pas ce souci.
+- **3 options** (stack actuelle : Vite + Svelte 5, une seule `index.html`, **pas** de routeur) :
+  - **A — Vite multi-pages (MPA)** : plusieurs `.html` en entrée (`index.html` = landing,
+    `jeu.html` = le jeu, `about.html`…) via `rollupOptions.input`. **Effort faible**, `CombatView`
+    et le moteur intacts, zéro routeur, workflow inchangé. → pour **« landing + 2-3 pages »**.
+  - **B — Routeur client** dans le SPA actuel (hash-routing pour éviter le 404). Effort faible/moyen,
+    1 seule app mais **pas de pré-rendu** (SEO landing plus faible).
+  - **C — Migrer vers SvelteKit + `adapter-static`** : routing par fichiers, **pré-rendu** (HTML
+    par page), layout/nav partagés. **Effort moyen**, 100 % statique → Pages OK. Le **moteur TS pur**
+    se porte tel quel, `CombatView` devient une route (`/jeu`), les `docs/*.md` peuvent alimenter des
+    pages. → pour un **site qui s'étoffe** (devlog, docs personnages/classes, SEO).
+- **Reco** : **A** si peu de pages (rapide, rien ne bouge) ; **C** si ambition de site pérenne.
+  Aucune option ne touche au jeu (moteur + vue de combat intacts) — on n'ajoute qu'une **coquille
+  de site** autour. **Décision ajournée** : trancher A vs C au moment de définir l'arborescence
+  (quelles pages : landing, à-propos, personnages/devlog…).
+
 ## Multijoueur (orientation, à faire plus tard)
 - **Pages seul ne suffit pas** : statique = aucun code serveur. Un multi en réseau a besoin
   d'un **backend** (sync d'état, relais des coups, salons).
