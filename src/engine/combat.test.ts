@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend, damageTaken,
   reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
-  unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
+  unitAt, unitById, graphDistance, activeUnits, canHeal, healUnit, resolveReactions,
+  type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
 import { CHARACTERS, makeUnitFromCharacter } from './pieces';
@@ -1398,5 +1399,101 @@ describe('combat — passage de main', () => {
     expect(unitById(s1, 'b')!.ap).toBe(4); // PA du camp entrant rechargés
     expect(unitById(s1, 'a')!.ap).toBe(0); // l'autre camp inchangé
     expect(endTurn(s1, 4).active).toBe('alice');
+  });
+});
+
+// ── Soigneur : verbe Soin (burst payé) + régénération réactive (HoT). Soin PUR. ──
+describe('combat — Soin (verbe heal, burst payé)', () => {
+  const healer = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ heal: { cost: 3, amount: 4, range: 2 }, ...over });
+
+  it('soigne un allié à portée : rend les PV et dépense le coût', () => {
+    const st = makeCombatState(LINE, [
+      healer({ id: 'h', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'f', owner: 'alice', hex: 'C', hp: 5, maxHp: 10 }), // ami à distance 2
+    ], 'alice');
+    expect(canHeal(st, 'h', 'f')).toBe(true);
+    const s = healUnit(st, 'h', 'f');
+    expect(unitById(s, 'f')!.hp).toBe(9);  // 5 + 4
+    expect(unitById(s, 'h')!.ap).toBe(1);  // 4 − 3
+  });
+
+  it('plafonne au maxHp (pas de surplus)', () => {
+    const st = makeCombatState(LINE, [
+      healer({ id: 'h', owner: 'alice', hex: 'A', ap: 4 }),
+      u({ id: 'f', owner: 'alice', hex: 'B', hp: 8, maxHp: 10 }),
+    ], 'alice');
+    expect(unitById(healUnit(st, 'h', 'f'), 'f')!.hp).toBe(10); // 8 + 4 → cap 10
+  });
+
+  it('refuse une cible pleine, un ennemi, soi-même, ou hors de portée', () => {
+    const st = makeCombatState(LINE, [
+      healer({ id: 'h', owner: 'alice', hex: 'A', ap: 4, hp: 6, maxHp: 10 }),
+      u({ id: 'full', owner: 'alice', hex: 'B', hp: 10, maxHp: 10 }),
+      u({ id: 'e', owner: 'bob', hex: 'C', hp: 5, maxHp: 10 }),
+      u({ id: 'far', owner: 'alice', hex: 'E', hp: 5, maxHp: 10 }), // distance 4 > portée 2
+    ], 'alice');
+    expect(canHeal(st, 'h', 'full')).toBe(false); // déjà plein
+    expect(canHeal(st, 'h', 'e')).toBe(false);    // ennemi
+    expect(canHeal(st, 'h', 'h')).toBe(false);    // soi-même
+    expect(canHeal(st, 'h', 'far')).toBe(false);  // hors portée
+  });
+
+  it('refuse sans assez de PA (et reste un no-op)', () => {
+    const st = makeCombatState(LINE, [
+      healer({ id: 'h', owner: 'alice', hex: 'A', ap: 2 }), // < coût 3
+      u({ id: 'f', owner: 'alice', hex: 'B', hp: 5, maxHp: 10 }),
+    ], 'alice');
+    expect(canHeal(st, 'h', 'f')).toBe(false);
+    expect(healUnit(st, 'h', 'f')).toBe(st);
+  });
+
+  it('une pièce silencée ne peut pas soigner', () => {
+    const st = makeCombatState(LINE, [
+      healer({ id: 'h', owner: 'alice', hex: 'A', ap: 4, silence: { owner: 'alice', expiresIn: 2 } }),
+      u({ id: 'f', owner: 'alice', hex: 'B', hp: 5, maxHp: 10 }),
+    ], 'alice');
+    expect(canHeal(st, 'h', 'f')).toBe(false);
+  });
+});
+
+describe('combat — Régénération (regen, soin réactif HoT)', () => {
+  it('soigne +amount au rechargement, sur `duration` tours, puis tombe', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'A', hp: 6, maxHp: 16, regen: { owner: 'alice', expiresIn: 2, amount: 2 } }),
+      u({ id: 'b', owner: 'bob', hex: 'E' }),
+    ], 'bob'); // bob actif (regen tout juste posé pendant le tour de bob)
+    let s = endTurn(st, 4);                              // bob finit → alice rechargée → +2 (#1)
+    expect(unitById(s, 'a')!.hp).toBe(8);
+    expect(unitById(s, 'a')!.regen!.expiresIn).toBe(2); // pas encore tické (owner ≠ bob)
+    s = endTurn(s, 4);                                   // alice finit → tick 2→1
+    expect(unitById(s, 'a')!.hp).toBe(8);               // pas de soin (pas le camp entrant)
+    expect(unitById(s, 'a')!.regen!.expiresIn).toBe(1);
+    s = endTurn(s, 4);                                   // bob finit → alice rechargée → +2 (#2)
+    expect(unitById(s, 'a')!.hp).toBe(10);
+    s = endTurn(s, 4);                                   // alice finit → tick 1→0 → tombe
+    expect(unitById(s, 'a')!.regen).toBeUndefined();
+    expect(unitById(s, 'a')!.hp).toBe(10);              // plus de soin ensuite
+  });
+
+  it('la régénération plafonne au maxHp', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'A', hp: 15, maxHp: 16, regen: { owner: 'alice', expiresIn: 2, amount: 2 } }),
+      u({ id: 'b', owner: 'bob', hex: 'E' }),
+    ], 'bob');
+    expect(unitById(endTurn(st, 4), 'a')!.hp).toBe(16); // 15 + 2 → cap 16
+  });
+
+  it('l\'effet regen (réaction) pose la régénération sur l\'allié SOURCE + son CD', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'src', owner: 'alice', hex: 'A', hp: 6, maxHp: 16 }),
+      u({ id: 'med', owner: 'alice', hex: 'B',
+        reactions: [{ id: 'rg', on: 'garde_encaissee', scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2 }], cooldowns: {} }),
+      u({ id: 'foe', owner: 'bob', hex: 'D' }),
+    ], 'bob');
+    const s = resolveReactions(st, { type: 'garde_encaissee', sourceId: 'src', attackerId: 'foe' });
+    expect(unitById(s, 'src')!.regen).toMatchObject({ owner: 'alice', amount: 2, expiresIn: 2 });
+    expect(unitById(s, 'med')!.cooldowns!.rg).toBe(3); // CD posé sur le possesseur
+    expect(unitById(s, 'med')!.regen).toBeUndefined(); // l'effet vise la SOURCE, pas le possesseur
   });
 });

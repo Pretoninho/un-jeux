@@ -7,7 +7,7 @@
 // Tous les archétypes vivent sur cette même droite : aucun n'est strictement meilleur,
 // tout est positionnel. Les valeurs ci-dessous sont des LEVIERS, à affiner au jeu.
 
-import type { GuardProfile, OverwatchProfile, RiposteProfile, ReactionSpec, Unit } from './combat';
+import type { GuardProfile, OverwatchProfile, RiposteProfile, HealProfile, ReactionSpec, Unit } from './combat';
 
 export interface Profile {
   range: number;      // portée d'attaque (cases)
@@ -32,6 +32,7 @@ export interface Archetype {
   guard?: GuardProfile;         // verbe « se défendre » — propre aux CAC ; nombres par perso
   overwatch?: OverwatchProfile; // verbe « tir réservé » — propre aux pièces à distance
   riposte?: RiposteProfile;     // verbe « riposte » — atypique (Duelliste) ; contre en mêlée
+  heal?: HealProfile;           // verbe « soigner » — propre au Soigneur ; soin pur d'un allié
   reactions?: ReactionSpec[];   // passifs en chaîne (synergies d'escouade) ; déclenchés par signaux
 }
 
@@ -341,6 +342,7 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
     guard: archetype.guard, guarding: false,
     overwatch: archetype.overwatch, watching: false,
     riposte: archetype.riposte, riposting: false,
+    heal: archetype.heal,
     reactions: mergeReactions(archetype.reactions, overlay?.reactions), cooldowns: {},
   };
 }

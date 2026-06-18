@@ -45,6 +45,17 @@ export interface RiposteProfile {
 }
 
 /**
+ * Capacité de SOIN — le verbe « soigner », propre au Soigneur. La pièce dépense `cost` PA pour
+ * rendre `amount` PV à un ALLIÉ à ≤ `range` cases, plafonné à son `maxHp` (pas de surplus).
+ * 1ᵉʳ verbe qui vise un AUTRE et qui AUGMENTE les PV. Soin PUR (rien d'autre). Nombres sur la pièce.
+ */
+export interface HealProfile {
+  cost: number;   // PA pour soigner
+  amount: number; // PV rendus
+  range: number;  // portée du soin (en cases)
+}
+
+/**
  * RÉACTIONS EN CHAÎNE — synergies d'escouade. Un événement de combat émet un SIGNAL typé ;
  * les alliés dont un passif ÉCOUTE ce type réagissent. La spécificité « possesseur × déclencheur »
  * vit dans l'effet : `amountBySource` module selon l'archétype de la SOURCE — on n'écrit que les
@@ -63,7 +74,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine' | 'charge'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine' | 'charge' | 'regen'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -130,6 +141,7 @@ export interface Unit {
   watching?: boolean;   // tir réservé armé, jusqu'au début de son prochain tour
   riposte?: RiposteProfile; // capacité de riposte (absente = pas de contre possible)
   riposting?: boolean;  // riposte armée, jusqu'au prochain tour OU jusqu'au premier contre
+  heal?: HealProfile;   // capacité de SOIN (absente = pièce qui ne peut pas soigner) — le Soigneur
   reactions?: ReactionSpec[];          // passifs en chaîne (écouteurs de signaux) — synergies d'escouade
   cooldowns?: Record<string, number>;  // CD restant par passif (clé = ReactionSpec.id), en tours
   mark?: Mark;                         // statut « marqué » subi (posé par un allié adverse, ex. Estoc)
@@ -145,6 +157,7 @@ export interface Unit {
   appui?: { owner: string; expiresIn: number; amount: number }; // « appui-feu » : +amount dégâts à SES attaques, borné (ex. Mireille × Fil)
   root?: { owner: string; expiresIn: number }; // « enraciné » : déplacement → 0 (attaques/verbes intacts), borné (ex. Orso × Bastion)
   haste?: { owner: string; expiresIn: number; amount: number }; // « charge » : +amount au plafond de déplacement, borné (ex. Bastion × Mireille)
+  regen?: { owner: string; expiresIn: number; amount: number }; // « régénération » : +amount PV à chaque rechargement, borné (soin réactif du Soigneur)
 }
 
 export interface CombatState {
@@ -591,6 +604,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       });
       return { ...state, units };
     }
+    case 'regen': { // SOUTIEN-SOIN : régénère l'allié SOURCE (ex. Bastion en garde) → +amount PV/rechargement, borné. Pur soin.
+      const source = unitById(state, p.sourceId);
+      if (!source) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.sourceId) return { ...u, regen: { owner: source.owner, expiresIn: p.spec.duration ?? 2, amount: p.amount } };
+        return u;
+      });
+      return { ...state, units };
+    }
     case 'ruee': { // le POSSESSEUR avance d'1 case VERS la cible (inverse de la provocation) ; CD posé même sans case libre
       const listener = unitById(state, p.listenerId);
       const target = unitById(state, p.targetId);
@@ -744,6 +767,41 @@ export function riposte(state: CombatState, unitId: string): CombatState {
   };
 }
 
+// ─────────────────────── Soin (Heal) ─────────────────────────────────────────
+
+/**
+ * `healerId` peut-il soigner `targetId` ? Pièce du camp actif dotée du verbe `heal`, non silencée ;
+ * cible ALLIÉE distincte de soi, à portée du soin, pas déjà à PV pleins (pas de soin gâché) et assez
+ * de PA. Module pur.
+ */
+export function canHeal(state: CombatState, healerId: string, targetId: string): boolean {
+  const h = unitById(state, healerId);
+  const t = unitById(state, targetId);
+  if (!h || !t || h.owner !== state.active) return false;
+  if (isSilenced(h) || !h.heal) return false;
+  if (t.owner !== h.owner || t.id === h.id) return false;                     // soigne un ALLIÉ, pas soi
+  if (t.hp >= t.maxHp) return false;                                          // déjà plein → soin gâché, interdit
+  if (graphDistance(state.map, h.hex, t.hex) > h.heal.range) return false;
+  return h.ap >= h.heal.cost;
+}
+
+/**
+ * `healerId` soigne `targetId` : dépense le coût et rend `amount` PV plafonnés au `maxHp` de la cible
+ * (pas de surplus). Sans effet si illégal. Soin PUR — n'inflige et ne pose rien d'autre.
+ */
+export function healUnit(state: CombatState, healerId: string, targetId: string): CombatState {
+  if (!canHeal(state, healerId, targetId)) return state;
+  const h = unitById(state, healerId)!;
+  return {
+    ...state,
+    units: state.units.map((u) => {
+      if (u.id === healerId) return { ...u, ap: u.ap - h.heal!.cost };
+      if (u.id === targetId) return { ...u, hp: Math.min(u.maxHp, u.hp + h.heal!.amount) };
+      return u;
+    }),
+  };
+}
+
 // ─────────────────────── Passage de main ─────────────────────────────────────
 
 /** Décrémente d'un tour tous les cooldowns d'une pièce (plancher 0). */
@@ -788,10 +846,12 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const appui = tickStatus(u.appui, state.active);
       const root = tickStatus(u.root, state.active);
       const haste = tickStatus(u.haste, state.active);
+      const regen = tickStatus(u.regen, state.active);
       let out =
         u.owner === next
-          // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), moved: 0, elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          // recharge SES PA (+ élan Némésis consommé + couverture persistante) et applique la régénération
+          // (+regen PV plafonnés) — sauf si étourdie : PA forcés à 0 (gel). Le soin, lui, opère toujours.
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), moved: 0, elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns), ...(u.regen ? { hp: Math.min(u.maxHp, u.hp + u.regen.amount) } : {}) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };
@@ -803,6 +863,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (appui !== u.appui) out = { ...out, appui };
       if (root !== u.root) out = { ...out, root };
       if (haste !== u.haste) out = { ...out, haste };
+      if (regen !== u.regen) out = { ...out, regen };
       return out;
     }),
   };
