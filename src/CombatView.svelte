@@ -265,7 +265,10 @@
   function attackFoe() {
     if (!selected || !foe || !canAttack(combat, selected.id, foe.id)) return;
     history = [...history, combat];
+    const who = selected.characterId;   // capturé avant la mutation d'état
     combat = attack(combat, selected.id, foe.id);
+    unlock('m_attack');
+    if (who === 'bastion' && ++bastionHits >= 3) unlock('h_bastion3');  // objectif « 3 attaques avec Bastion »
   }
 
   function selectDefault() {
@@ -286,6 +289,7 @@
     if (reach.has(hexId)) {
       history = [...history, combat];
       combat = resolveOverwatch(moveUnit(combat, selected.id, hexId), selected.id);
+      unlock('m_move');
     }
   }
 
@@ -479,6 +483,87 @@
     tuto = null;
     restart();  // bascule sur une vraie partie (line-up complet)
   }
+
+  // ── OBJECTIFS / SUCCÈS ─────────────────────────────────────────────────────
+  // Checklist d'onboarding détectée 100 % côté UI (le moteur reste intact) : un
+  // observateur compare l'état AVANT/APRÈS chaque coup ; un compteur d'attaques sert
+  // le seul objectif qui demande une attribution fine (× Bastion). Débloqués une fois
+  // pour toutes (localStorage) → « archivage ».
+  interface Objective { id: string; cat: 'Mécanique' | 'Duos & héros'; label: string }
+  const OBJECTIVES: Objective[] = [
+    { id: 'm_move', cat: 'Mécanique', label: 'Déplacer une pièce' },
+    { id: 'm_attack', cat: 'Mécanique', label: 'Attaquer un ennemi' },
+    { id: 'm_guard', cat: 'Mécanique', label: 'Mettre une Lourde en Garde' },
+    { id: 'm_reserve', cat: 'Mécanique', label: 'Réserver un tir (Tireur)' },
+    { id: 'm_riposte', cat: 'Mécanique', label: 'Armer une Riposte (Duelliste)' },
+    { id: 'm_status', cat: 'Mécanique', label: 'Infliger un statut (marque/estropié/silence/étourdi)' },
+    { id: 'm_resonance', cat: 'Mécanique', label: 'Déclencher une Résonance' },
+    { id: 'm_nemesis', cat: 'Mécanique', label: 'Tuer un Némésis' },
+    { id: 'm_win', cat: 'Mécanique', label: 'Gagner une partie' },
+    { id: 'h_estoc_bastion', cat: 'Duos & héros', label: 'Résonance Estoc × Bastion (épines)' },
+    { id: 'h_mireille', cat: 'Duos & héros', label: 'Déclencher une Résonance de Mireille' },
+    { id: 'h_bastion3', cat: 'Duos & héros', label: 'Frapper 3 fois avec Bastion' },
+    { id: 'h_fil_nemesis', cat: 'Duos & héros', label: 'Tuer son Némésis avec Fil' },
+  ];
+  const OBJ_CATS = ['Mécanique', 'Duos & héros'] as const;
+  function loadAch(): Set<string> {
+    try { const r = localStorage.getItem('achievements'); return new Set<string>(r ? JSON.parse(r) : []); }
+    catch { return new Set<string>(); }
+  }
+  let achievements = $state<Set<string>>(loadAch());
+  let showObjectives = $state(false);
+  let justUnlocked = $state<string | null>(null);
+  let bastionHits = 0;           // compteur (non réactif) — attaques portées par Bastion
+  const objDone = $derived(OBJECTIVES.filter((o) => achievements.has(o.id)).length);
+  $effect(() => { try { localStorage.setItem('achievements', JSON.stringify([...achievements])); } catch { /* noop */ } });
+  // Toast éphémère au déblocage.
+  $effect(() => { if (justUnlocked) { const t = setTimeout(() => { justUnlocked = null; }, 2800); return () => clearTimeout(t); } });
+
+  function unlock(id: string) {
+    if (achievements.has(id)) return;
+    achievements = new Set(achievements).add(id);
+    justUnlocked = id;
+  }
+  function resetAchievements() {
+    achievements = new Set();
+    bastionHits = 0;
+    justUnlocked = null;
+  }
+
+  // Observateur : diff de `combat` à chaque coup → déduit les objectifs atteints.
+  let prevSnap: CombatState | undefined;
+  $effect(() => {
+    const cur = combat;             // dépendance suivie
+    const prev = prevSnap;
+    prevSnap = cur;
+    if (!prev || prev === cur) return;
+    const pById = new Map(prev.units.map((u) => [u.id, u] as const));
+    for (const u of cur.units) {
+      const p = pById.get(u.id);
+      // (m_move / m_attack sont hookés sur TES actions — pas ici — pour ne pas créditer un coup adverse)
+      if (u.guarding && !p?.guarding) unlock('m_guard');
+      if (u.watching && !p?.watching) unlock('m_reserve');
+      if (u.riposting && !p?.riposting) unlock('m_riposte');
+      if ((u.mark && !p?.mark) || (u.cripple && !p?.cripple) || (u.silence && !p?.silence) || (u.stun && !p?.stun)) unlock('m_status');
+      if (p && u.cooldowns) for (const [rid, cd] of Object.entries(u.cooldowns)) {
+        if (cd > 0 && !((p.cooldowns?.[rid] ?? 0) > 0)) {     // un cooldown qui SAUTE de 0 → la Résonance vient de partir
+          unlock('m_resonance');
+          if (rid === 'epines_estoc_bastion') unlock('h_estoc_bastion');
+          if (u.characterId === 'mireille') unlock('h_mireille');
+        }
+      }
+    }
+    // Morts → kills de Némésis (le tueur = lastHitBy, même archétype, camp adverse).
+    for (const dead of prev.units) {
+      if (cur.units.some((u) => u.id === dead.id)) continue;
+      const killer = dead.lastHitBy ? prev.units.find((u) => u.id === dead.lastHitBy) : undefined;
+      if (killer && killer.kind === dead.kind && killer.owner !== dead.owner) {
+        unlock('m_nemesis');
+        if (killer.characterId === 'fil') unlock('h_fil_nemesis');
+      }
+    }
+    if (winner(cur) !== null) unlock('m_win');
+  });
 </script>
 
 <div class="combat">
@@ -845,6 +930,29 @@
     </aside>
   </div>
 
+  <div class="objbar">
+    <button class="obj-toggle" class:on={showObjectives} onclick={() => (showObjectives = !showObjectives)}>
+      🎯 Objectifs <b>{objDone}/{OBJECTIVES.length}</b> {showObjectives ? '▲' : '▼'}
+    </button>
+    {#if showObjectives}
+      <div class="obj-panel">
+        <p class="muted small">Petits défis pour découvrir les mécaniques. Débloqués une fois pour toutes (archivés sur cet appareil).</p>
+        {#each OBJ_CATS as cat}
+          <div class="obj-cat">{cat}</div>
+          <ul class="obj-list">
+            {#each OBJECTIVES.filter((o) => o.cat === cat) as o}
+              {@const done = achievements.has(o.id)}
+              <li class:done>
+                <span class="obj-check">{done ? '✓' : '☐'}</span>{o.label}
+              </li>
+            {/each}
+          </ul>
+        {/each}
+        <button class="obj-reset" onclick={resetAchievements}>↺ Réinitialiser les succès</button>
+      </div>
+    {/if}
+  </div>
+
   <div class="matrixbar">
     <button class="matrix-toggle" class:on={showMatrix} onclick={() => (showMatrix = !showMatrix)}>
       ✦ Matrice de Résonance {showMatrix ? '▲' : '▼'}
@@ -904,6 +1012,11 @@
     {/if}
   </div>
 </div>
+
+{#if justUnlocked}
+  {@const o = OBJECTIVES.find((x) => x.id === justUnlocked)}
+  <div class="obj-toast">🎯 Objectif débloqué — <b>{o?.label}</b></div>
+{/if}
 
 {#if showHelp}
   <div class="modal-backdrop">
@@ -1091,6 +1204,22 @@
   .hint { padding: 0 .2rem; }
 
   /* Matrice de Résonance (panneau dépliable, pleine largeur) */
+  .objbar { margin: .6rem .2rem 0; }
+  .obj-toggle { background: #1f3a33; color: #b8f0e2; border: 1px solid #2f6f5e; border-radius: 6px; padding: .35rem .7rem; font-size: .82rem; font-weight: 700; cursor: pointer; }
+  .obj-toggle.on, .obj-toggle:hover { background: #2a5249; }
+  .obj-toggle b { color: #eafff7; }
+  .obj-panel { margin-top: .5rem; padding: .6rem .8rem; background: #15171f; border: 1px solid #272c37; border-radius: 8px; }
+  .obj-cat { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6fae9a; margin: .5rem 0 .2rem; }
+  .obj-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .15rem .9rem; }
+  .obj-list li { font-size: .82rem; color: #9aa3b5; display: flex; align-items: baseline; gap: .45rem; }
+  .obj-list li.done { color: #cfe0ea; }
+  .obj-check { color: #4a5468; font-weight: 700; }
+  .obj-list li.done .obj-check { color: #5fc99a; }
+  .obj-reset { margin-top: .7rem; background: #221a22; border: 1px solid #4a3340; color: #c69ab0; border-radius: 5px; padding: .35rem .7rem; font-size: .78rem; cursor: pointer; }
+  .obj-reset:hover { border-color: #7a5065; }
+  .obj-toast { position: fixed; left: 50%; bottom: 1.4rem; transform: translateX(-50%); background: #1f3a33; border: 1px solid #3a8a76; color: #eafff7; border-radius: 8px; padding: .55rem 1rem; font-size: .9rem; box-shadow: 0 6px 24px rgba(0, 0, 0, .45); z-index: 40; animation: objpop .25s ease-out; }
+  .obj-toast b { color: #b8f0e2; }
+  @keyframes objpop { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .matrixbar { margin: .6rem .2rem 0; }
   .matrix-toggle { background: #2c2640; color: #cbb6ec; border: 1px solid #3a3356; border-radius: 6px; padding: .35rem .7rem; font-size: .82rem; font-weight: 700; cursor: pointer; }
   .matrix-toggle.on, .matrix-toggle:hover { background: #3a3356; }
