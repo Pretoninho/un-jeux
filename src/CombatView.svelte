@@ -414,10 +414,13 @@
           <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
-          <!-- icônes d'état (postures + statuts), en rangée au-dessus du nom -->
-          {#each states as st, i}
-            <text x={t.cx + (i - (states.length - 1) / 2) * 9} y={t.cy - r - 13} class="statemark">{st.icon}</text>
-          {/each}
+          <!-- bulle d'état (postures + statuts), regroupée au-dessus du nom pour ressortir du plateau -->
+          {#if states.length}
+            <rect x={t.cx - (states.length * 10 + 6) / 2} y={t.cy - r - 22} width={states.length * 10 + 6} height="13" rx="6" class="statebubble" />
+            {#each states as st, i}
+              <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
+            {/each}
+          {/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
@@ -628,9 +631,11 @@
                 <th class="rowhead" title={KIND_NAME[row.archetype]}><span class="mk">{KIND_GLYPH[row.archetype]}</span> {row.name}</th>
                 {#each HEROES as col}
                   {@const duo = row.id === col.id ? undefined : row.reactions?.find((r) => r.fromCharacter === col.id)}
-                  <td class:self={row.id === col.id} class:has={!!duo}>
+                  {@const nemesis = row.id !== col.id && row.archetype === col.archetype}
+                  <td class:self={row.id === col.id} class:has={!!duo} class:nemcell={nemesis}>
                     {#if row.id === col.id}<span class="diag">·</span>
-                    {:else if duo}<span class="cell" title={`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}>{EFFECT_ICON[duo.kind] ?? '✦'}</span>{/if}
+                    {:else if duo}<span class="cell" title={`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}>{EFFECT_ICON[duo.kind] ?? '✦'}</span>
+                    {:else if nemesis}<span class="nemmark" title={`${row.name} × ${col.name} — Némésis (même archétype : ennemis, jamais coéquipiers)`}>N</span>{/if}
                   </td>
                 {/each}
               </tr>
@@ -641,6 +646,7 @@
           {#each Object.entries(EFFECT_ICON) as [kind, icon]}
             <span><b>{icon}</b> {RESON_LABEL[kind] ?? kind}</span>
           {/each}
+          <span><b class="nemmark">N</b> Némésis (même archétype)</span>
         </div>
       </div>
     {/if}
@@ -715,7 +721,8 @@
   .utxt { fill: #0e1015; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .statemark { font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .statebubble { fill: rgba(8, 10, 16, 0.86); stroke: #424a59; stroke-width: 0.7; pointer-events: none; }
+  .statemark { font-size: 10px; text-anchor: middle; pointer-events: none; }
   .pname { fill: #e8ecf2; font-size: 7px; font-weight: 600; text-anchor: middle; pointer-events: none; }
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
@@ -781,6 +788,8 @@
   table.matrix .mk { color: #8a93a6; font-size: .72rem; }
   table.matrix td.self { background: #0e1015; }
   table.matrix td.has { background: #221d33; }
+  table.matrix td.nemcell { background: #2a1a1e; }
+  .nemmark { color: #e0a0a0; font-weight: 700; cursor: help; }
   table.matrix .cell { font-size: 1rem; cursor: help; }
   table.matrix .diag { color: #3a4150; }
   .matrix-legend { display: flex; flex-wrap: wrap; gap: .2rem 1rem; margin-top: .5rem; }
