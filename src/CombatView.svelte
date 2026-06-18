@@ -331,6 +331,8 @@
     combat = endTurn(combat, AP_PER_TURN);
     history = [];
     inspectedId = '';
+    // UNIQUEMENT EN TUTO : l'adversaire est scripté (le moteur, lui, reste neutre).
+    if (tutoActive && combat.active === 'bob') tutoEnemyTurn();
     selectDefault();
   }
 
@@ -354,6 +356,7 @@
   // sur l'état du jeu (pas de mode spécial dans le moteur — on observe, on n'impose pas).
   let tutoStep = $state(-1);  // -1 = tuto inactif ; 0..N-1 = étape courante ; N = terminé
   let tuto = $state<{ lourde: string; tireur: string; enemy: string; enemyHp: number } | null>(null);
+  let tutoEnemyTurns = $state(0);  // nb de tours adverses scriptés déjà joués (détecte les étapes « finir le tour »)
   const tutoActive = $derived(tutoStep >= 0);
 
   // Place Bastion (Lourde) au coin, Mireille (Tireur) à côté, un ennemi robuste à 2 cases
@@ -389,24 +392,69 @@
     return !!l && !!e && rangeSet(l.hex, l.range).has(e.hex);
   };
 
-  interface TutoStep { text: string; done: () => boolean; focus: () => string[] }
+  // Pas vers une cible (BFS pur) : voisin LIBRE de `from` le plus proche de `goal`. Tuto seulement.
+  function tutoStepToward(from: string, goal: string): string | null {
+    const byId = new Map(combat.map.hexes.map((h) => [h.id, h] as const));
+    const dist = new Map<string, number>([[goal, 0]]);
+    let frontier = [goal];
+    while (frontier.length) {
+      const next: string[] = [];
+      for (const h of frontier)
+        for (const x of byId.get(h)?.neighbors ?? [])
+          if (!dist.has(x)) { dist.set(x, (dist.get(h) ?? 0) + 1); next.push(x); }
+      frontier = next;
+    }
+    let best: string | null = null, bestD = Infinity;
+    for (const nb of byId.get(from)?.neighbors ?? []) {
+      if (unitAt(combat, nb)) continue;                 // case occupée → pas franchissable
+      const d = dist.get(nb) ?? Infinity;
+      if (d < bestD) { bestD = d; best = nb; }
+    }
+    return best;
+  }
+
+  // TOUR ADVERSE SCRIPTÉ — uniquement appelé pendant le tuto (via finishTurn). Pilote les
+  // fonctions PUBLIQUES du moteur, comme un humain : avance d'un pas si besoin, puis frappe
+  // UNE fois (un seul coup → dégâts prévisibles), puis rend la main à Alice.
+  function tutoEnemyTurn() {
+    const eId = tuto?.enemy, lId = tuto?.lourde;
+    if (eId && lId) {
+      if (!canAttack(combat, eId, lId)) {               // pas au contact → s'approcher (avance)
+        const e = tunit(eId);
+        const step = e ? tutoStepToward(e.hex, tunitHex(lId)) : null;
+        if (step) combat = resolveOverwatch(moveUnit(combat, eId, step), eId);
+      }
+      if (canAttack(combat, eId, lId)) combat = attack(combat, eId, lId);  // frappe
+    }
+    tutoEnemyTurns += 1;
+    combat = endTurn(combat, AP_PER_TURN);              // repasse à Alice
+  }
+
+  type TutoBtn = 'attack' | 'watch' | 'guard' | 'end';
+  interface TutoStep { text: string; done: () => boolean; focus: () => string[]; btn?: TutoBtn }
   const TUTO_STEPS: TutoStep[] = [
-    { text: '1 / 6 — Clique ta Lourde 🛡 (le pion qui clignote) pour la sélectionner.',
+    { text: '1 / 8 — Clique ta Lourde 🛡 (le pion qui clignote) pour la sélectionner.',
       done: () => selectedId === tuto?.lourde, focus: () => (tuto ? [tunitHex(tuto.lourde)] : []) },
-    { text: '2 / 6 — Amène-la au contact : clique une case verte collée à l’ennemi.',
+    { text: '2 / 8 — Amène-la au contact : clique une case verte collée à l’ennemi.',
       done: () => lourdeAtContact(), focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
-    { text: '3 / 6 — Clique la pièce adverse pour l’inspecter (sa portée s’affiche).',
+    { text: '3 / 8 — Clique la pièce adverse pour l’inspecter (sa portée s’affiche).',
       done: () => inspectedId === tuto?.enemy, focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
-    { text: '4 / 6 — Frappe-la : bouton ⚔ Attaquer dans le panneau de droite.',
-      done: () => !!tuto && (tunit(tuto.enemy)?.hp ?? 0) < tuto.enemyHp, focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
-    { text: '5 / 6 — Sélectionne ton Tireur 🎯 puis clique « 🎯 Réserver » (tir réflexe).',
-      done: () => !!tunit(tuto?.tireur)?.watching, focus: () => (tuto ? [tunitHex(tuto.tireur)] : []) },
-    { text: '6 / 6 — Termine avec « Finir le tour ⏩ » (colonne de gauche).',
-      done: () => combat.active !== 'alice', focus: () => [] },
+    { text: '4 / 8 — Frappe-la : bouton ⚔ Attaquer (il brille) dans le panneau de droite.',
+      done: () => !!tuto && (tunit(tuto.enemy)?.hp ?? 0) < tuto.enemyHp, focus: () => (tuto ? [tunitHex(tuto.enemy)] : []), btn: 'attack' },
+    { text: '5 / 8 — Sélectionne ton Tireur 🎯 puis clique « 🎯 Réserver » (tir réflexe).',
+      done: () => !!tunit(tuto?.tireur)?.watching, focus: () => (tuto ? [tunitHex(tuto.tireur)] : []), btn: 'watch' },
+    { text: '6 / 8 — Termine avec « Finir le tour ⏩ » : ton adversaire va jouer.',
+      done: () => tutoEnemyTurns >= 1, focus: () => [], btn: 'end' },
+    { text: '7 / 8 — L’ennemi a frappé ta Lourde ! Sélectionne-la et clique « 🛡 Garder » pour diviser les dégâts.',
+      done: () => !!tunit(tuto?.lourde)?.guarding, focus: () => (tuto ? [tunitHex(tuto.lourde)] : []), btn: 'guard' },
+    { text: '8 / 8 — Finis ton tour : la Garde encaisse le prochain coup à moitié.',
+      done: () => tutoEnemyTurns >= 2, focus: () => [], btn: 'end' },
   ];
   const tutoDone = $derived(tutoActive && tutoStep >= TUTO_STEPS.length);
   const tutoFocus = $derived.by(() =>
     tutoActive && tutoStep < TUTO_STEPS.length ? new Set(TUTO_STEPS[tutoStep]!.focus()) : new Set<string>());
+  // Bouton à faire briller pour l'étape courante (undefined si l'action est un clic sur le plateau).
+  const tutoBtn = $derived(tutoActive && tutoStep < TUTO_STEPS.length ? TUTO_STEPS[tutoStep]!.btn : undefined);
 
   // Avance d'une étape dès que sa condition est remplie (peut enchaîner si déjà satisfaite).
   $effect(() => {
@@ -419,6 +467,7 @@
     history = [];
     inspectedId = '';
     selectedId = '';  // l'étape 1 EST de sélectionner la Lourde
+    tutoEnemyTurns = 0;
     tuto = { lourde: 'a1', tireur: 'a2', enemy: 'b1', enemyHp: tunit('b1')!.hp };
     tutoStep = 0;
   }
@@ -448,7 +497,7 @@
       <button onclick={resetView} title="Ajuster à l'écran" aria-label="Ajuster à l'écran">⤢</button>
     </div>
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
-    <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
+    <button class="end-turn" class:tutoglow={tutoBtn === 'end'} onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
     {#if tutoActive}
       <button class="tuto-btn on" onclick={endTutorial}>✕ Quitter le tuto</button>
@@ -479,7 +528,7 @@
     {/if}
     {#if tutoDone}
       <div class="tutodone">
-        🎉 <b>Tu sais jouer&nbsp;!</b> Tu as déplacé, attaqué, réservé un tir et fini ton tour.
+        🎉 <b>Tu sais jouer&nbsp;!</b> Déplacement, attaque, tir réservé, et la <b>Garde</b> qui a divisé les dégâts du contre adverse.
         <button class="tutogo" onclick={endTutorial}>Commencer une vraie partie ▶</button>
       </div>
     {/if}
@@ -640,13 +689,13 @@
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
             {#if selected.guard}
-              <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}
+              <button class="defend" class:on={selected.guarding} class:tutoglow={tutoBtn === 'guard'} onclick={defendSelected} disabled={!canGuard}
                 title={`GARDE (${selected.guard.cost} PA) : posture défensive jusqu'à ton prochain tour — dégâts subis réduits (×${selected.guard.damageTakenMul}). Encaisser une attaque en garde déclenche les Résonances de tes alliés.`}>
                 {selected.guarding ? '🛡 En garde' : `🛡 Garder (${selected.guard.cost})`}
               </button>
             {/if}
             {#if selected.overwatch}
-              <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}
+              <button class="watch" class:on={selected.watching} class:tutoglow={tutoBtn === 'watch'} onclick={reserveSelected} disabled={!canWatch}
                 title={`TIR RÉSERVÉ (${selected.overwatch.cost} PA) : prépare un tir réflexe jusqu'à ton prochain tour — frappe la 1ʳᵉ pièce ennemie qui s'arrête dans ta zone de menace. Déclenche les Résonances « tir réservé ».`}>
                 {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
               </button>
@@ -716,7 +765,7 @@
             </div>
           {/if}
           <div class="pacts">
-            <button class="attack" onclick={attackFoe} disabled={!canHitFoe}>⚔ Attaquer{#if selected} ({selected.attackCost} PA){/if}</button>
+            <button class="attack" class:tutoglow={tutoBtn === 'attack'} onclick={attackFoe} disabled={!canHitFoe}>⚔ Attaquer{#if selected} ({selected.attackCost} PA){/if}</button>
             {#if attackBlock}<span class="reason">{attackBlock}</span>{/if}
           </div>
         {:else}
@@ -884,6 +933,12 @@
   .tutogo:hover { background: #348973; }
   .tutoring { fill: none; stroke: #ffd479; stroke-width: 4; pointer-events: none; animation: tutopulse 1.1s ease-in-out infinite; }
   @keyframes tutopulse { 0%, 100% { opacity: .35; stroke-width: 3; } 50% { opacity: 1; stroke-width: 5.5; } }
+  /* Bouton à cliquer pendant le tuto : halo doré pulsé (passe outre l'état désactivé visuel). */
+  .tutoglow { animation: tutoglow 1.1s ease-in-out infinite; border-color: #ffd479 !important; }
+  @keyframes tutoglow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 212, 121, 0); }
+    50% { box-shadow: 0 0 10px 3px rgba(255, 212, 121, .65); }
+  }
   .settings { font-size: .8rem; color: #9aa3b5; }
   .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
