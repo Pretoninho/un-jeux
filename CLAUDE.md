@@ -211,12 +211,19 @@
     via `Unit.root`, décompté à `endTurn`). « **Silence de mobilité** » (miroir du silence : le silence coupe
     tout sauf le déplacement, l'enracinement coupe le déplacement seul). **Contre direct de la mêlée** : un
     bruiser qui frappe ta Lourde se retrouve cloué → ton Tireur kite, l'escouade focus/désengage.
+  - **Duo livré — *Bastion × Mireille*** (1ᵉʳ façonnage de Bastion ; **3ᵉ côté du triangle anti-mêlée**) :
+    quand le Tir réservé de Mireille part (`tir_reserve`, `fromCharacter: 'mireille'`, escouade), Bastion
+    gagne une **CHARGE** (`kind: 'charge'`, auto-buff, amount 2, `duration: 1`, CD 3) : **+2 à son plafond de
+    déplacement** pour son prochain tour (statut `Unit.haste` lu dans `moveBudget`, décompté à `endTurn`) →
+    la Lourde lente (3) **s'engage à pleine vitesse** quand la Tireuse ouvre le feu. **L'axe mobilité a
+    maintenant ses deux signes** : malus (`cripple`/`racine`) ↔ bonus (`haste`/`charge`).
   - **THÈME DE RANGÉE — identité par possesseur (orientation 2026-06-18)** : pour rendre la matrice lisible
     et créer un gabarit de héros, chaque archétype-possesseur porte un *thème* — **Lourde = mobilité/charge**
-    (bonus de déplacement, à venir), **Tireur = contrôle** (ralentir `estropier` / enraciner `racine`),
-    **Duelliste = burst** (`marquage` → bonus dégâts, déjà chez Estoc). Sert le **rééquilibrage anti-mêlée**
-    (« triangle » : `moveCap` Lourde lente + contrôle Tireur + charge Lourde conditionnelle). Façonnage des
-    **rangées vides en priorité** (Orso = Tireur ✓ commencé ; Bastion/Rempart = Lourdes → charge, à faire).
+    (`charge` → +déplacement, posé chez Bastion), **Tireur = contrôle** (ralentir `estropier` / enraciner
+    `racine`, posé chez Orso), **Duelliste = burst** (`marquage` → bonus dégâts, déjà chez Estoc). Sert le
+    **rééquilibrage anti-mêlée** (« triangle » LIVRÉ : `moveCap` Lourde lente + contrôle Tireur + charge
+    Lourde conditionnelle). Façonnage des **rangées vides en priorité** (Orso/Bastion ✓ commencés ; reste à
+    compléter leurs lignes + la rangée de Rempart).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta/enraciné) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

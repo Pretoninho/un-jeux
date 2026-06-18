@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine' | 'charge'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -144,6 +144,7 @@ export interface Unit {
   cover?: { owner: string; expiresIn: number; amount: number }; // « couverture » : +amount PA à chaque rechargement, borné (ex. Mireille × Rempart)
   appui?: { owner: string; expiresIn: number; amount: number }; // « appui-feu » : +amount dégâts à SES attaques, borné (ex. Mireille × Fil)
   root?: { owner: string; expiresIn: number }; // « enraciné » : déplacement → 0 (attaques/verbes intacts), borné (ex. Orso × Bastion)
+  haste?: { owner: string; expiresIn: number; amount: number }; // « charge » : +amount au plafond de déplacement, borné (ex. Bastion × Mireille)
 }
 
 export interface CombatState {
@@ -220,7 +221,8 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
  */
 export function moveBudget(unit: Unit): number {
   if ((unit.root?.expiresIn ?? 0) > 0) return 0; // enraciné : plus aucun pas (attaques/verbes intacts)
-  const capLeft = (unit.moveCap ?? Infinity) - (unit.moved ?? 0);
+  const cap = (unit.moveCap ?? Infinity) + (unit.haste?.amount ?? 0); // « charge » relève le plafond
+  const capLeft = cap - (unit.moved ?? 0);
   return Math.max(0, Math.min(unit.ap - (unit.cripple?.amount ?? 0), capLeft));
 }
 
@@ -536,6 +538,13 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
         u.id === p.listenerId ? { ...arm(u), cover: { owner: listener.owner, expiresIn: p.spec.duration ?? 2, amount: p.amount } } : u);
       return { ...state, units };
     }
+    case 'charge': { // SOUTIEN-SOI : le possesseur (Lourde) gagne +amount au plafond de déplacement pendant `duration` tours
+      const listener = unitById(state, p.listenerId);
+      if (!listener) return state;
+      const units = state.units.map((u) =>
+        u.id === p.listenerId ? { ...arm(u), haste: { owner: listener.owner, expiresIn: p.spec.duration ?? 1, amount: p.amount } } : u);
+      return { ...state, units };
+    }
     case 'etourdir': { // SOUTIEN : arme l'allié SOURCE (ex. Rempart) → sa prochaine attaque étourdit `amount` tour(s)
       const source = unitById(state, p.sourceId);
       if (!source) return state;
@@ -775,6 +784,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const cover = tickStatus(u.cover, state.active);
       const appui = tickStatus(u.appui, state.active);
       const root = tickStatus(u.root, state.active);
+      const haste = tickStatus(u.haste, state.active);
       let out =
         u.owner === next
           // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
@@ -789,6 +799,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (cover !== u.cover) out = { ...out, cover };
       if (appui !== u.appui) out = { ...out, appui };
       if (root !== u.root) out = { ...out, root };
+      if (haste !== u.haste) out = { ...out, haste };
       return out;
     }),
   };

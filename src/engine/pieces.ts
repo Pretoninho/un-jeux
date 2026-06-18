@@ -202,6 +202,18 @@ const RACINE_ORSO_BASTION: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'racine', duration: 2,
 };
 
+/**
+ * Résonance DUO « Bastion × Mireille » (1ᵉʳ façonnage de Bastion, thème **MOBILITÉ de la Lourde** —
+ * 3ᵉ côté du triangle anti-mêlée). Quand le Tir réservé de Mireille part (signal `tir_reserve`),
+ * Bastion gagne une **CHARGE** (`kind: 'charge'`, auto-buff) : +2 à son plafond de déplacement pendant
+ * `duration: 1` (son prochain tour plein) → la Lourde lente (3) **s'engage à pleine vitesse** pour
+ * profiter du contrôle de la Tireuse. Portée escouade (Mireille tire de loin). CD 3.
+ */
+const CHARGE_BASTION_MIREILLE: ReactionSpec = {
+  id: 'charge_bastion_mireille', on: 'tir_reserve', fromCharacter: 'mireille',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -216,7 +228,7 @@ export interface Character {
  * NOMS = PLACEHOLDERS provisoires. Le draft (qui choisit quoi) reste une couche au-dessus, ajournée.
  */
 export const CHARACTERS: Record<string, Character> = {
-  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
+  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE] },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
