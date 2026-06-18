@@ -102,9 +102,26 @@
   - **Tir réservé** (`overwatch`, distance) — Tireur : 3 PA, réflexe à l'arrivée d'un ennemi.
   - **Riposte** (`riposte`, atypique Duelliste) — 2 PA : contre un attaquant **adjacent** qui
     le frappe (s'il survit) ; miroir mêlée du tir réservé ; résolu dans `attack()`.
-- **Effectif déployé** : Lourde + Tireur + **Duelliste** (3/camp pour l'instant). Cible = 4
-  (le **Soigneur** sera la 4ᵉ). Exotiques (Hallebardier/Saboteur) en réserve dans le registre.
-  Le **Duelliste** est hors-droite (PV 9, dégâts 2, **attaque 1 PA** → frappe deux fois/tour).
+  - **Soin** (`heal`, support — Soigneur) — 3 PA → **+4 PV** à un allié à ≤2 cases, **plafonné
+    au `maxHp`** (`canHeal`/`healUnit`). 1ᵉʳ verbe qui vise un AUTRE et qui **augmente** les PV.
+    **Burst payé** (instantané). Soin PUR (n'inflige/ne pose rien d'autre).
+- **SOIGNEUR — 4ᵉ archétype LIVRÉ (2026-06-18, EN RÉSERVE)** : support « **pur soin** » (sur-droite
+  **tier 3** : portée 3 / PV 10 / dégâts 3, `moveCap: 4`). **IDENTITÉ DE RANGÉE = PUR SOIN** : son
+  verbe ET toutes ses Résonances ne font QUE soigner — **jamais** de contrôle/dégâts/buff offensif
+  (≠ Lourde=mobilité, Tireur=contrôle, Duelliste=burst). **2 facettes du soin** : (1) verbe **Soin**
+  (burst payé) ; (2) effet réactif **`regen`** = statut `Unit.regen` (HoT) qui rend `+amount` PV **au
+  rechargement** pendant `duration` tours (plafonné, tické à `endTurn`, comme `cover` pour les PA) —
+  vise l'allié **SOURCE** du signal. **EN RÉSERVE** : présent dans `CHARACTERS`/`ARCHETYPES` mais
+  **PAS dans les `SLOTS`** de l'escouade par défaut (non fieldable, **pas d'UI/IA** — différés au lot
+  « fielder le Soigneur »). **2 héros (paire)** : **Baume** (× Bastion, `garde_encaissee` → `regen`
+  +2×**2**, soin réactif **court**) et **Mélisse** (× Estoc, `riposte` → `regen` +2×**3**, sustain
+  **long**) — miroir court/long. → **Némésis Soigneur↔Soigneur (Baume↔Mélisse) ACTIVE** automatiquement
+  (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`). *Stats/nombres à affiner
+  au playtest.*
+- **Effectif** : escouade par défaut = Lourde + Tireur + **Duelliste** (3/camp). Le **Soigneur** (4ᵉ
+  archétype) est **créé mais en réserve** (pas encore dans l'escouade — passage à 4 = lot ultérieur).
+  Exotiques (Hallebardier/Saboteur) toujours en réserve. Le **Duelliste** est hors-droite (PV 9,
+  dégâts 2, **attaque 1 PA** → frappe deux fois/tour).
 - **Couche PERSONNAGE** (`Character`/`CHARACTERS`, `makeUnitFromCharacter`) : une pièce déployée
   = **socle de classe** (archétype) + **calque perso** (nom, override de stats, **Résonance
   signature**). Fusion des Résonances **par `id`** (signature étend/écrase le socle). Les deux

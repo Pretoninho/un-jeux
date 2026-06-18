@@ -167,4 +167,18 @@ describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve
     // L'escouade = 1 Lourde + 1 Tireur + 1 Duelliste ; le Soigneur reste hors-roster pour l'instant.
     expect(['lourde', 'tireur', 'duelliste']).not.toContain('soigneur');
   });
+
+  it('Mélisse : 2e Soigneur, signature regen SUSTAIN (riposte, +2×3) — pur soin', () => {
+    const m = makeUnitFromCharacter('a4', 'alice', 'X', CHARACTERS.melisse!, 4);
+    expect(m.name).toBe('Mélisse');
+    expect(m.kind).toBe('soigneur');
+    expect(m.heal).toEqual({ cost: 3, amount: 4, range: 2 });
+    const rg = m.reactions!.find((r) => r.id === 'regen_melisse_estoc')!;
+    expect(rg).toMatchObject({ on: 'riposte', fromCharacter: 'estoc', kind: 'regen', amount: 2, duration: 3 });
+  });
+
+  it('Baume & Mélisse sont deux Soigneurs (paire d\'archétype → Némésis mutuelle)', () => {
+    expect(CHARACTERS.baume!.archetype).toBe('soigneur');
+    expect(CHARACTERS.melisse!.archetype).toBe('soigneur');
+  });
 });

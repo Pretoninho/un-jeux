@@ -1492,6 +1492,33 @@ describe('combat — Résonance Baume × Bastion (regen, soin réactif — pur s
   });
 });
 
+describe('combat — Mélisse × Estoc (regen sustain) + Némésis Soigneur↔Soigneur', () => {
+  const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
+
+  it('la Riposte d\'Estoc part → Mélisse le régénère (+2×3, sustain) + CD', () => {
+    const st = makeCombatState(LINE, [
+      hero('estoc', 'alice', 'B', { riposting: true, hp: 9, maxHp: 9 }),
+      hero('melisse', 'alice', 'A'),
+      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 2 }),
+    ], 'bob');
+    const s = attack(st, 'foe', 'estoc'); // foe frappe Estoc (adjacent) → Estoc contre → signal riposte
+    expect(unitById(s, 'estoc')!.regen).toMatchObject({ owner: 'alice', amount: 2, expiresIn: 3 });
+    expect(unitById(s, 'melisse')!.cooldowns!.regen_melisse_estoc).toBe(3);
+  });
+
+  it('Némésis : Baume achève Mélisse (camps opposés, même archétype) → élan au tueur', () => {
+    const st = makeCombatState(LINE, [
+      hero('baume', 'alice', 'B', { damage: 20 }),       // tueur (force l'élimination)
+      hero('melisse', 'bob', 'C', { hp: 4, maxHp: 10 }), // sa Némésis (Soigneur adverse)
+    ], 'alice');
+    const s = attack(st, 'baume', 'melisse');
+    expect(unitAt(s, 'C')).toBeUndefined();         // Mélisse retirée
+    expect(unitById(s, 'baume')!.elan).toBe(1);     // round(10/8) = 1
+    expect(unitById(s, 'baume')!.cooldowns!.nemesis).toBe(2);
+  });
+});
+
 describe('combat — Régénération (regen, soin réactif HoT)', () => {
   it('soigne +amount au rechargement, sur `duration` tours, puis tombe', () => {
     const st = makeCombatState(LINE, [

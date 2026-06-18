@@ -300,6 +300,16 @@ const REGEN_BAUME_BASTION: ReactionSpec = {
   id: 'regen_baume_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
   scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
 };
+/**
+ * Résonance signature « Mélisse × Estoc » (2ᵉ Soigneur). Quand la Riposte d'Estoc part (signal
+ * `riposte`), Mélisse le régénère (`kind: 'regen'`, pur soin) : +2 PV sur ses 3 prochains tours
+ * (sustain plus long que Baume). « L'escarmoucheur échange les coups → le médecin le tient debout. »
+ * Portée escouade, CD 3. Variante SUSTAIN du soin réactif (miroir : Baume = court / Mélisse = long).
+ */
+const REGEN_MELISSE_ESTOC: ReactionSpec = {
+  id: 'regen_melisse_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 3,
+};
 
 export interface Character {
   id: string;                 // identifiant unique du héros
@@ -323,6 +333,7 @@ export const CHARACTERS: Record<string, Character> = {
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
   fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION] },
   baume:   { id: 'baume',   name: 'Baume',   archetype: 'soigneur', reactions: [REGEN_BAUME_BASTION] },
+  melisse: { id: 'melisse', name: 'Mélisse', archetype: 'soigneur', reactions: [REGEN_MELISSE_ESTOC] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */
