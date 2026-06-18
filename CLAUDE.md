@@ -205,8 +205,20 @@
     Mireille l'**APPUIE** (`kind: 'appui'`, « appui-feu », escouade, CD 3, `duration: 2`) : +1 dégât aux
     attaques de Fil pendant 2 tours (statut `Unit.appui` lu dans `strike`). **Mireille a ses 4 duos**
     (Bastion, Estoc, Rempart, Fil) → **sa ligne de matrice est complète**.
+  - **Duo livré — *Orso × Bastion*** (1ᵉʳ façonnage d'Orso ; **1ᵉʳ effet de l'axe mobilité**) : quand
+    Bastion (en garde) encaisse, Orso **ENRACINE** l'attaquant (`kind: 'racine'`, `fromCharacter: 'bastion'`,
+    escouade, CD 3, `duration: 2`) : son **déplacement tombe à 0** (attaques/verbes intacts ; `moveBudget` → 0
+    via `Unit.root`, décompté à `endTurn`). « **Silence de mobilité** » (miroir du silence : le silence coupe
+    tout sauf le déplacement, l'enracinement coupe le déplacement seul). **Contre direct de la mêlée** : un
+    bruiser qui frappe ta Lourde se retrouve cloué → ton Tireur kite, l'escouade focus/désengage.
+  - **THÈME DE RANGÉE — identité par possesseur (orientation 2026-06-18)** : pour rendre la matrice lisible
+    et créer un gabarit de héros, chaque archétype-possesseur porte un *thème* — **Lourde = mobilité/charge**
+    (bonus de déplacement, à venir), **Tireur = contrôle** (ralentir `estropier` / enraciner `racine`),
+    **Duelliste = burst** (`marquage` → bonus dégâts, déjà chez Estoc). Sert le **rééquilibrage anti-mêlée**
+    (« triangle » : `moveCap` Lourde lente + contrôle Tireur + charge Lourde conditionnelle). Façonnage des
+    **rangées vides en priorité** (Orso = Tireur ✓ commencé ; Bastion/Rempart = Lourdes → charge, à faire).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
-    bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
+    bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta/enraciné) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
   (`allie_a_terre`, `pres_de_mourir`…), nouvelles cellules sur pièces existantes, nouveaux
   effets `kind`, puis **spécialistes** (Soigneur/Hallebardier/Saboteur) « nés résonants ».

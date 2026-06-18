@@ -189,6 +189,19 @@ const APPUI_MIREILLE_FIL: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'appui', amount: 1, duration: 2,
 };
 
+/**
+ * Résonance DUO « Orso × Bastion » — 1ᵉʳ façonnage d'Orso, thème **CONTRÔLE du Tireur**. Quand Bastion
+ * (en garde) encaisse, Orso **ENRACINE** l'attaquant (`kind: 'racine'`) : son déplacement tombe à **0**
+ * (attaques/verbes intacts) — « silence de mobilité ». Posée pendant le tour de la cible → `duration: 2`
+ * = reste collée ce tour-ci + tout son prochain tour plein. Portée escouade (Orso tire de loin). CD 3.
+ * Contre direct de la mêlée : un bruiser qui frappe ta Lourde en garde se retrouve **cloué** → ton
+ * Tireur kite, ton escouade focus/désengage.
+ */
+const RACINE_ORSO_BASTION: ReactionSpec = {
+  id: 'racine_orso_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
+  scope: { squad: true }, cooldown: 3, kind: 'racine', duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -207,7 +220,7 @@ export const CHARACTERS: Record<string, Character> = {
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
-  orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
+  orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION] },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
 };
 

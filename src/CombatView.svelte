@@ -34,13 +34,13 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence', couverture: 'Couverture', appui: 'Appui-feu' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence', couverture: 'Couverture', appui: 'Appui-feu', racine: 'Enracinement' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué', riposte: 'Riposte déclenchée' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
   // Matrice : chaque EFFET de duo → un pictogramme SVG (clé du snippet `stateGlyph`) + une couleur
   // de pastille selon l'INTENTION (rouge = nuit à l'ennemi · vert = soutient un allié · bleu = déplacement).
-  const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui' };
-  const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad' };
+  const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui', racine: 'root' };
+  const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad' };
   const HEROES = Object.values(CHARACTERS);
   // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
   const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
@@ -79,6 +79,7 @@
     if (u.cripple) s.push({ key: 'cripple', fam: 'malus', label: `Estropié — −${u.cripple.amount} déplacement (${u.cripple.expiresIn} t.)` });
     if (u.stun) s.push({ key: 'stun', fam: 'malus', label: `Étourdi — ne peut rien faire ce tour` });
     if (u.silence) s.push({ key: 'silence', fam: 'malus', label: `Silencé — déplacement uniquement` });
+    if (u.root) s.push({ key: 'root', fam: 'malus', label: `Enraciné — ne peut pas se déplacer (${u.root.expiresIn} t.)` });
     return s;
   }
   function pieceTitle(u: Unit): string {
@@ -679,6 +680,9 @@
     {:else if key === 'silence'}
       <circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2" />
       <path d="M6.3 6.3 L17.7 17.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+    {:else if key === 'root'}
+      <circle cx="12" cy="4.5" r="2.1" fill="none" stroke="#fff" stroke-width="2" />
+      <path d="M12 6.6 V20 M12 12 C9 15 7.5 16.5 6 20 M12 12 C15 15 16.5 16.5 18 20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
     {:else if key === 'epines'}
       <path d="M12 2 L13.4 8.6 L18.5 5.5 L15.4 10.6 L22 12 L15.4 13.4 L18.5 18.5 L13.4 15.4 L12 22 L10.6 15.4 L5.5 18.5 L8.6 13.4 L2 12 L8.6 10.6 L5.5 5.5 L10.6 8.6 Z" fill="#fff" />
     {:else if key === 'provocation'}
@@ -847,6 +851,8 @@
                   <div class="amt">le possesseur avance de {rx.amount ?? 1} case vers la cible</div>
                 {:else if rx.kind === 'silence'}
                   <div class="amt">silence la cible : déplacement uniquement (ni attaque/verbe/Résonance/élan) · {rx.duration ?? 2} tours</div>
+                {:else if rx.kind === 'racine'}
+                  <div class="amt">enracine la cible : déplacement → 0 (attaques/verbes intacts) · {rx.duration ?? 2} tours</div>
                 {:else if rx.kind === 'couverture'}
                   <div class="amt">le possesseur gagne +{rx.amount ?? 1} PA/tour · {rx.duration ?? 2} tours</div>
                 {:else if rx.kind === 'appui'}

@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -143,6 +143,7 @@ export interface Unit {
   silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance, ni élan)
   cover?: { owner: string; expiresIn: number; amount: number }; // « couverture » : +amount PA à chaque rechargement, borné (ex. Mireille × Rempart)
   appui?: { owner: string; expiresIn: number; amount: number }; // « appui-feu » : +amount dégâts à SES attaques, borné (ex. Mireille × Fil)
+  root?: { owner: string; expiresIn: number }; // « enraciné » : déplacement → 0 (attaques/verbes intacts), borné (ex. Orso × Bastion)
 }
 
 export interface CombatState {
@@ -218,6 +219,7 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
  * Les attaques restent payées sur les PA pleins — seul le mouvement est bridé. Plancher 0.
  */
 export function moveBudget(unit: Unit): number {
+  if ((unit.root?.expiresIn ?? 0) > 0) return 0; // enraciné : plus aucun pas (attaques/verbes intacts)
   const capLeft = (unit.moveCap ?? Infinity) - (unit.moved ?? 0);
   return Math.max(0, Math.min(unit.ap - (unit.cripple?.amount ?? 0), capLeft));
 }
@@ -362,7 +364,7 @@ const REACTION_CHAIN_CAP = 64; // garde-fou dur, en plus du « un passif au plus
 
 // Effets OFFENSIFS : ils visent un ennemi (`targetId`) → ne partent pas si la cible a disparu.
 // (Les effets de soutien/soi — `vendetta`, `ralliement` — n'ont pas besoin de cible.)
-const NEEDS_TARGET = new Set<ReactionSpec['kind']>(['epines', 'marquage', 'estropier', 'provocation', 'ruee', 'silence']);
+const NEEDS_TARGET = new Set<ReactionSpec['kind']>(['epines', 'marquage', 'estropier', 'provocation', 'ruee', 'silence', 'racine']);
 
 /**
  * Retrait CENTRALISÉ des pièces mortes (hp ≤ 0). Pour CHAQUE mort, fait émettre le signal `rale`
@@ -567,6 +569,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       });
       return { ...state, units };
     }
+    case 'racine': { // ENRACINE l'attaquant : déplacement → 0 (attaques/verbes intacts) ; miroir mobilité du silence
+      const target = unitById(state, p.targetId);
+      if (!target) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.targetId) return { ...u, root: { owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
     case 'ruee': { // le POSSESSEUR avance d'1 case VERS la cible (inverse de la provocation) ; CD posé même sans case libre
       const listener = unitById(state, p.listenerId);
       const target = unitById(state, p.targetId);
@@ -762,6 +774,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const silence = tickStatus(u.silence, state.active);
       const cover = tickStatus(u.cover, state.active);
       const appui = tickStatus(u.appui, state.active);
+      const root = tickStatus(u.root, state.active);
       let out =
         u.owner === next
           // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
@@ -775,6 +788,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (silence !== u.silence) out = { ...out, silence };
       if (cover !== u.cover) out = { ...out, cover };
       if (appui !== u.appui) out = { ...out, appui };
+      if (root !== u.root) out = { ...out, root };
       return out;
     }),
   };

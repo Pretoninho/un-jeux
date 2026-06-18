@@ -1075,6 +1075,44 @@ describe('combat — Résonance Mireille × Bastion (silence — déplacement un
   });
 });
 
+describe('combat — Résonance Orso × Bastion (enracinement — déplacement → 0)', () => {
+  const bastion = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'lourde', guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 16, characterId: 'bastion', ...over });
+  const orso = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'rac', on: 'garde_encaissee', fromCharacter: 'bastion', scope: { squad: true },
+        cooldown: 3, kind: 'racine', duration: 2 }], cooldowns: {}, ...over });
+
+  it('Bastion encaisse en garde → Orso enracine l\'attaquant (+ CD)', () => {
+    const base = makeCombatState(LINE, [
+      bastion({ id: 'r', owner: 'alice', hex: 'B', ap: 4 }),
+      orso({ id: 'o', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'r');
+    expect(unitById(s, 'b')!.root).toMatchObject({ owner: 'bob', expiresIn: 2 });
+    expect(unitById(s, 'o')!.cooldowns!.rac).toBe(3);
+  });
+
+  it('un enraciné ne peut plus se déplacer mais attaque encore', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, damage: 4, root: { owner: 'bob', expiresIn: 2 } }),
+      u({ id: 'x', owner: 'alice', hex: 'D', hp: 10 }),
+    ], 'bob');
+    expect(moveBudget(unitById(st, 'b')!)).toBe(0);          // figé
+    expect(moveUnit(st, 'b', 'B')).toBe(st);                 // déplacement refusé
+    expect(canAttack(st, 'b', 'x')).toBe(true);              // mais frappe encore (D adjacent)
+  });
+
+  it('l\'enracinement se décompte et finit par tomber', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, root: { owner: 'bob', expiresIn: 1 } }),
+    ], 'bob');
+    const back = endTurn(endTurn(st, 4), 4);                 // bob finit (racine tombe) → … → bob actif
+    expect(unitById(back, 'b')!.root).toBeUndefined();
+    expect(moveBudget(unitById(back, 'b')!)).toBe(4);
+  });
+});
+
 describe('combat — Résonance Mireille × Estoc (tir réplique sur la riposte)', () => {
   const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ kind: 'duelliste', hp: 9, maxHp: 9, damage: 2, riposte: { cost: 2 }, riposting: true, characterId: 'estoc', ...over });
