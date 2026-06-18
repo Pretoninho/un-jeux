@@ -271,6 +271,18 @@ const CHARGE_REMPART_FIL: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
 };
 
+// ── Héros FLÈCHE (Tireur, thème « focus / exécution ») — fiche : docs/heros/fleche.md ──
+/** « Flèche × Bastion » — Bastion (en garde) encaisse → Flèche MARQUE l'attaquant (+1 à son prochain tir). CD 2. */
+const MARQUAGE_FLECHE_BASTION: ReactionSpec = {
+  id: 'marquage_fleche_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+/** « Bastion × Flèche » (réciprocité de l'arête) — Tir réservé de Flèche → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
+const CHARGE_BASTION_FLECHE: ReactionSpec = {
+  id: 'charge_bastion_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -285,12 +297,13 @@ export interface Character {
  * NOMS = PLACEHOLDERS provisoires. Le draft (qui choisit quoi) reste une couche au-dessus, ajournée.
  */
 export const CHARACTERS: Record<string, Character> = {
-  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE, CHARGE_BASTION_ORSO, CHARGE_BASTION_ESTOC, CHARGE_BASTION_FIL] },
+  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE, CHARGE_BASTION_ORSO, CHARGE_BASTION_ESTOC, CHARGE_BASTION_FIL, CHARGE_BASTION_FLECHE] },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde', reactions: [CHARGE_REMPART_MIREILLE, CHARGE_REMPART_ORSO, CHARGE_REMPART_ESTOC, CHARGE_REMPART_FIL] },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION, ESTROPIER_ORSO_REMPART, ESTROPIER_ORSO_ESTOC, RACINE_ORSO_FIL] },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
+  fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

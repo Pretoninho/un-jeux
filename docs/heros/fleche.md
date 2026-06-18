@@ -4,8 +4,9 @@
 > (+ `docs/classes.md`, `docs/resonances.md`). Couvre : prénom → archétype → stats → verbe →
 > Résonance → **Némésis** → enregistrement → déploiement → UI → tests. Rien d'omis.
 >
-> **Statut : SPEC (proposée).** Aucun code n'est encore écrit dans `pieces.ts` — cette fiche est le
-> plan validable. Le câblage (CHARACTERS + tests) est l'étape finale, sur ton feu vert.
+> **Statut : LIVRÉ (2026-06-18).** Câblé dans `pieces.ts` (`CHARACTERS.fleche` + `MARQUAGE_FLECHE_BASTION`
+> + réciprocité `CHARGE_BASTION_FLECHE`) avec tests (`engine/combat.test.ts`). 1ᵉʳ héros au-delà des 6
+> d'origine → le vivier a un **3ᵉ Tireur** (cf. caveat `complementOf` au §7).
 
 ---
 
@@ -177,7 +178,7 @@ npm test && npm run check && npm run build
 - [x] Verbe : **Tir réservé** ; `moveCap` : aucun
 - [x] Résonance signature : `marquage_fleche_bastion` (`id` unique, signal+effet **existants**, escouade, CD 2)
 - [x] **Némésis** : automatique vs Tireurs ennemis (Mireille/Orso), élan **+1**, **LIVE**
-- [ ] Entrée `CHARACTERS` (à câbler) + réciprocité `CHARGE_BASTION_FLECHE` (optionnel)
-- [ ] Note draft `complementOf` (3 Tireurs)
-- [ ] Tests du lot
-- [ ] Gates verts
+- [x] Entrée `CHARACTERS` + réciprocité `CHARGE_BASTION_FLECHE`
+- [x] Note draft `complementOf` (3 Tireurs) — documentée (§7), à traiter au draft
+- [x] Tests du lot (fabrique + marquage + charge réciproque)
+- [x] Gates verts (158 tests)

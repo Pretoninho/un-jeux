@@ -1229,6 +1229,38 @@ describe('combat — matrice : rangée Rempart (mobilité soutenue, charge 2 tou
   });
 });
 
+describe('combat — Héros Flèche (Tireur, focus/exécution)', () => {
+  const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
+
+  it('makeUnitFromCharacter pose identité + stats Tireur (sur-droite) + signature', () => {
+    const f = makeUnitFromCharacter('fleche', 'alice', 'A', CHARACTERS.fleche!, 4);
+    expect(f.name).toBe('Flèche');
+    expect(f.characterId).toBe('fleche');
+    expect(f.kind).toBe('tireur');
+    expect([f.range, f.maxHp, f.damage, f.attackCost]).toEqual([4, 7, 2, 2]); // portée+robustesse=5
+    expect(f.overwatch).toBeTruthy();                                          // verbe Tir réservé
+    expect(f.reactions?.some((r) => r.id === 'marquage_fleche_bastion')).toBe(true);
+  });
+
+  it('Flèche × Bastion : Bastion encaisse en garde → l’attaquant est marqué par Flèche', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('bastion', 'alice', 'B', { guarding: true }), hero('fleche', 'alice', 'A'),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, damage: 4, hp: 20 }),
+    ], 'bob'), 'b', 'bastion');
+    expect(unitById(s, 'b')!.mark).toMatchObject({ by: 'fleche', bonus: 1 });
+  });
+
+  it('Bastion × Flèche (réciprocité) : le Tir réservé de Flèche charge Bastion', () => {
+    const base = makeCombatState(LINE, [
+      hero('fleche', 'alice', 'A', { watching: true }), hero('bastion', 'alice', 'B'),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),
+    ], 'bob');
+    const s = resolveOverwatch(moveUnit(base, 'b', 'C'), 'b');
+    expect(unitById(s, 'bastion')!.haste).toMatchObject({ amount: 2 });
+  });
+});
+
 describe('combat — Résonance Mireille × Estoc (tir réplique sur la riposte)', () => {
   const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ kind: 'duelliste', hp: 9, maxHp: 9, damage: 2, riposte: { cost: 2 }, riposting: true, characterId: 'estoc', ...over });
