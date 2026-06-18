@@ -642,7 +642,7 @@
             {#if selected.guard}
               <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}
                 title={`GARDE (${selected.guard.cost} PA) : posture défensive jusqu'à ton prochain tour — dégâts subis réduits (×${selected.guard.damageTakenMul}). Encaisser une attaque en garde déclenche les Résonances de tes alliés.`}>
-                {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
+                {selected.guarding ? '🛡 En garde' : `🛡 Garder (${selected.guard.cost})`}
               </button>
             {/if}
             {#if selected.overwatch}
@@ -781,7 +781,7 @@
       verte pour <b>bouger</b>. Clique une <b style="color:#e0604a">pièce adverse</b> pour l'inspecter
       (panneau + <b style="color:#e0604a">sa portée</b>), puis <b>⚔ Attaquer</b> si elle est à portée.
       <br/>🔍 <b>Molette</b> pour zoomer, <b>glisse</b> pour déplacer la carte, <b>⤢</b> pour tout réafficher.
-      La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Défendre (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
+      La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Garder (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
       Le <b>Tireur</b> peut <b style="color:#f0c0a0">🎯 Réserver (3 PA)</b> son tir : il <b>tire en réflexe</b> sur la première pièce qui s'arrête dans sa <b style="color:#c07a6a">zone de menace</b> (teintée pendant ton tour).
       {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
     {/if}
