@@ -38,6 +38,9 @@
   // Couleur des bulles d'état — réglable par le joueur (menu Réglages), persistée.
   let bubbleColor = $state((typeof localStorage !== 'undefined' && localStorage.getItem('bubbleColor')) || '#3d4658');
   $effect(() => { try { localStorage.setItem('bubbleColor', bubbleColor); } catch { /* stockage indispo */ } });
+  // Tuto « Comment jouer » : affiché au 1er lancement, ré-ouvrable via le bouton ? Aide.
+  let showHelp = $state(typeof localStorage === 'undefined' || !localStorage.getItem('seenHelp'));
+  function closeHelp() { showHelp = false; try { localStorage.setItem('seenHelp', '1'); } catch { /* noop */ } }
 
   // États actifs d'une pièce (postures + statuts de Résonance) : une icône + une description chacun.
   // Servent à la fois les petites icônes SUR la pièce et le tooltip au survol (`<title>` natif).
@@ -367,6 +370,7 @@
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
+    <button class="help-btn" onclick={() => (showHelp = true)}>❔ Comment jouer</button>
     <details class="settings">
       <summary>⚙ Réglages</summary>
       <label class="setrow">Couleur des bulles d'état
@@ -686,6 +690,52 @@
   </div>
 </div>
 
+{#if showHelp}
+  <div class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Comment jouer">
+      <button class="modal-close" onclick={closeHelp} aria-label="Fermer">✕</button>
+      <h2>Comment jouer</h2>
+      <p class="lead">Combat tactique <b>tour par tour</b>, en <b>hotseat</b> (2 joueurs, même écran). <b>Information parfaite, aucun hasard</b> — pure stratégie.</p>
+
+      <h3>🎯 But</h3>
+      <p>Éliminer <b>toutes</b> les pièces adverses.</p>
+
+      <h3>🕹 Le tour de jeu</h3>
+      <ul>
+        <li>Chaque pièce a des <b>PA</b> : bouger coûte <b>1 PA/case</b>, attaquer coûte son coût. Tu joues tes pièces dans <b>l'ordre que tu veux</b>.</li>
+        <li>Les <b>pièces sont des obstacles</b> — on ne les traverse pas.</li>
+        <li><b>Finir le tour</b> passe la main à l'autre joueur ; les PA <b>rechargent</b>.</li>
+      </ul>
+
+      <h3>🖱 Agir</h3>
+      <ul>
+        <li>Clique <b>ta pièce</b> → une <b>case verte</b> pour <b>bouger</b>.</li>
+        <li>Clique une <b>pièce adverse</b> pour l'<b>inspecter</b> (sa portée / sa zone de menace), puis <b>⚔ Attaquer</b> si elle est à portée.</li>
+      </ul>
+
+      <h3>♟ Les archétypes</h3>
+      <ul>
+        <li><b>Lourde</b> (L) — robuste, mêlée · verbe <b>Garde</b>.</li>
+        <li><b>Tireur</b> (T) — fragile, longue portée · verbe <b>Tir réservé</b>.</li>
+        <li><b>Duelliste</b> (D) — frappe 2×/tour · verbe <b>Riposte</b>.</li>
+      </ul>
+      <p class="muted small">Le détail d'un verbe s'affiche en <b>survolant son bouton</b> dans le panneau.</p>
+
+      <h3>✦ Résonance &amp; Némésis</h3>
+      <ul>
+        <li><b>Résonance</b> : des <b>synergies entre alliés</b> se déclenchent automatiquement (panneau <b>✦ Matrice</b> en bas).</li>
+        <li><b>Némésis</b> : tuer l'ennemi du <b>même archétype</b> (le <b>N</b> de la matrice) donne un <b>élan de PA</b> à ton équipe.</li>
+      </ul>
+
+      <h3>🔍 Repères</h3>
+      <p>Molette = <b>zoom</b> · glisser = <b>déplacer</b> la carte · <b>⤢</b> = tout réafficher.</p>
+      <p class="lead">Le reste se découvre en jouant — <b>teste les personnages !</b></p>
+
+      <button class="modal-ok" onclick={closeHelp}>Compris, jouer&nbsp;!</button>
+    </div>
+  </div>
+{/if}
+
 <style>
   .combat { display: flex; flex-direction: column; gap: .7rem; }
   /* 3 colonnes : contrôles à gauche, board au centre, panneaux d'info à droite. */
@@ -727,6 +777,20 @@
   .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
   .setrow input[type="color"] { width: 34px; height: 22px; padding: 0; border: 1px solid #3a4555; border-radius: 4px; background: none; cursor: pointer; }
+  .help-btn { background: #1c2438; border: 1px solid #3a4860; color: #aec6f0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .help-btn:hover { background: #243150; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(6, 8, 12, 0.72); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
+  .modal { position: relative; background: #161a22; border: 1px solid #2a2f3a; border-radius: 12px; padding: 1.4rem 1.6rem; max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
+  .modal h2 { margin: 0 0 .3rem; font-size: 1.35rem; }
+  .modal h3 { margin: 1rem 0 .25rem; font-size: .95rem; color: #aec6f0; }
+  .modal p { margin: .2rem 0; line-height: 1.45; }
+  .modal .lead { color: #cdd3df; }
+  .modal ul { margin: .2rem 0; padding-left: 1.2rem; }
+  .modal li { margin: .25rem 0; line-height: 1.4; }
+  .modal-close { position: absolute; top: .55rem; right: .7rem; background: none; border: none; color: #8a93a6; font-size: 1.15rem; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: #e8ecf2; }
+  .modal-ok { margin-top: 1.1rem; width: 100%; background: #2a6f5e; border: 1px solid #3a8a76; color: #eafff7; border-radius: 6px; padding: .6rem; font-size: .95rem; font-weight: 700; cursor: pointer; }
+  .modal-ok:hover { background: #348973; }
   .banner { background: #1e2435; border: 1px solid var(--c); border-radius: 8px; padding: .6rem 1rem; display: flex; align-items: center; gap: 1rem; }
   .banner b { color: var(--c); }
   .rematch { margin-left: auto; background: #1a2030; border: 1px solid var(--c); color: #e6ebf5; border-radius: 5px; padding: .35rem .8rem; cursor: pointer; }
