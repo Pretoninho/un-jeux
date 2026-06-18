@@ -1164,18 +1164,18 @@ describe('combat — matrice : rangées Orso (contrôle) & Bastion (mobilité) c
     ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
   const foe = (hex: string): Unit => u({ id: 'b', owner: 'bob', hex, ap: 4, damage: 4, hp: 20 });
 
-  it('Orso × Rempart : Rempart encaisse en garde → l’attaquant est estropié', () => {
+  it('Orso × Rempart : Rempart encaisse en garde → l’attaquant est enraciné (racine)', () => {
     const s = attack(makeCombatState(LINE, [
       hero('rempart', 'alice', 'B', { guarding: true }), hero('orso', 'alice', 'A'), foe('C'),
     ], 'bob'), 'b', 'rempart');
-    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 2 });
+    expect(unitById(s, 'b')!.root).toMatchObject({ expiresIn: 2 });
   });
 
-  it('Orso × Estoc : la Riposte d’Estoc part → l’attaquant est estropié', () => {
+  it('Orso × Estoc : la Riposte d’Estoc part → l’attaquant est enraciné (racine)', () => {
     const s = attack(makeCombatState(LINE, [
       hero('estoc', 'alice', 'B', { riposting: true }), hero('orso', 'alice', 'A'), foe('C'),
     ], 'bob'), 'b', 'estoc');
-    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 1 });
+    expect(unitById(s, 'b')!.root).toMatchObject({ expiresIn: 2 });
   });
 
   it('Orso × Fil : la Riposte de Fil part → l’attaquant est enraciné', () => {
@@ -1492,20 +1492,9 @@ describe('combat — Résonance Baume × Bastion (regen, soin réactif — pur s
   });
 });
 
-describe('combat — Mélisse × Estoc (regen sustain) + Némésis Soigneur↔Soigneur', () => {
+describe('combat — Némésis Soigneur↔Soigneur (Baume ↔ Mélisse)', () => {
   const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
     ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
-
-  it('la Riposte d\'Estoc part → Mélisse le régénère (+2×3, sustain) + CD', () => {
-    const st = makeCombatState(LINE, [
-      hero('estoc', 'alice', 'B', { riposting: true, hp: 9, maxHp: 9 }),
-      hero('melisse', 'alice', 'A'),
-      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 2 }),
-    ], 'bob');
-    const s = attack(st, 'foe', 'estoc'); // foe frappe Estoc (adjacent) → Estoc contre → signal riposte
-    expect(unitById(s, 'estoc')!.regen).toMatchObject({ owner: 'alice', amount: 2, expiresIn: 3 });
-    expect(unitById(s, 'melisse')!.cooldowns!.regen_melisse_estoc).toBe(3);
-  });
 
   it('Némésis : Baume achève Mélisse (camps opposés, même archétype) → élan au tueur', () => {
     const st = makeCombatState(LINE, [

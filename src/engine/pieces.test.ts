@@ -92,14 +92,10 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(d).toMatchObject({ name: 'Estoc', characterId: 'estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
     expect(d.reactions).toHaveLength(4);                                    // quatre duos
     const ids = d.reactions!.map((r) => r.id);
-    expect(ids).toContain('epines_estoc_bastion');                         // × Bastion
-    expect(ids).toContain('marquage_estoc_mireille');                      // × Mireille
-    expect(ids).toContain('estropier_estoc_rempart');                      // × Rempart
-    expect(ids).toContain('provocation_estoc_orso');                       // × Orso
-    expect(d.reactions!.find((r) => r.id === 'epines_estoc_bastion')!.fromCharacter).toBe('bastion');
-    expect(d.reactions!.find((r) => r.id === 'marquage_estoc_mireille')!.fromCharacter).toBe('mireille');
-    expect(d.reactions!.find((r) => r.id === 'estropier_estoc_rempart')!.fromCharacter).toBe('rempart');
-    expect(d.reactions!.find((r) => r.id === 'provocation_estoc_orso')!.fromCharacter).toBe('orso');
+    // « Un possesseur = un effet » : tous les duos d'Estoc sont des ÉPINES, seul le partenaire change.
+    expect(ids).toEqual(['epines_estoc_bastion', 'epines_estoc_mireille', 'epines_estoc_rempart', 'epines_estoc_orso']);
+    expect(d.reactions!.every((r) => r.kind === 'epines')).toBe(true);
+    expect(d.reactions!.map((r) => r.fromCharacter)).toEqual(['bastion', 'mireille', 'rempart', 'orso']);
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
   });
 
@@ -124,13 +120,15 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect({ hp: a.hp, damage: a.damage, range: a.range, attackCost: a.attackCost })
       .toEqual({ hp: b.hp, damage: b.damage, range: b.range, attackCost: b.attackCost });
     expect(a.reactions).not.toEqual(b.reactions);            // duos distincts
-    expect(a.reactions!.map((r) => r.id)).toContain('epines_estoc_bastion'); // Estoc × Bastion
-    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'ralliement_fil_mireille', 'etourdir_fil_rempart', 'ruee_fil_orso']); // Fil × Bastion, × Mireille, × Rempart, × Orso
+    expect(a.reactions!.every((r) => r.kind === 'epines')).toBe(true);   // Estoc = épines
+    expect(b.reactions!.every((r) => r.kind === 'vendetta')).toBe(true); // Fil = vendetta
+    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'vendetta_fil_mireille', 'vendetta_fil_rempart', 'vendetta_fil_orso']);
   });
 
-  it('Mireille (Tireuse) a ses Résonances de possesseur (silence + tir réplique)', () => {
+  it('Mireille (Tireuse) — un possesseur = un effet : tous ses duos SILENCENT', () => {
     const m = makeUnitFromCharacter('a2', 'alice', 'Z', CHARACTERS.mireille!, 4);
-    expect(m.reactions!.map((r) => r.id)).toEqual(['silence_mireille_bastion', 'replique_mireille_estoc', 'couverture_mireille_rempart', 'appui_mireille_fil']);
+    expect(m.reactions!.every((r) => r.kind === 'silence')).toBe(true);
+    expect(m.reactions!.map((r) => r.id)).toEqual(['silence_mireille_bastion', 'silence_mireille_estoc', 'silence_mireille_rempart', 'silence_mireille_fil']);
   });
 
   it('un personnage à l\'archétype inconnu est rejeté', () => {
@@ -168,13 +166,12 @@ describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve
     expect(['lourde', 'tireur', 'duelliste']).not.toContain('soigneur');
   });
 
-  it('Mélisse : 2e Soigneur, signature regen SUSTAIN (riposte, +2×3) — pur soin', () => {
+  it('Mélisse : 2e Soigneur, verbe Soin mais AUCUNE Résonance pour l\'instant (à créer)', () => {
     const m = makeUnitFromCharacter('a4', 'alice', 'X', CHARACTERS.melisse!, 4);
     expect(m.name).toBe('Mélisse');
     expect(m.kind).toBe('soigneur');
     expect(m.heal).toEqual({ cost: 3, amount: 4, range: 2 });
-    const rg = m.reactions!.find((r) => r.id === 'regen_melisse_estoc')!;
-    expect(rg).toMatchObject({ on: 'riposte', fromCharacter: 'estoc', kind: 'regen', amount: 2, duration: 3 });
+    expect(m.reactions ?? []).toHaveLength(0); // pas encore de signature
   });
 
   it('Baume & Mélisse sont deux Soigneurs (paire d\'archétype → Némésis mutuelle)', () => {

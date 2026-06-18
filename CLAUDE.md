@@ -113,11 +113,11 @@
   rechargement** pendant `duration` tours (plafonné, tické à `endTurn`, comme `cover` pour les PA) —
   vise l'allié **SOURCE** du signal. **EN RÉSERVE** : présent dans `CHARACTERS`/`ARCHETYPES` mais
   **PAS dans les `SLOTS`** de l'escouade par défaut (non fieldable, **pas d'UI/IA** — différés au lot
-  « fielder le Soigneur »). **2 héros (paire)** : **Baume** (× Bastion, `garde_encaissee` → `regen`
-  +2×**2**, soin réactif **court**) et **Mélisse** (× Estoc, `riposte` → `regen` +2×**3**, sustain
-  **long**) — miroir court/long. → **Némésis Soigneur↔Soigneur (Baume↔Mélisse) ACTIVE** automatiquement
-  (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`). *Stats/nombres à affiner
-  au playtest.*
+  « fielder le Soigneur »). **2 héros (paire)** : **Baume** — signature **`regen`** (× Bastion,
+  `garde_encaissee` → +2×2, soin réactif) — et **Mélisse** — **AUCUNE Résonance pour l'instant**
+  (`reactions: []`, on lui en créera une au prochain lot). → **Némésis Soigneur↔Soigneur (Baume↔Mélisse)
+  ACTIVE** automatiquement (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`).
+  *Stats/nombres à affiner au playtest.*
 - **Effectif** : escouade par défaut = Lourde + Tireur + **Duelliste** (3/camp). Le **Soigneur** (4ᵉ
   archétype) est **créé mais en réserve** (pas encore dans l'escouade — passage à 4 = lot ultérieur).
   Exotiques (Hallebardier/Saboteur) toujours en réserve. Le **Duelliste** est hors-droite (PV 9,
@@ -172,6 +172,20 @@
     restent pour le cas léger « même effet, magnitude variable ». **Contrainte** : un duo n'existe
     que s'il a un **signal que le partenaire émet** (aujourd'hui seul `garde_encaissee`, émis par
     la Garde → seuls les duos avec un tank sont déclenchables sans nouveau signal).
+  - **⚠️ MODÈLE RÉVISÉ — « UN POSSESSEUR = UN EFFET » (décidé/livré 2026-06-18)** — *durcissement du
+    « thème de rangée »* : on **abandonne la variété par-duo** au profit de la **lisibilité**. Chaque
+    héros-possesseur porte désormais **UN SEUL `kind`**, le **même pour TOUS ses duos** ; le partenaire
+    ne change que le **déclencheur** (le signal qu'il émet : `garde_encaissee`=Lourde, `tir_reserve`=Tireur,
+    `riposte`=Duelliste). L'effet **EST** l'identité du possesseur. Roster homogénéisé : **Estoc=`epines`,
+    Fil=`vendetta`, Mireille=`silence`, Orso=`racine`, Bastion/Rempart=`charge`, Flèche=`marquage`,
+    Baume=`regen`**. Conséquences : *Fil × Mireille* (jadis `ralliement`/mort) rebranché sur `tir_reserve`
+    (→ `vendetta`) — la mécanique « mort→ralliement » est **retirée du roster** (effet conservé dans le
+    moteur, réutilisable). Les effets `marquage`(Estoc)/`estropier`/`provocation`/`couverture`/`appui`/
+    `etourdir`/`ruee` ne sont **plus câblés** au roster (restent dans le moteur). **⚠️ Les descriptions
+    par-duo détaillées ci-dessous (Estoc×Mireille=marque, Fil×Rempart=étourdir, etc.) sont OBSOLÈTES** :
+    seul compte désormais « possesseur → son effet unique ».
+  - **Mélisse (2ᵉ Soigneur) n'a PLUS de Résonance** (`reactions: []`) — on lui en créera une (lot à venir).
+    Baume conserve `regen` (Baume × Bastion).
   - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`bastion`, en garde, rayon 2)
     encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'bastion'`), CD 2 tours.
   - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`
