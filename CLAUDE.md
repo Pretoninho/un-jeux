@@ -14,6 +14,21 @@
 - Séparation tenue depuis le début : **topologie (moteur) vs présentation (forme/rendu)**.
   Le moteur de combat ne lit que `neighbors` → il est agnostique à la forme des tuiles.
 
+## Feuille de route — priorités (décidé 2026-06-18)
+> Ordre de travail validé. Méthode inchangée : **un lot = une cellule validée** (proposer → valider → coder → gates verts).
+1. **Terminer les Résonances des autres personnages** — densifier la matrice « possesseur × déclencheur ».
+   Aujourd'hui Mireille a sa ligne complète (4 duos) et Estoc/Fil leurs 4 duos ; reste à compléter les
+   **lignes des Lourdes (Bastion, Rempart)** et des **Tireurs/Duellistes manquants** (Orso, etc.) →
+   viser la **réciprocité** (remplir les deux sens de chaque arête). *Rappel garde-fou* : un duo n'existe
+   que si le partenaire **émet un signal** (cf. revue de conception, point 1) — élargir le vocabulaire de
+   signaux est une décision active.
+2. **Création de nouveaux personnages** — enrichir le **vivier plat** (`CHARACTERS`), un héros à la fois
+   (procédé : `docs/personnages.md`). Inclut les **spécialistes** en réserve (Soigneur = 4ᵉ archétype visé,
+   Hallebardier/Saboteur) « nés résonants ».
+3. **Némésis — découpler la rivalité de la composition** via `isNemesis` + couche de données (détail dans la
+   sous-section NÉMÉSIS ci-dessous). Prérequis logique des deux premiers : plus le vivier est riche, plus le
+   découplage + le draft libre prennent leur sens.
+
 ## Garde-fous techniques
 - Avant de livrer : `npm test`, `npm run check`, `npm run build` doivent passer.
 - Moteur = modules purs et immuables (aucune dépendance DOM), testables sans navigateur.
@@ -210,6 +225,21 @@
     seule la magnitude varie ; faire varier l'**effet par archétype tué** = enrichissement futur (quand un
     mode de jeu existera pour l'ancrer). **RÉSURRECTION non construite** (design déjà res-safe : temporaire
     + échelonné) ; **question ouverte notée** : re-tuer son Némésis re-déclenche-t-il ? (le CD laisse le choix).
+  - **DÉCOUPLAGE DRAFT (orientation 2026-06-18, à construire)** — *promouvoir Némésis d'effet ÉMERGENT
+    (dérivé de l'invariant « escouade = 1 de chaque archétype ») à RELATION DÉCLARÉE*, pour qu'un draft
+    libre (et de nouveaux archétypes) garde la mécanique. **Constat** : le moteur n'impose déjà rien — le
+    déclencheur `killer.kind === dead.kind && owner !== owner` est agnostique à la composition ; ce qui est
+    couplé, c'est le **récit méta** (« deux mêmes archétypes sont *toujours* ennemis » repose sur 1-de-chaque)
+    et l'**équité par miroir**. **Plan** : introduire un prédicat pur `isNemesis(killer, dead)` (camps opposés
+    ET rivalité *authored*), résolu depuis une **petite couche de données** à deux granularités — (1) règle
+    **par archétype** par défaut (**rétro-compatible** : garde Bastion↔Rempart, Estoc↔Fil… sans rien réécrire),
+    (2) paires **explicites** héros/thématiques (`Character.nemesis?: { kinds?; characters? }`) pour rivalités
+    **inter-archétypes** (futur Saboteur↔Soigneur…). `resolveNemesis` appelle `isNemesis` au lieu de
+    `kind===kind` (**1 ligne**, comportement actuel = règle archétype par défaut). **Débloque le draft libre** :
+    « pas de rival en face → Némésis **dormant** » devient un **levier de draft** (drafter un contre *active* le
+    bonus), l'**équité migre au draft**. **Cap symétrique** : `NemesisSpec` par paire (effet propre) = **matrice
+    jumelle** de la Résonance (Résonance vise les alliés du mort ; Némésis vise le tueur) ; `lastHitBy` est
+    **déjà** la brique d'attribution générale, composition-agnostique → rien à refaire de ce côté.
 - **REVUE DE CONCEPTION — points retenus (2026-06-16)** : forces du système = fort effet de levier
   (on n'écrit que les cellules utiles), profondeur de draft (synergies mutuellement exclusives →
   « pas d'escouade strictement meilleure »), couches nettes (`kind`/`ReactionSpec`/roster). Points
