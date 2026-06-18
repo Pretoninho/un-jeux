@@ -347,6 +347,86 @@
     resetView();
     restart();
   }
+
+  // ── TUTORIEL JOUABLE ───────────────────────────────────────────────────────
+  // Mini-scénario RÉEL (vraie CombatState, mêmes handlers que la partie) : la Lourde
+  // + le Tireur d'Alice face à un ennemi robuste. 6 étapes guidées, chacune détectée
+  // sur l'état du jeu (pas de mode spécial dans le moteur — on observe, on n'impose pas).
+  let tutoStep = $state(-1);  // -1 = tuto inactif ; 0..N-1 = étape courante ; N = terminé
+  let tuto = $state<{ lourde: string; tireur: string; enemy: string; enemyHp: number } | null>(null);
+  const tutoActive = $derived(tutoStep >= 0);
+
+  // Place Bastion (Lourde) au coin, Mireille (Tireur) à côté, un ennemi robuste à 2 cases
+  // (la Lourde le rejoint en 1 pas) — BFS déterministe, agnostique à la forme du plateau.
+  function tutorialState(g: Geo): CombatState {
+    const c0 = g.corners[0];
+    const byId = new Map(g.map.hexes.map((h) => [h.id, h] as const));
+    const nb = (id: string) => byId.get(id)?.neighbors ?? [];
+    const dist = new Map<string, number>([[c0, 0]]);
+    const order: string[] = [c0];
+    let frontier = [c0];
+    for (let d = 1; d <= 4; d++) {
+      const next: string[] = [];
+      for (const h of frontier) for (const x of nb(h)) if (!dist.has(x)) { dist.set(x, d); order.push(x); next.push(x); }
+      frontier = next;
+    }
+    const d1 = order.filter((id) => dist.get(id) === 1);
+    const tireurHex = d1.find((id) => !id.startsWith('s:')) ?? d1[0]!;
+    // Ennemi à 2 cases AVEC un voisin libre à 1 case (≠ Tireur) → la Lourde peut le rejoindre.
+    const enemyHex = order.find((id) => dist.get(id) === 2 && nb(id).some((x) => dist.get(x) === 1 && x !== tireurHex))
+      ?? order.find((id) => dist.get(id) === 2) ?? d1[0]!;
+    return makeCombatState(g.map, [
+      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.bastion!, AP_PER_TURN),
+      makeUnitFromCharacter('a2', 'alice', tireurHex, CHARACTERS.mireille!, AP_PER_TURN),
+      makeUnitFromCharacter('b1', 'bob', enemyHex, CHARACTERS.rempart!, AP_PER_TURN),
+    ], 'alice');
+  }
+
+  const tunit = (id: string | undefined) => combat.units.find((u) => u.id === id);
+  const tunitHex = (id: string) => tunit(id)?.hex ?? '';
+  const lourdeAtContact = () => {
+    const l = tunit(tuto?.lourde), e = tunit(tuto?.enemy);
+    return !!l && !!e && rangeSet(l.hex, l.range).has(e.hex);
+  };
+
+  interface TutoStep { text: string; done: () => boolean; focus: () => string[] }
+  const TUTO_STEPS: TutoStep[] = [
+    { text: '1 / 6 — Clique ta Lourde 🛡 (le pion qui clignote) pour la sélectionner.',
+      done: () => selectedId === tuto?.lourde, focus: () => (tuto ? [tunitHex(tuto.lourde)] : []) },
+    { text: '2 / 6 — Amène-la au contact : clique une case verte collée à l’ennemi.',
+      done: () => lourdeAtContact(), focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
+    { text: '3 / 6 — Clique la pièce adverse pour l’inspecter (sa portée s’affiche).',
+      done: () => inspectedId === tuto?.enemy, focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
+    { text: '4 / 6 — Frappe-la : bouton ⚔ Attaquer dans le panneau de droite.',
+      done: () => !!tuto && (tunit(tuto.enemy)?.hp ?? 0) < tuto.enemyHp, focus: () => (tuto ? [tunitHex(tuto.enemy)] : []) },
+    { text: '5 / 6 — Sélectionne ton Tireur 🎯 puis clique « 🎯 Réserver » (tir réflexe).',
+      done: () => !!tunit(tuto?.tireur)?.watching, focus: () => (tuto ? [tunitHex(tuto.tireur)] : []) },
+    { text: '6 / 6 — Termine avec « Finir le tour ⏩ » (colonne de gauche).',
+      done: () => combat.active !== 'alice', focus: () => [] },
+  ];
+  const tutoDone = $derived(tutoActive && tutoStep >= TUTO_STEPS.length);
+  const tutoFocus = $derived.by(() =>
+    tutoActive && tutoStep < TUTO_STEPS.length ? new Set(TUTO_STEPS[tutoStep]!.focus()) : new Set<string>());
+
+  // Avance d'une étape dès que sa condition est remplie (peut enchaîner si déjà satisfaite).
+  $effect(() => {
+    if (tutoStep < 0 || !tuto || tutoStep >= TUTO_STEPS.length) return;
+    if (TUTO_STEPS[tutoStep]!.done()) tutoStep += 1;
+  });
+
+  function startTutorial() {
+    combat = tutorialState(geo);
+    history = [];
+    inspectedId = '';
+    selectedId = '';  // l'étape 1 EST de sélectionner la Lourde
+    tuto = { lourde: 'a1', tireur: 'a2', enemy: 'b1', enemyHp: tunit('b1')!.hp };
+    tutoStep = 0;
+  }
+  function endTutorial() {
+    tutoStep = -1;
+    tuto = null;
+    restart();  // bascule sur une vraie partie (line-up complet)
+  }
 </script>
 
 <div class="combat">
@@ -370,6 +450,11 @@
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
+    {#if tutoActive}
+      <button class="tuto-btn on" onclick={endTutorial}>✕ Quitter le tuto</button>
+    {:else}
+      <button class="tuto-btn" onclick={startTutorial}>▶ Tutoriel jouable</button>
+    {/if}
     <details class="settings">
       <summary>⚙ Menu</summary>
       <button class="menu-link" onclick={() => (showHelp = true)}>❔ Comment jouer</button>
@@ -384,6 +469,18 @@
       <div class="banner" style="--c:{COLORS[champ!]}">
         🏁 <b>{NAMES[champ!]}</b> remporte le duel.
         <button class="rematch" onclick={restart}>Revanche</button>
+      </div>
+    {/if}
+    {#if tutoActive && !tutoDone}
+      <div class="tutobar">
+        <span class="tutostep">{TUTO_STEPS[tutoStep]!.text}</span>
+        <button class="tutoskip" onclick={endTutorial}>Passer ✕</button>
+      </div>
+    {/if}
+    {#if tutoDone}
+      <div class="tutodone">
+        🎉 <b>Tu sais jouer&nbsp;!</b> Tu as déplacé, attaqué, réservé un tir et fini ton tour.
+        <button class="tutogo" onclick={endTutorial}>Commencer une vraie partie ▶</button>
       </div>
     {/if}
 
@@ -408,6 +505,7 @@
           fill={inReach ? '#1f3340' : threatened ? '#2a1a1e' : t.small ? '#10131a' : '#161a22'}
           stroke={attackable ? '#e0604a' : inReach ? '#5ab0a0' : threatened ? '#7a3c44' : t.small ? '#222734' : '#272c37'}
           stroke-width={attackable ? 3.5 : inReach ? 2.5 : threatened ? 2 : 1.5} />
+        {#if tutoFocus.has(t.id)}<polygon points={t.points} class="tutoring" />{/if}
         {#if inAlly}<polygon points={t.points} class="rng-ally" />{/if}
         {#if inFoe}<polygon points={t.points} class="rng-foe" />{/if}
         {#if occ}
@@ -773,6 +871,19 @@
   .end-turn:hover:not(:disabled) { border-color: #5a70b0; }
   .end-turn:disabled { opacity: .4; cursor: not-allowed; }
   .restart { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .tuto-btn { background: #1f3a33; border: 1px solid #3a8a76; color: #b8f0e2; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; font-weight: 600; }
+  .tuto-btn:hover { border-color: #5fae9a; }
+  .tuto-btn.on { background: #3a2030; border-color: #8a6075; color: #e0b0c0; }
+  .tutobar { display: flex; align-items: center; gap: 1rem; background: #1b2a26; border: 1px solid #3a8a76; border-radius: 8px; padding: .55rem .9rem; margin-bottom: .7rem; }
+  .tutostep { color: #d6fff2; font-size: .92rem; font-weight: 600; }
+  .tutoskip { margin-left: auto; background: #14201d; border: 1px solid #3a5a52; color: #9ad0c2; border-radius: 5px; padding: .3rem .7rem; cursor: pointer; font-size: .8rem; white-space: nowrap; }
+  .tutoskip:hover { border-color: #5fae9a; }
+  .tutodone { display: flex; align-items: center; gap: 1rem; background: #1e2435; border: 1px solid #5a70b0; border-radius: 8px; padding: .7rem 1rem; margin-bottom: .7rem; }
+  .tutodone b { color: #cfe0ff; }
+  .tutogo { margin-left: auto; background: #2a6f5e; border: 1px solid #3a8a76; color: #eafff7; border-radius: 6px; padding: .45rem .9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .tutogo:hover { background: #348973; }
+  .tutoring { fill: none; stroke: #ffd479; stroke-width: 4; pointer-events: none; animation: tutopulse 1.1s ease-in-out infinite; }
+  @keyframes tutopulse { 0%, 100% { opacity: .35; stroke-width: 3; } 50% { opacity: 1; stroke-width: 5.5; } }
   .settings { font-size: .8rem; color: #9aa3b5; }
   .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
