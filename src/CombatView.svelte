@@ -150,8 +150,9 @@
   }
 
   const startGeo = buildBoard('octa', OCTA_TRAIN); // démarrage sur l'Entraînement (petit octogone)
-  // PHASE : l'appli démarre sur l'écran de pré-partie (setup) ; « Commencer » bascule en combat.
-  let phase = $state<'setup' | 'combat'>('setup');
+  // PHASE : l'appli démarre DIRECTEMENT en combat (config par défaut : Entraînement, vs IA normal,
+  // escouade par défaut). L'écran de pré-partie (setup) reste accessible via « ⚙ Nouvelle partie ».
+  let phase = $state<'setup' | 'combat'>('combat');
   let opponent = $state<Opponent>('ia');
   let aiLevel = $state<Difficulty>('normal');
   let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade d'Alice (toi) ; Bob = complément
