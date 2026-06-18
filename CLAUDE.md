@@ -230,6 +230,27 @@
      **réciprocité émerge** en remplissant les deux sens de la matrice → cap : matrice dense quand
      tous les héros auront toutes leurs Résonances.
 
+## IA / adversaire (avancement)
+- **CERVEAU LIVRÉ (lot 1, 2026-06-18)** — `engine/ai.ts`, **module pur** (0 DOM, déterministe, testé
+  `engine/ai.test.ts`). **Aucun câblage UI** pour l'instant → **rien ne change en jeu** (pas importé
+  dans `CombatView`). On valide d'abord la qualité de jeu isolément.
+  - **API** : `planTurn(state, level): AiAction[]` (suite d'actions, terminée par `endTurn` → rejouable
+    une par une pour un futur **auto-play animé**) ; `applyAction(state, action, apPerTurn)` (dispatcher
+    fidèle au jeu : un `move` déclenche `resolveOverwatch`, un `attack` résout riposte + Résonances) ;
+    `playTurn(state, apPerTurn, level)` (= repli du plan).
+  - **Stratégie** : **greedy 1-ply** — énumère les actions légales du camp actif, les **score en simulant**
+    sur le moteur pur (matériel : `vie + PV`, un kill ≫ un coup ; + terme positionnel de rapprochement
+    via un champ de distance multi-source), joue la meilleure, recommence ; `endTurn` quand plus rien ne
+    vaut le coup. Borné (`MAX_ACTIONS`) → terminaison garantie. **Pas de hasard** (départage par ids).
+  - **3 niveaux sélectionnables** (`Difficulty = 'facile' | 'normal' | 'difficile'`, mêmes règles, finesse
+    croissante via `Brain`) : **Facile** = aveugle au tir réservé (fonce dans l'overwatch), pas de verbes,
+    score d'attaque naïf (ignore ripostes/contres subis) ; **Normal** = anticipe l'overwatch, **se met en
+    garde / réserve son tir** à propos, trade lucide ; **Difficile** = Normal **+** valorise les
+    déclenchements de **Résonance** (`previewReactions`) **+** protège ses pièces exposées/entamées.
+  - **Calibrage = PLAYTEST** (constantes en tête de fichier : `ALIVE/HP_W/CLOSE_W/GUARD_VALUE/…`).
+  - **Lot 2 (à valider séparément)** : câblage UI — mode « **vs IA** » (Alice = toi, Bob = IA) + auto-play
+    du tour adverse avec animation entre les actions ; choix du niveau dans les contrôles.
+
 ## Déploiement (en ligne)
 - **URL publique : https://pretoninho.github.io/un-jeux/** — hébergement **statique**
   GitHub Pages (CDN), en ligne **24/7**, rien à relancer.
