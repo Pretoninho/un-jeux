@@ -118,6 +118,8 @@ export interface Unit {
   hp: number;
   maxHp: number;
   ap: number;
+  moveCap?: number;   // plafond de PAS par tour (axe MOBILITÉ, hors droite portée/robustesse) — ex. Lourde lente
+  moved?: number;     // pas déjà effectués ce tour (alimente le plafond `moveCap`) ; remis à 0 à `endTurn`
   range: number;      // portée d'attaque (1 = adjacent)
   damage: number;     // dégâts par coup
   attackCost: number; // coût en PA d'une attaque
@@ -211,11 +213,13 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
 }
 
 /**
- * Pas de déplacement disponibles pour une pièce : ses PA, moins l'éventuel malus « estropié »
- * (plancher 0). Les attaques restent payées sur les PA pleins — seul le mouvement est bridé.
+ * Pas de déplacement disponibles pour une pièce : ses PA, moins l'éventuel malus « estropié »,
+ * et borné par le plafond de mobilité `moveCap` (déduction faite des pas déjà faits ce tour).
+ * Les attaques restent payées sur les PA pleins — seul le mouvement est bridé. Plancher 0.
  */
 export function moveBudget(unit: Unit): number {
-  return Math.max(0, unit.ap - (unit.cripple?.amount ?? 0));
+  const capLeft = (unit.moveCap ?? Infinity) - (unit.moved ?? 0);
+  return Math.max(0, Math.min(unit.ap - (unit.cripple?.amount ?? 0), capLeft));
 }
 
 /** Déplace une pièce du camp actif vers `dest` si atteignable ; déduit la distance de SES PA. */
@@ -226,7 +230,7 @@ export function moveUnit(state: CombatState, unitId: string, dest: HexId): Comba
   if (d === undefined) return state;
   return {
     ...state,
-    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest, ap: u.ap - d } : u)),
+    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest, ap: u.ap - d, moved: (u.moved ?? 0) + d } : u)),
   };
 }
 
@@ -761,7 +765,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       let out =
         u.owner === next
           // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), moved: 0, elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };

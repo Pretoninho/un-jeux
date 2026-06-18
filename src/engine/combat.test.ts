@@ -87,6 +87,36 @@ describe('combat/déplacement — appliquer + coût en PA', () => {
   });
 });
 
+describe('combat/mobilité — plafond moveCap (Lourde lente)', () => {
+  it('moveBudget est borné par moveCap, même avec des PA en réserve', () => {
+    const slow = u({ id: 'L', owner: 'alice', hex: 'A', ap: 10, moveCap: 3 });
+    expect(moveBudget(slow)).toBe(3);
+    const r = reachable(makeCombatState(LINE, [slow], 'alice'), 'L', moveBudget(slow));
+    expect(r.get('D')).toBe(3);     // 3 pas atteints
+    expect(r.has('E')).toBe(false); // 4e pas refusé par le plafond
+  });
+
+  it('les pas déjà faits ce tour décomptent du plafond (pas de contournement par clics)', () => {
+    const s0 = makeCombatState(LINE, [u({ id: 'L', owner: 'alice', hex: 'A', ap: 10, moveCap: 3 })], 'alice');
+    const s1 = moveUnit(s0, 'L', 'C'); // 2 pas
+    expect(unitById(s1, 'L')!.moved).toBe(2);
+    expect(moveBudget(unitById(s1, 'L')!)).toBe(1);   // 3 − 2
+    expect(moveUnit(s1, 'L', 'E')).toBe(s1);           // D puis E (2 pas) > plafond restant → refusé
+  });
+
+  it('endTurn remet le compteur de pas à zéro (le plafond revient plein)', () => {
+    let s = makeCombatState(LINE, [
+      u({ id: 'L', owner: 'alice', hex: 'A', ap: 10, moveCap: 3 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+    ], 'alice');
+    s = moveUnit(s, 'L', 'C');               // moved = 2
+    s = endTurn(s, 4);                        // tour de bob
+    s = endTurn(s, 4);                        // retour à alice → moved remis à 0
+    expect(unitById(s, 'L')!.moved).toBe(0);
+    expect(moveBudget(unitById(s, 'L')!)).toBe(3);
+  });
+});
+
 describe('combat/attaque', () => {
   it('graphDistance mesure la distance de cases', () => {
     expect(graphDistance(LINE, 'A', 'B')).toBe(1);

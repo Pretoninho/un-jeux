@@ -27,6 +27,7 @@ export interface Archetype {
   name: string;
   glyph: string;     // marqueur affiché sur la pièce
   rangeTier: number; // position sur la droite de calibrage
+  moveCap?: number;  // plafond de pas/tour (axe MOBILITÉ, indépendant de la droite) — ex. Lourde lente
   profile?: Partial<Profile>;   // override des stats dérivées — pour les pièces HORS-DROITE (ex. Duelliste)
   guard?: GuardProfile;         // verbe « se défendre » — propre aux CAC ; nombres par perso
   overwatch?: OverwatchProfile; // verbe « tir réservé » — propre aux pièces à distance
@@ -40,7 +41,7 @@ export interface Archetype {
  */
 export const ARCHETYPES: Record<string, Archetype> = {
   // La Lourde (CAC) sait se garder : 3 PA (→ pas d'attaque le même tour) pour ×0.5 dégâts subis.
-  lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1, guard: { cost: 3, damageTakenMul: 0.5 } }, // 1/4 — mêlée-tank
+  lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1, moveCap: 3, guard: { cost: 3, damageTakenMul: 0.5 } }, // 1/4 — mêlée-tank, LENTE (3 pas/tour) → le Tireur peut kiter
   // Le Tireur (distance) réserve son tir : 3 PA (→ pas d'attaque le même tour) pour un réflexe.
   tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4, overwatch: { cost: 3 } }, // 4/1 — distance-verre
   // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
@@ -239,6 +240,7 @@ export function makeUnit(id: string, owner: string, hex: string, archetype: Arch
     characterId: overlay?.id,
     name: overlay?.name,
     hp: p.maxHp, maxHp: p.maxHp,
+    moveCap: archetype.moveCap,
     range: p.range, damage: p.damage, attackCost: p.attackCost,
     kind: archetype.key,
     guard: archetype.guard, guarding: false,

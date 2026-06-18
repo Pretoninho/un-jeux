@@ -76,6 +76,11 @@
   `damage=1+t`, `attackCost=2`. Aucune pièce strictement meilleure, tout est positionnel.
 - **Pièces hors-droite** : hook `Archetype.profile?: Partial<Profile>` → `makeUnit` fusionne
   `profileFor(rangeTier)` + override (la portée reste sur la droite).
+- **Axe MOBILITÉ (séparé de la droite) — `moveCap` (livré 2026-06-18)** : plafond de **pas/tour**
+  indépendant des PA (les attaques restent payées sur les PA pleins). `Unit.moveCap`/`Unit.moved`
+  (pas faits ce tour, remis à 0 à `endTurn`) ; `moveBudget = min(ap−estropie, moveCap−moved)`. **La
+  Lourde est LENTE (`moveCap: 3`)** → le Tireur (4 pas) peut enfin **kiter** (rééquilibrage de la
+  mêlée sans toucher au calibrage portée/robustesse). 1ᵉʳ levier du triangle anti-mêlée (cf. plus bas).
 - **Verbes** (capacités à nombres personnalisables, portés par la pièce) :
   - **Garde** (`guard`, CAC) — Lourde : 3 PA → ×0.5 dégâts subis.
   - **Tir réservé** (`overwatch`, distance) — Tireur : 3 PA, réflexe à l'arrivée d'un ennemi.
