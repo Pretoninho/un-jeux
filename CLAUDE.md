@@ -299,8 +299,9 @@
   - **3 niveaux sélectionnables** (`Difficulty = 'facile' | 'normal' | 'difficile'`, mêmes règles, finesse
     croissante via `Brain`) : **Facile** = aveugle au tir réservé (fonce dans l'overwatch), pas de verbes,
     score d'attaque naïf (ignore ripostes/contres subis) ; **Normal** = anticipe l'overwatch, **se met en
-    garde / réserve son tir** à propos, trade lucide ; **Difficile** = Normal **+** valorise les
-    déclenchements de **Résonance** (`previewReactions`) **+** protège ses pièces exposées/entamées.
+    garde / réserve son tir** à propos, trade lucide ; **Difficile** = Normal **+** conscient des
+    **Résonances** (`previewReactions`) → **évite de frapper dans la garde/riposte adverse** **+** protège
+    ses pièces exposées/entamées.
   - **Calibrage = PLAYTEST** (constantes en tête de fichier : `ALIVE/HP_W/CLOSE_W/GUARD_VALUE/…`).
   - **Lot 2 CÂBLÉ (2026-06-18)** : mode « **vs IA** » dans `CombatView` (choisi au setup, Alice = toi,
     Bob = IA, niveau réglable). `finishTurn` déclenche `runAiTurn` quand la main passe à Bob : on **planifie

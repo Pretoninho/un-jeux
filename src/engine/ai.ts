@@ -31,7 +31,7 @@ const CLOSE_W = 1;         // attrait d'un pas vers l'ennemi (≪ HP : ne sacrif
 const FAR = 9999;          // distance d'une case non reliée (ne devrait pas arriver)
 const GUARD_VALUE = 45;    // valeur d'une garde quand la pièce est menacée
 const RESERVE_VALUE = 35;  // valeur d'un tir réservé quand un ennemi peut s'approcher dans la zone
-const RESONANCE_NUDGE = 3; // bonus par réaction déclenchée (départage : Difficile préfère les coups « résonants »)
+const RESONANCE_NUDGE = 3; // malus par Résonance adverse nourrie (départage : Difficile évite les gardes/ripostes ennemies)
 const PROTECT_W = 4;       // pénalité (Difficile) pour une pièce exposée, accrue si elle est entamée
 const THREAT_HORIZON = 4;  // mobilité ennemie supposée pour juger une menace (≈ PA d'un tour)
 const MIN_GAIN = 0.5;      // en-dessous, l'action ne « vaut pas le coup » → on s'arrête
@@ -42,7 +42,7 @@ const MAX_ACTIONS = 64;    // garde-fou de terminaison
 interface Brain {
   seeOverwatch: boolean;   // anticiper le tir réservé en notant un déplacement (Facile : aveugle → fonce dedans)
   useVerbs: boolean;       // peut se mettre en garde / réserver son tir
-  valueResonance: boolean; // valorise les coups qui déclenchent une Résonance
+  valueResonance: boolean; // conscient des Résonances : ÉVITE de frapper dans la garde/riposte adverse
   naiveAttacks: boolean;   // score une attaque sur les seuls dégâts infligés (ignore riposte/contre subis)
   protectWeak: boolean;    // pénalise l'exposition de ses pièces (surtout entamées)
 }
@@ -171,8 +171,13 @@ function score(state: CombatState, action: AiAction, efield: Map<HexId, number>,
       let g = brain.naiveAttacks
         ? enemyMaterial(state, me) - enemyMaterial(after, me)
         : evalState(after, me, efield, brain) - evalState(state, me, efield, brain);
-      if (brain.valueResonance)
-        g += RESONANCE_NUDGE * previewReactions(state, action.attackerId, action.targetId).length;
+      if (brain.valueResonance) {
+        // Un coup ne déclenche QUE les Résonances du DÉFENSEUR (sa garde/riposte) → elles NUISENT à
+        // l'attaquant (épines, enracinement, silence…). Difficile ÉVITE donc de les nourrir (malus).
+        const enemyReactions = previewReactions(state, action.attackerId, action.targetId)
+          .filter((r) => unitById(state, r.listenerId)?.owner !== me).length;
+        g -= RESONANCE_NUDGE * enemyReactions;
+      }
       return g;
     }
     case 'move': {
