@@ -16,6 +16,7 @@
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
+  import { planTurn, applyAction, DIFFICULTIES, type Difficulty } from './engine/ai';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
   const RADIUS = 4;                 // plateau hexagonal — MIS DE CÔTÉ (code conservé, plus exposé dans l'UI)
@@ -41,6 +42,18 @@
   const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui' };
   const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad' };
   const HEROES = Object.values(CHARACTERS);
+  // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
+  const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
+  type Slot = (typeof SLOTS)[number];
+  type Opponent = 'hotseat' | 'ia';
+  const heroesOf = (arch: string) => HEROES.filter((h) => h.archetype === arch);
+  // Vivier à 2 héros/archétype → dès que TU choisis tes 3, l'adversaire prend les complémentaires.
+  const lineupOf = (p: Record<Slot, string>) => SLOTS.map((s) => p[s]);
+  const complementOf = (p: Record<Slot, string>) =>
+    SLOTS.map((s) => (heroesOf(s).find((h) => h.id !== p[s]) ?? heroesOf(s)[0]!).id);
+  const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc' };
+  const LEVEL_LABEL: Record<Difficulty, string> = { facile: 'Facile', normal: 'Normal', difficile: 'Difficile' };
+  const AI_STEP_MS = 480; // délai entre deux actions de l'IA (auto-play animé)
   let showMatrix = $state(false);
   // Tuto « Comment jouer » : affiché au 1er lancement, ré-ouvrable via le bouton ? Aide.
   let showHelp = $state(typeof localStorage === 'undefined' || !localStorage.getItem('seenHelp'));
@@ -109,7 +122,9 @@
   // Chaque camp aligne Lourde (mêlée-tank) + Tireur (distance-verre) + Duelliste (escarmouche).
   // Pièces 2 et 3 sur des voisins « salle » distincts (on évite les carrés-carrefours exigus).
   // (Le Soigneur — 4ᵉ pièce — arrive au Lot 1, avec son verbe de soin.)
-  function initialFor(geo: Geo): CombatState {
+  // Déploie deux escouades choisies au setup : `alice`/`bob` = [idLourde, idTireur, idDuelliste].
+  // Lourde au coin, Tireur puis Duelliste autour. Alice joue toujours en premier.
+  function initialFor(geo: Geo, alice: string[], bob: string[]): CombatState {
     const [c0, c1] = geo.corners;
     const nbOf = (id: string) => geo.map.hexes.find((h) => h.id === id)!.neighbors;
     // Deux emplacements de départ distincts autour d'un coin (salles d'abord, sinon repli).
@@ -120,23 +135,27 @@
     };
     const [a2, a3] = spots(c0);
     const [b2, b3] = spots(c1);
-    // Line-up par défaut (vivier plat) : Lourde au coin, Tireur puis Duelliste autour.
-    //   Alice = Bastion + Mireille + Estoc · Bob = Rempart + Orso + Fil.
-    //   → vivants : Estoc × Bastion, Estoc × Mireille (camp Alice) ; Fil × Rempart, Fil × Orso (camp Bob).
+    const ch = (id: string) => CHARACTERS[id]!;
     return makeCombatState(geo.map, [
-      makeUnitFromCharacter('a1', 'alice', c0, CHARACTERS.bastion!, AP_PER_TURN),
-      makeUnitFromCharacter('a2', 'alice', a2, CHARACTERS.mireille!, AP_PER_TURN),
-      makeUnitFromCharacter('a3', 'alice', a3, CHARACTERS.estoc!, AP_PER_TURN),
-      makeUnitFromCharacter('b1', 'bob', c1, CHARACTERS.rempart!, AP_PER_TURN),
-      makeUnitFromCharacter('b2', 'bob', b2, CHARACTERS.orso!, AP_PER_TURN),
-      makeUnitFromCharacter('b3', 'bob', b3, CHARACTERS.fil!, AP_PER_TURN),
+      makeUnitFromCharacter('a1', 'alice', c0, ch(alice[0]!), AP_PER_TURN),
+      makeUnitFromCharacter('a2', 'alice', a2, ch(alice[1]!), AP_PER_TURN),
+      makeUnitFromCharacter('a3', 'alice', a3, ch(alice[2]!), AP_PER_TURN),
+      makeUnitFromCharacter('b1', 'bob', c1, ch(bob[0]!), AP_PER_TURN),
+      makeUnitFromCharacter('b2', 'bob', b2, ch(bob[1]!), AP_PER_TURN),
+      makeUnitFromCharacter('b3', 'bob', b3, ch(bob[2]!), AP_PER_TURN),
     ], 'alice');
   }
 
   const startGeo = buildBoard('octa', OCTA_TRAIN); // démarrage sur l'Entraînement (petit octogone)
+  // PHASE : l'appli démarre sur l'écran de pré-partie (setup) ; « Commencer » bascule en combat.
+  let phase = $state<'setup' | 'combat'>('setup');
+  let opponent = $state<Opponent>('ia');
+  let aiLevel = $state<Difficulty>('normal');
+  let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade d'Alice (toi) ; Bob = complément
+  let aiThinking = $state(false);                                // l'IA joue son tour → entrées gelées
   let mode = $state<Mode>('entrainement');
   let geo = $state<Geo>(startGeo);
-  let combat = $state<CombatState>(initialFor(startGeo));
+  let combat = $state<CombatState>(initialFor(startGeo, lineupOf(DEFAULT_PICK), complementOf(DEFAULT_PICK)));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
   let selectedId = $state<string>('a1');
   let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
@@ -216,7 +235,7 @@
   // Némésis = ennemi(s) du MÊME archétype présent(s) sur le plateau (rivalité automatique).
   const nemesisOf = (u: Unit): Unit[] => combat.units.filter((x) => x.kind === u.kind && x.owner !== u.owner);
   const selected = $derived(combat.units.find((u) => u.id === selectedId && u.owner === combat.active));
-  const reach = $derived(over || !selected ? new Map<string, number>() : reachable(combat, selected.id, moveBudget(selected)));
+  const reach = $derived(over || aiThinking || !selected ? new Map<string, number>() : reachable(combat, selected.id, moveBudget(selected)));
 
   const isAttackable = (hexId: string) => {
     const t = unitAt(combat, hexId);
@@ -234,7 +253,7 @@
 
   // Pièce adverse inspectée (clic sur une pièce ennemie) — alimente le panneau adverse.
   const foe = $derived(combat.units.find((u) => u.id === inspectedId && u.owner !== combat.active));
-  const canHitFoe = $derived(!!selected && !!foe && !over && canAttack(combat, selected.id, foe.id));
+  const canHitFoe = $derived(!!selected && !!foe && !over && !aiThinking && canAttack(combat, selected.id, foe.id));
   // Lisibilité : si frapper ce foe déclenchait une cascade (ex. son tank en garde → un allié
   // relaie des épines sur TA pièce), on l'annonce avant le coup (dry-run pur, rien n'est committé).
   const chainPreview = $derived(
@@ -282,7 +301,7 @@
 
   function onHex(hexId: string) {
     if (dragMoved) { dragMoved = false; return; } // glissé en cours → on n'interprète pas le clic
-    if (over) return;
+    if (over || aiThinking) return;
     const occ = unitAt(combat, hexId);
     // Clic sur une de mes pièces → la sélectionner.
     if (occ && occ.owner === combat.active) { selectedId = occ.id; return; }
@@ -298,9 +317,9 @@
     }
   }
 
-  const canGuard = $derived(!!selected && !over && canDefend(combat, selected.id));
-  const canWatch = $derived(!!selected && !over && canReserve(combat, selected.id));
-  const canParry = $derived(!!selected && !over && canRiposte(combat, selected.id));
+  const canGuard = $derived(!!selected && !over && !aiThinking && canDefend(combat, selected.id));
+  const canWatch = $derived(!!selected && !over && !aiThinking && canReserve(combat, selected.id));
+  const canParry = $derived(!!selected && !over && !aiThinking && canRiposte(combat, selected.id));
 
   // Cases sous le feu d'un guetteur ADVERSE (zone de menace affichée pendant ton tour).
   const threat = $derived.by(() => {
@@ -339,17 +358,39 @@
   }
 
   function finishTurn() {
-    if (over) return;
+    if (over || aiThinking) return;
     combat = endTurn(combat, AP_PER_TURN);
     history = [];
     inspectedId = '';
     // UNIQUEMENT EN TUTO : l'adversaire est scripté (le moteur, lui, reste neutre).
     if (tutoActive && combat.active === 'bob') tutoEnemyTurn();
+    // VS IA : le moteur d'IA joue le tour de Bob, action par action (animé).
+    else if (opponent === 'ia' && combat.active === 'bob' && !winner(combat)) { runAiTurn(); return; }
     selectDefault();
   }
 
+  // Auto-play du tour adverse : on planifie tout le tour (pur), puis on rejoue les actions une
+  // par une avec un court délai → on voit l'IA bouger. Entrées gelées via `aiThinking`.
+  let aiTimer: ReturnType<typeof setTimeout> | undefined;
+  function cancelAi() { if (aiTimer) { clearTimeout(aiTimer); aiTimer = undefined; } aiThinking = false; }
+  function runAiTurn() {
+    aiThinking = true;
+    selectedId = '';
+    inspectedId = '';
+    const actions = planTurn(combat, aiLevel); // suite d'actions terminée par endTurn
+    let i = 0;
+    const step = () => {
+      aiTimer = undefined;
+      if (i >= actions.length || winner(combat)) { aiThinking = false; selectDefault(); return; }
+      combat = applyAction(combat, actions[i++]!, AP_PER_TURN);
+      aiTimer = setTimeout(step, AI_STEP_MS);
+    };
+    aiTimer = setTimeout(step, AI_STEP_MS);
+  }
+
   function restart() {
-    combat = initialFor(geo);
+    cancelAi();
+    combat = initialFor(geo, lineupOf(pick), complementOf(pick));
     history = [];
     selectedId = 'a1';
     inspectedId = '';
@@ -361,6 +402,22 @@
     resetView();
     restart();
   }
+
+  // Lance une partie depuis l'écran de setup (plateau + escouades choisies).
+  function startGame() {
+    cancelAi();
+    geo = buildBoard('octa', MODE_N[mode]);
+    resetView();
+    combat = initialFor(geo, lineupOf(pick), complementOf(pick));
+    history = [];
+    selectedId = 'a1';
+    inspectedId = '';
+    phase = 'combat';
+  }
+  function newGame() { cancelAi(); phase = 'setup'; }
+  // Aperçu des deux escouades dans l'écran de setup.
+  const aliceLineup = $derived(lineupOf(pick).map((id) => CHAR_NAME[id] ?? id));
+  const bobLineup = $derived(complementOf(pick).map((id) => CHAR_NAME[id] ?? id));
 
   // ── TUTORIEL JOUABLE ───────────────────────────────────────────────────────
   // Mini-scénario RÉEL (vraie CombatState, mêmes handlers que la partie) : la Lourde
@@ -640,20 +697,22 @@
     {#if !over}
       <div class="active" style="--c:{COLORS[combat.active]}">
         Au tour de <b>{NAMES[combat.active]}</b>
+        {#if opponent === 'ia' && combat.active === 'bob'}<span class="aitag">🤖 {aiThinking ? 'réfléchit…' : 'IA'}</span>{/if}
       </div>
     {/if}
     <div class="shape">
-      <button class:on={mode === 'entrainement'} onclick={() => setMode('entrainement')} title="Petit octogone — tuto & practice">🎓 Entraînement</button>
-      <button class:on={mode === 'partie'} onclick={() => setMode('partie')} title="Grand octogone — vraie partie">⚔ Partie</button>
+      <button class:on={mode === 'entrainement'} onclick={() => setMode('entrainement')} disabled={aiThinking} title="Petit octogone — tuto & practice">🎓 Entraînement</button>
+      <button class:on={mode === 'partie'} onclick={() => setMode('partie')} disabled={aiThinking} title="Grand octogone — vraie partie">⚔ Partie</button>
     </div>
     <div class="zoom">
       <button onclick={() => zoomCenter(1 / 1.3)} title="Dézoomer" aria-label="Dézoomer">−</button>
       <button onclick={() => zoomCenter(1.3)} title="Zoomer" aria-label="Zoomer">+</button>
       <button onclick={resetView} title="Ajuster à l'écran" aria-label="Ajuster à l'écran">⤢</button>
     </div>
-    <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
-    <button class="end-turn" class:tutoglow={tutoBtn === 'end'} onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
-    <button class="restart" onclick={restart}>Recommencer</button>
+    <button class="undo" onclick={undo} disabled={!acted || aiThinking}>↩ Annuler</button>
+    <button class="end-turn" class:tutoglow={tutoBtn === 'end'} onclick={finishTurn} disabled={over || aiThinking}>Finir le tour ⏩</button>
+    <button class="restart" onclick={restart} disabled={aiThinking}>Recommencer</button>
+    <button class="newgame" onclick={newGame} disabled={aiThinking}>⚙ Nouvelle partie</button>
     {#if tutoActive}
       <button class="tuto-btn on" onclick={endTutorial}>✕ Quitter le tuto</button>
     {:else}
@@ -1026,12 +1085,62 @@
   <div class="obj-toast">🎯 Objectif débloqué — <b>{o?.label}</b></div>
 {/if}
 
+{#if phase === 'setup' && !showHelp}
+  <div class="modal-backdrop">
+    <div class="modal setup" role="dialog" aria-modal="true" aria-label="Préparer la partie">
+      <h2>Préparer la partie</h2>
+
+      <h3>Plateau</h3>
+      <div class="seg">
+        <button class:on={mode === 'entrainement'} onclick={() => (mode = 'entrainement')}>🎓 Entraînement <span class="muted small">petit</span></button>
+        <button class:on={mode === 'partie'} onclick={() => (mode = 'partie')}>⚔ Partie <span class="muted small">grand</span></button>
+      </div>
+
+      <h3>Adversaire</h3>
+      <div class="seg">
+        <button class:on={opponent === 'hotseat'} onclick={() => (opponent = 'hotseat')}>🤝 Hotseat <span class="muted small">2 joueurs</span></button>
+        <button class:on={opponent === 'ia'} onclick={() => (opponent = 'ia')}>🤖 vs IA</button>
+      </div>
+      {#if opponent === 'ia'}
+        <div class="seg levels">
+          {#each DIFFICULTIES as lvl}
+            <button class:on={aiLevel === lvl} onclick={() => (aiLevel = lvl)}>{LEVEL_LABEL[lvl]}</button>
+          {/each}
+        </div>
+      {/if}
+
+      <h3>Ton escouade <span class="muted small">— l'adversaire prend les héros complémentaires</span></h3>
+      {#each SLOTS as slot}
+        <div class="pickrow">
+          <span class="slotname">{KIND_GLYPH[slot]} {KIND_NAME[slot]}</span>
+          <div class="seg">
+            {#each heroesOf(slot) as h}
+              <button class:on={pick[slot] === h.id} onclick={() => (pick = { ...pick, [slot]: h.id })}
+                title="{KIND_NAME[h.archetype]}{h.reactions?.length ? ` · ${h.reactions.length} Résonance(s)` : ''}">
+                {h.name}{#if h.reactions?.length}<span class="reso">✦</span>{/if}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/each}
+
+      <div class="vs-preview">
+        <span style="color:{COLORS.alice}"><b>Toi</b> · {aliceLineup.join(' · ')}</span>
+        <span class="vs">⚔</span>
+        <span style="color:{COLORS.bob}">{bobLineup.join(' · ')} · <b>{opponent === 'ia' ? `IA ${LEVEL_LABEL[aiLevel]}` : 'Joueur 2'}</b></span>
+      </div>
+
+      <button class="modal-ok" onclick={startGame}>⚔ Commencer</button>
+    </div>
+  </div>
+{/if}
+
 {#if showHelp}
   <div class="modal-backdrop">
     <div class="modal" role="dialog" aria-modal="true" aria-label="Comment jouer">
       <button class="modal-close" onclick={closeHelp} aria-label="Fermer">✕</button>
       <h2>Comment jouer</h2>
-      <p class="lead">Combat tactique <b>tour par tour</b>, en <b>hotseat</b> (2 joueurs, même écran). <b>Information parfaite, aucun hasard</b> — pure stratégie.</p>
+      <p class="lead">Combat tactique <b>tour par tour</b>, en <b>hotseat</b> (2 joueurs) ou <b>contre l'IA</b> (3 niveaux) — choix à l'écran de préparation. <b>Information parfaite, aucun hasard</b> — pure stratégie.</p>
 
       <h3>🎯 But</h3>
       <p>Éliminer <b>toutes</b> les pièces adverses.</p>
@@ -1144,6 +1253,22 @@
   .modal-close:hover { color: #e8ecf2; }
   .modal-ok { margin-top: 1.1rem; width: 100%; background: #2a6f5e; border: 1px solid #3a8a76; color: #eafff7; border-radius: 6px; padding: .6rem; font-size: .95rem; font-weight: 700; cursor: pointer; }
   .modal-ok:hover { background: #348973; }
+  /* Écran de setup (pré-partie) */
+  .modal.setup .seg { display: flex; gap: .4rem; margin: .15rem 0; }
+  .modal.setup .seg button { flex: 1; background: #1a2030; border: 1px solid #3a4555; color: #b6c0d2; border-radius: 6px; padding: .5rem .6rem; cursor: pointer; font-size: .86rem; display: flex; align-items: center; justify-content: center; gap: .35rem; }
+  .modal.setup .seg button:hover { border-color: #5a70b0; }
+  .modal.setup .seg button.on { border-color: #5a70b0; background: #20283a; color: #dce8ff; font-weight: 600; }
+  .modal.setup .seg.levels button { padding: .35rem; font-size: .82rem; }
+  .pickrow { display: flex; align-items: center; gap: .6rem; margin: .35rem 0; }
+  .pickrow .slotname { flex: 0 0 96px; color: #9aa3b5; font-size: .85rem; }
+  .pickrow .seg { flex: 1; }
+  .pickrow .reso { color: #ffd27a; margin-left: .3rem; }
+  .vs-preview { display: flex; align-items: center; justify-content: center; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; padding: .55rem; background: #11141b; border: 1px solid #2a2f3a; border-radius: 6px; font-size: .85rem; }
+  .vs-preview .vs { color: #6a7384; }
+  .aitag { color: #c9b06a; font-size: .8rem; }
+  .newgame { background: #1f2a3a; border: 1px solid #3f5a8a; color: #aec6f0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .newgame:hover:not(:disabled) { border-color: #6f90c8; }
+  .newgame:disabled, .restart:disabled, .shape button:disabled { opacity: .4; cursor: not-allowed; }
   .banner { background: #1e2435; border: 1px solid var(--c); border-radius: 8px; padding: .6rem 1rem; display: flex; align-items: center; gap: 1rem; }
   .banner b { color: var(--c); }
   .rematch { margin-left: auto; background: #1a2030; border: 1px solid var(--c); color: #e6ebf5; border-radius: 5px; padding: .35rem .8rem; cursor: pointer; }

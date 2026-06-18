@@ -34,8 +34,15 @@
 - Moteur = modules purs et immuables (aucune dépendance DOM), testables sans navigateur.
 
 ## État du jeu (décisions de design en vigueur)
-- **Mode actuel : hotseat local** (Alice et Bob à tour de rôle sur le même écran). Pas
+- **Modes locaux : hotseat OU vs IA** (décidé/livré 2026-06-18) — choisis sur l'**écran de pré-partie**
+  (setup). Hotseat = Alice et Bob à tour de rôle ; vs IA = **Alice = toi, Bob = IA** (3 niveaux). Pas
   encore de multijoueur en réseau.
+- **Écran de pré-partie (setup) LIVRÉ (2026-06-18)** — `phase: 'setup' | 'combat'` dans `CombatView`,
+  démarrage sur le setup. On y choisit : **plateau** (Entraînement/Partie), **adversaire** (Hotseat /
+  vs IA + niveau), et **ton escouade** (1 héros par archétype). Vivier à **2 héros/archétype** → choisir
+  tes 3 héros **détermine** ceux de l'adversaire (les complémentaires, `complementOf`). `initialFor(geo,
+  alice, bob)` déploie les deux escouades choisies. Boutons : « Recommencer » (même config), « ⚙ Nouvelle
+  partie » (revient au setup). *Le vrai draft libre (2 sens, équité) reste ajourné — cf. Némésis.*
 - **Plateau = octogone, deux tailles (décidé 2026-06-18)** : on quitte le toggle forme et on
   passe **tout en octogone**. Le sélecteur est désormais un **MODE** :
   - **🎓 Entraînement** = petit octogone **`OCTA_TRAIN = 9`** (145 cases) — plateau resserré, sert
@@ -278,8 +285,12 @@
     garde / réserve son tir** à propos, trade lucide ; **Difficile** = Normal **+** valorise les
     déclenchements de **Résonance** (`previewReactions`) **+** protège ses pièces exposées/entamées.
   - **Calibrage = PLAYTEST** (constantes en tête de fichier : `ALIVE/HP_W/CLOSE_W/GUARD_VALUE/…`).
-  - **Lot 2 (à valider séparément)** : câblage UI — mode « **vs IA** » (Alice = toi, Bob = IA) + auto-play
-    du tour adverse avec animation entre les actions ; choix du niveau dans les contrôles.
+  - **Lot 2 CÂBLÉ (2026-06-18)** : mode « **vs IA** » dans `CombatView` (choisi au setup, Alice = toi,
+    Bob = IA, niveau réglable). `finishTurn` déclenche `runAiTurn` quand la main passe à Bob : on **planifie
+    tout le tour** (`planTurn`, pur) puis on **rejoue les actions une par une** (`applyAction`) avec un délai
+    (`AI_STEP_MS`) → auto-play **animé**. Entrées humaines **gelées** pendant (`aiThinking` : `reach`/verbes/
+    `onHex`/boutons coupés). `cancelAi` purge le timer à chaque reset (restart/setMode/nouvelle partie). Le
+    **tuto** garde son adversaire scripté (pas l'IA).
 
 ## Déploiement (en ligne)
 - **URL publique : https://pretoninho.github.io/un-jeux/** — hébergement **statique**
