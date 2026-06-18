@@ -63,7 +63,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -140,6 +140,7 @@ export interface Unit {
   elan?: number;                       // bonus de PA en attente, appliqué au PROCHAIN rechargement (récompense Némésis)
   silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance, ni élan)
   cover?: { owner: string; expiresIn: number; amount: number }; // « couverture » : +amount PA à chaque rechargement, borné (ex. Mireille × Rempart)
+  appui?: { owner: string; expiresIn: number; amount: number }; // « appui-feu » : +amount dégâts à SES attaques, borné (ex. Mireille × Fil)
 }
 
 export interface CombatState {
@@ -291,8 +292,8 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   const target0 = unitById(state, targetId)!;
   // Marque : si la cible portait une marque DE CET attaquant, son 1er coup gagne le bonus, puis tombe.
   const marked = !!target0.mark && target0.mark.by === attackerId;
-  // Bonus de dégâts : marque (sur cette cible) + vendetta en attente (sur SON attaque) ; consommés.
-  const raw = attacker.damage + (marked ? target0.mark!.bonus : 0) + (attacker.vendetta ?? 0);
+  // Bonus de dégâts : marque (sur cette cible, consommée) + vendetta en attente (consommée) + appui-feu (persistant).
+  const raw = attacker.damage + (marked ? target0.mark!.bonus : 0) + (attacker.vendetta ?? 0) + (attacker.appui?.amount ?? 0);
   const stunning = attacker.stunCharge; // « Coup étourdissant » : consommé, étourdit la cible
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
@@ -508,6 +509,16 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       const units = state.units.map((u) => {
         if (u.id === p.listenerId) return arm(u);
         if (u.id === p.sourceId) return { ...u, vendetta: p.amount };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'appui': { // SOUTIEN : +amount dégâts aux attaques de l'allié SOURCE (ex. Fil) pendant `duration` tours
+      const source = unitById(state, p.sourceId);
+      if (!source) return state;
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.sourceId) return { ...u, appui: { owner: source.owner, expiresIn: p.spec.duration ?? 2, amount: p.amount } };
         return u;
       });
       return { ...state, units };
@@ -746,6 +757,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const stunCharge = tickStatus(u.stunCharge, state.active);
       const silence = tickStatus(u.silence, state.active);
       const cover = tickStatus(u.cover, state.active);
+      const appui = tickStatus(u.appui, state.active);
       let out =
         u.owner === next
           // recharge SES PA (+ élan Némésis consommé + couverture persistante) — sauf si étourdie : PA forcés à 0 (gel).
@@ -758,6 +770,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       if (stunCharge !== u.stunCharge) out = { ...out, stunCharge };
       if (silence !== u.silence) out = { ...out, silence };
       if (cover !== u.cover) out = { ...out, cover };
+      if (appui !== u.appui) out = { ...out, appui };
       return out;
     }),
   };

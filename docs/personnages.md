@@ -143,6 +143,8 @@ const EPINES_ESTOC_BASTION: ReactionSpec = {
   Résonances (`pendingReactions` l'ignore) et l'élan Némésis (`resolveNemesis`). Lu via `isSilenced`.
 - `couverture` — **soutien-soi persistant** : pose `Unit.cover` sur le possesseur → +`amount` PA à
   chaque rechargement pendant `duration` tours (lu dans `endTurn`, comme `elan` mais sur plusieurs tours).
+- `appui` — **soutien persistant** : pose `Unit.appui` sur l'**allié source** → +`amount` dégâts à ses
+  attaques pendant `duration` tours (lu dans `strike`, décompté dans `endTurn`).
 - `vendetta` — **SOUTIEN** (1ᵉʳ effet qui buffe un allié, pas l'ennemi) : pose `Unit.vendetta` sur
   l'allié **source** (`p.sourceId`, ex. Bastion qui a encaissé) → +`amount` à sa PROCHAINE attaque,
   consommé dans `strike()`, sans expiration (garde sa rancune jusqu'à frapper).

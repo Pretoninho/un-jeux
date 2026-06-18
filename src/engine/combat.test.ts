@@ -1125,6 +1125,43 @@ describe('combat — Résonance Mireille × Rempart (couverture — +PA persista
   });
 });
 
+describe('combat — Résonance Mireille × Fil (appui-feu — +dégâts persistant)', () => {
+  const fil = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ kind: 'duelliste', hp: 9, maxHp: 9, damage: 2, riposte: { cost: 2 }, riposting: true, characterId: 'fil', ...over });
+  const mireille = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
+    u({ reactions: [{ id: 'app', on: 'riposte', fromCharacter: 'fil', scope: { squad: true },
+        cooldown: 3, kind: 'appui', amount: 1, duration: 2 }], cooldowns: {}, ...over });
+
+  it('quand la riposte de Fil part, Mireille l\'appuie (+1 dégât, 2 tours) — sur Fil, pas l\'attaquant', () => {
+    const base = makeCombatState(LINE, [
+      fil({ id: 'f', owner: 'alice', hex: 'B' }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(base, 'b', 'f');
+    expect(unitById(s, 'f')!.appui).toMatchObject({ owner: 'alice', expiresIn: 2, amount: 1 });
+    expect(unitById(s, 'b')!.appui).toBeUndefined();       // c'est Fil qui est renforcé
+    expect(unitById(s, 'm')!.cooldowns!.app).toBe(3);
+  });
+
+  it('l\'appui ajoute +1 aux attaques de Fil tant qu\'il est actif', () => {
+    const st = makeCombatState(LINE, [
+      u({ id: 'f', owner: 'alice', hex: 'B', ap: 4, damage: 2, appui: { owner: 'alice', expiresIn: 2, amount: 1 } }),
+      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
+    ], 'alice');
+    expect(unitById(attack(st, 'f', 'b'), 'b')!.hp).toBe(7); // 10 − (2 + 1 appui)
+  });
+
+  it('gâté à Fil : la riposte d\'un autre Duelliste n\'appuie pas', () => {
+    const base = makeCombatState(LINE, [
+      fil({ id: 'f', owner: 'alice', hex: 'B', characterId: 'estoc' }),
+      mireille({ id: 'm', owner: 'alice', hex: 'A', hp: 7 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    expect(unitById(attack(base, 'b', 'f'), 'f')!.appui).toBeUndefined();
+  });
+});
+
 describe('combat — passage de main', () => {
   it('endTurn alterne le camp actif, incrémente le tour et recharge SES PA', () => {
     const depleted = makeCombatState(LINE, [

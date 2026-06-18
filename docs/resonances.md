@@ -69,6 +69,7 @@ primitive existante** par défaut ; n'en crée une **que pour une mécanique abs
 | `etourdir` | charge → la prochaine attaque **étourdit** | source puis cible (`stunCharge`/`stun`) | oui |
 | `silence` | la cible ne peut **que se déplacer** | attaquant (`Unit.silence`) | oui |
 | `couverture` | +PA/tour au possesseur | **possesseur** (`Unit.cover`) | oui |
+| `appui` | +dégâts aux attaques de l'allié | **source** (`Unit.appui`) | oui |
 
 ### Choisir la CIBLE de l'effet
 `PendingReaction` porte tout ce qu'il faut — choisis selon l'effet :
@@ -197,6 +198,7 @@ Pour chaque effet : ce que `amount`/`duration` signifient, et **quelle pièce** 
 | `etourdir` | **durée du stun** posé (tours) | persistance de la **charge** | source (`Unit.stunCharge`) → attaquant (`Unit.stun`) | oui |
 | `silence` | — | tours du silence | attaquant (`Unit.silence`) | oui |
 | `couverture` | PA bonus par tour | tours du buff | possesseur (`Unit.cover`) | oui |
+| `appui` | dégâts en plus aux attaques | tours du buff | source (`Unit.appui`) | oui |
 
 > **Clé de ciblage** (depuis `PendingReaction`) : `targetId` (ennemi/offensif) · `sourceId` (allié
 > émetteur/soutien) · `listenerId` (le possesseur lui-même) · `sourceHex` (case de la source, pour un
@@ -217,5 +219,6 @@ Posés par les effets ci-dessus, **lus** à l'endroit concerné et **décomptés
 | `stun` | PA forcés à 0 + Résonances silencées | `endTurn` (PA=0), `pendingReactions` |
 | `silence` | ne peut QUE se déplacer | `isSilenced` (canAttack/verbes/réactions/Némésis) |
 | `cover` | +PA à chaque rechargement (couverture) | `endTurn` (rechargement) |
+| `appui` | +dégâts à ses attaques (appui-feu) | `strike` |
 | `elan` | +PA au prochain tour (récompense Némésis) | `endTurn` (rechargement) |
 | `lastHitBy` | dernier attaquant (attribution du kill) | `resolveNemesis` |

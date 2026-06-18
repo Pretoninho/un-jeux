@@ -130,7 +130,7 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
 
   it('Mireille (Tireuse) a ses Résonances de possesseur (silence + tir réplique)', () => {
     const m = makeUnitFromCharacter('a2', 'alice', 'Z', CHARACTERS.mireille!, 4);
-    expect(m.reactions!.map((r) => r.id)).toEqual(['silence_mireille_bastion', 'replique_mireille_estoc', 'couverture_mireille_rempart']);
+    expect(m.reactions!.map((r) => r.id)).toEqual(['silence_mireille_bastion', 'replique_mireille_estoc', 'couverture_mireille_rempart', 'appui_mireille_fil']);
   });
 
   it('un personnage à l\'archétype inconnu est rejeté', () => {

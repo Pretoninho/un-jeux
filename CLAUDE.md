@@ -168,7 +168,11 @@
   - **Duo livré — *Mireille × Rempart*** : quand Rempart (en garde) encaisse, Mireille entre en
     **COUVERTURE** (`kind: 'couverture'`, `fromCharacter: 'rempart'`, escouade, CD 3, `duration: 2`) :
     **+1 PA à chaque tour pendant 2 tours** (soutien-soi, statut `Unit.cover` lu au rechargement dans
-    `endTurn`, comme `elan` mais persistant). **Mireille a ses 3 duos** (Bastion, Estoc, Rempart).
+    `endTurn`, comme `elan` mais persistant).
+  - **Duo livré — *Mireille × Fil*** : quand la Riposte de Fil part (`riposte`, `fromCharacter: 'fil'`),
+    Mireille l'**APPUIE** (`kind: 'appui'`, « appui-feu », escouade, CD 3, `duration: 2`) : +1 dégât aux
+    attaques de Fil pendant 2 tours (statut `Unit.appui` lu dans `strike`). **Mireille a ses 4 duos**
+    (Bastion, Estoc, Rempart, Fil) → **sa ligne de matrice est complète**.
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux

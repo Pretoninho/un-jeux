@@ -178,6 +178,16 @@ const COUVERTURE_MIREILLE_REMPART: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'couverture', amount: 1, duration: 2,
 };
 
+/**
+ * Résonance DUO « Mireille × Fil » — quand la Riposte de Fil part, Mireille l'**APPUIE** (appui-feu) :
+ * +1 dégât à ses attaques pendant 2 tours (soutien persistant sur l'allié source, `Unit.appui`).
+ * Portée escouade. CD 3. Dort si Estoc est le Duelliste fieldé (1 Duelliste/escouade).
+ */
+const APPUI_MIREILLE_FIL: ReactionSpec = {
+  id: 'appui_mireille_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 3, kind: 'appui', amount: 1, duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -193,7 +203,7 @@ export interface Character {
  */
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde' },
-  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART] },
+  mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur' },
