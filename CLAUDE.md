@@ -17,9 +17,13 @@
 ## Feuille de route — priorités (décidé 2026-06-18)
 > Ordre de travail validé. Méthode inchangée : **un lot = une cellule validée** (proposer → valider → coder → gates verts).
 1. **Terminer les Résonances des autres personnages** — ✅ **matrice des possesseurs PLEINE** : les 6 héros
-   (Estoc, Fil, Mireille, Orso, Bastion, Rempart) ont leur rangée complète (4 duos). Suite : viser la
-   **réciprocité** (remplir les deux sens de chaque arête, certaines manquent) et/ou élargir le **vocabulaire
-   de signaux** (`allie_a_terre`, `pres_de_mourir`…) pour ouvrir de nouveaux duos.
+   (Estoc, Fil, Mireille, Orso, Bastion, Rempart) ont leur rangée complète (4 duos). **RÉCIPROCITÉ = ACQUISE
+   (constat 2026-06-18)** : remplir toutes les rangées a *mécaniquement* rempli **les deux sens de chaque
+   arête** — 12 arêtes inter-archétypes × 2 sens = 24 duos dirigés = 6 héros × 4 partenaires (aucun sens ne
+   manque). Suite possible : **(a)** passe de **cohérence de paire** (que les deux sens d'une arête racontent
+   *une* histoire — polish, **après playtest**) ; **(b)** élargir le **vocabulaire de signaux**
+   (`allie_a_terre`, `pres_de_mourir`, double-frappe, soin…) — le **vrai levier de densité** (aujourd'hui un
+   possesseur ne réagit à son partenaire que dans 3 postures : garde encaissée / tir réservé / riposte).
    *Rappel garde-fou* : un duo n'existe que si le partenaire **émet un signal** (cf. revue de conception, pt 1).
 2. **Création de nouveaux personnages** — enrichir le **vivier plat** (`CHARACTERS`), un héros à la fois
    (procédé : `docs/personnages.md`). Inclut les **spécialistes** en réserve (Soigneur = 4ᵉ archétype visé,
@@ -222,8 +226,9 @@
     ×Orso (tir réservé), ×Estoc & ×Fil (riposte) → `charge` +2 **1 tour**. **Rempart (Lourde, mobilité
     SOUTENUE)** : ×Mireille & ×Orso (tir réservé), ×Estoc & ×Fil (riposte) → `charge` +2 **2 tours** (les deux
     Lourdes partagent le thème mais diffèrent : Bastion = burst, Rempart = prolongé). **Les 6 héros ont leur
-    rangée complète (4 duos)** → reste à viser la **réciprocité** (deux sens de chaque arête) et à créer de
-    nouveaux héros.
+    rangée complète (4 duos)** → **RÉCIPROCITÉ ACQUISE** : les 12 arêtes inter-archétypes ont leurs **deux
+    sens** remplis (24 duos dirigés = 6 × 4). Plus aucun sens à remplir ; suite = cohérence de paire (polish)
+    ou nouveaux signaux / nouveaux héros (cf. feuille de route, pt 1).
   - **THÈME DE RANGÉE — identité par possesseur (orientation 2026-06-18)** : pour rendre la matrice lisible
     et créer un gabarit de héros, chaque archétype-possesseur porte un *thème* — **Lourde = mobilité/charge**
     (`charge` → +déplacement, posé chez Bastion), **Tireur = contrôle** (ralentir `estropier` / enraciner
@@ -294,9 +299,12 @@
      de Résonance, rangée au-dessus du pion) + **tooltip au survol** (`<title>` SVG natif, via
      `pieceStates`/`pieceTitle`) décrivant nom/PV + chaque état actif.
   4. **État caché OK si affichage parlant** (précédent Divinity assumé).
-  5. **« Duo » = arête DIRIGÉE** aujourd'hui (le possesseur réagit au signal du partenaire). La
-     **réciprocité émerge** en remplissant les deux sens de la matrice → cap : matrice dense quand
-     tous les héros auront toutes leurs Résonances.
+  5. **« Duo » = arête DIRIGÉE** (le possesseur réagit au signal du partenaire). La **réciprocité émerge**
+     en remplissant les deux sens de la matrice → **ATTEINTE le 2026-06-18** : toutes les rangées pleines ⇒
+     24 duos dirigés = 12 arêtes × 2 sens (chaque héros = 4 partenaires). La densité *restante* ne passe plus
+     par « remplir des sens » (il n'en manque aucun) mais par **(a)** la cohérence de chaque paire (les deux
+     sens forment-ils *une* histoire ?) et **(b)** de **nouveaux signaux** (une paire n'interagit qu'en garde
+     encaissée / tir réservé / riposte — élargir le vocabulaire ouvre de nouvelles interactions).
 
 ## IA / adversaire (avancement)
 - **CERVEAU LIVRÉ (lot 1, 2026-06-18)** — `engine/ai.ts`, **module pur** (0 DOM, déterministe, testé
