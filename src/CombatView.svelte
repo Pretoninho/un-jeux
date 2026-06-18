@@ -370,9 +370,9 @@
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
-    <button class="help-btn" onclick={() => (showHelp = true)}>❔ Comment jouer</button>
     <details class="settings">
-      <summary>⚙ Réglages</summary>
+      <summary>⚙ Menu</summary>
+      <button class="menu-link" onclick={() => (showHelp = true)}>❔ Comment jouer</button>
       <label class="setrow">Couleur des bulles d'état
         <input type="color" bind:value={bubbleColor} aria-label="Couleur des bulles d'état" />
       </label>
@@ -777,8 +777,8 @@
   .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
   .setrow input[type="color"] { width: 34px; height: 22px; padding: 0; border: 1px solid #3a4555; border-radius: 4px; background: none; cursor: pointer; }
-  .help-btn { background: #1c2438; border: 1px solid #3a4860; color: #aec6f0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
-  .help-btn:hover { background: #243150; }
+  .menu-link { width: 100%; margin-top: .4rem; background: #1c2438; border: 1px solid #3a4860; color: #aec6f0; border-radius: 5px; padding: .4rem .6rem; cursor: pointer; font-size: .82rem; text-align: left; }
+  .menu-link:hover { background: #243150; }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(6, 8, 12, 0.72); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
   .modal { position: relative; background: #161a22; border: 1px solid #2a2f3a; border-radius: 12px; padding: 1.4rem 1.6rem; max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
   .modal h2 { margin: 0 0 .3rem; font-size: 1.35rem; }
