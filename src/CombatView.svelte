@@ -35,35 +35,35 @@
   const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃', silence: '🔇', couverture: '🔋', appui: '🔥' };
   const HEROES = Object.values(CHARACTERS);
   let showMatrix = $state(false);
-  // Couleur des bulles d'état — réglable par le joueur (menu Réglages), persistée.
-  let bubbleColor = $state((typeof localStorage !== 'undefined' && localStorage.getItem('bubbleColor')) || '#3d4658');
-  $effect(() => { try { localStorage.setItem('bubbleColor', bubbleColor); } catch { /* stockage indispo */ } });
   // Tuto « Comment jouer » : affiché au 1er lancement, ré-ouvrable via le bouton ? Aide.
   let showHelp = $state(typeof localStorage === 'undefined' || !localStorage.getItem('seenHelp'));
   function closeHelp() { showHelp = false; try { localStorage.setItem('seenHelp', '1'); } catch { /* noop */ } }
 
-  // États actifs d'une pièce (postures + statuts de Résonance) : une icône + une description chacun.
-  // Servent à la fois les petites icônes SUR la pièce et le tooltip au survol (`<title>` natif).
-  function pieceStates(u: Unit): { icon: string; label: string }[] {
-    const s: { icon: string; label: string }[] = [];
-    if (u.guarding) s.push({ icon: '🛡', label: 'En garde — dégâts subis réduits' });
-    if (u.watching) s.push({ icon: '🎯', label: 'Tir réservé armé' });
-    if (u.riposting) s.push({ icon: '🗡', label: 'Riposte armée' });
-    if (u.block) s.push({ icon: '🔆', label: `Bloqué — immunité totale aux dégâts (${u.block.expiresIn} t.)` });
-    if (u.mark) s.push({ icon: '✖', label: `Marqué — +${u.mark.bonus} au 1ᵉʳ coup adverse (${u.mark.expiresIn} t.)` });
-    if (u.cripple) s.push({ icon: '🦿', label: `Estropié — −${u.cripple.amount} déplacement (${u.cripple.expiresIn} t.)` });
-    if (u.vendetta) s.push({ icon: '⚔', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
-    if (u.stunCharge) s.push({ icon: '💫', label: `Coup étourdissant armé — sa prochaine attaque étourdit (${u.stunCharge.expiresIn} t.)` });
-    if (u.stun) s.push({ icon: '😵', label: `Étourdi — ne peut rien faire ce tour` });
-    if (u.elan) s.push({ icon: '⚡', label: `Élan (Némésis) — +${u.elan} PA au prochain tour` });
-    if (u.silence) s.push({ icon: '🔇', label: `Silencé — déplacement uniquement` });
-    if (u.cover) s.push({ icon: '🔋', label: `Couverture — +${u.cover.amount} PA/tour (${u.cover.expiresIn} t.)` });
-    if (u.appui) s.push({ icon: '🔥', label: `Appui-feu — +${u.appui.amount} dégâts (${u.appui.expiresIn} t.)` });
+  // États actifs d'une pièce (postures + statuts de Résonance). Chacun porte une CLÉ (→ pictogramme
+  // SVG sur mesure, cf. snippet `stateGlyph`), une FAMILLE (→ couleur de pastille : la couleur porte
+  // la 1ʳᵉ lecture, même minuscule) et un libellé (tooltip au survol + panneaux).
+  type StateFam = 'posture' | 'bonus' | 'malus';
+  const STATE_FAM_COLOR: Record<StateFam, string> = { posture: '#3266ad', bonus: '#2a9d76', malus: '#c9543a' };
+  function pieceStates(u: Unit): { key: string; fam: StateFam; label: string }[] {
+    const s: { key: string; fam: StateFam; label: string }[] = [];
+    if (u.guarding) s.push({ key: 'guard', fam: 'posture', label: 'En garde — dégâts subis réduits' });
+    if (u.watching) s.push({ key: 'watch', fam: 'posture', label: 'Tir réservé armé' });
+    if (u.riposting) s.push({ key: 'riposte', fam: 'posture', label: 'Riposte armée' });
+    if (u.block) s.push({ key: 'block', fam: 'bonus', label: `Bloqué — immunité totale aux dégâts (${u.block.expiresIn} t.)` });
+    if (u.vendetta) s.push({ key: 'vendetta', fam: 'bonus', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
+    if (u.elan) s.push({ key: 'elan', fam: 'bonus', label: `Élan (Némésis) — +${u.elan} PA au prochain tour` });
+    if (u.cover) s.push({ key: 'cover', fam: 'bonus', label: `Couverture — +${u.cover.amount} PA/tour (${u.cover.expiresIn} t.)` });
+    if (u.appui) s.push({ key: 'appui', fam: 'bonus', label: `Appui-feu — +${u.appui.amount} dégâts (${u.appui.expiresIn} t.)` });
+    if (u.stunCharge) s.push({ key: 'stuncharge', fam: 'bonus', label: `Coup étourdissant armé — sa prochaine attaque étourdit (${u.stunCharge.expiresIn} t.)` });
+    if (u.mark) s.push({ key: 'mark', fam: 'malus', label: `Marqué — +${u.mark.bonus} au 1ᵉʳ coup adverse (${u.mark.expiresIn} t.)` });
+    if (u.cripple) s.push({ key: 'cripple', fam: 'malus', label: `Estropié — −${u.cripple.amount} déplacement (${u.cripple.expiresIn} t.)` });
+    if (u.stun) s.push({ key: 'stun', fam: 'malus', label: `Étourdi — ne peut rien faire ce tour` });
+    if (u.silence) s.push({ key: 'silence', fam: 'malus', label: `Silencé — déplacement uniquement` });
     return s;
   }
   function pieceTitle(u: Unit): string {
     const head = `${u.name ?? KIND_NAME[u.kind] ?? u.kind} · ${KIND_NAME[u.kind] ?? u.kind} · PV ${u.hp}/${u.maxHp}`;
-    const st = pieceStates(u).map((e) => `${e.icon} ${e.label}`);
+    const st = pieceStates(u).map((e) => `• ${e.label}`);
     return st.length ? `${head}\n${st.join('\n')}` : head;
   }
 
@@ -507,9 +507,6 @@
     <details class="settings">
       <summary>⚙ Menu</summary>
       <button class="menu-link" onclick={() => (showHelp = true)}>❔ Comment jouer</button>
-      <label class="setrow">Couleur des bulles d'état
-        <input type="color" bind:value={bubbleColor} aria-label="Couleur des bulles d'état" />
-      </label>
     </details>
     </aside>
 
@@ -578,16 +575,63 @@
         {/if}
       </g>
     {/each}
-    <!-- OVERLAY : bulles d'état rendues APRÈS tous les hexes → jamais masquées par un voisin -->
+    <!-- OVERLAY : marqueurs d'état — pastilles colorées (famille) + pictogramme SVG sur mesure.
+         Rendus APRÈS tous les hexes → jamais masqués par un voisin. -->
+    {#snippet stateGlyph(key: string)}
+      {#if key === 'guard'}
+        <path d="M12 2 L20 5.5 V12 C20 16.5 16.5 19.8 12 21.5 C7.5 19.8 4 16.5 4 12 V5.5 Z" fill="#fff" />
+      {:else if key === 'watch'}
+        <circle cx="12" cy="12" r="6.8" fill="none" stroke="#fff" stroke-width="2.2" />
+        <path d="M12 2.5 V5.4 M12 18.6 V21.5 M2.5 12 H5.4 M18.6 12 H21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+        <circle cx="12" cy="12" r="1.7" fill="#fff" />
+      {:else if key === 'riposte'}
+        <path d="M5 5 L19 19 M19 5 L5 19" stroke="#fff" stroke-width="2.6" stroke-linecap="round" />
+        <circle cx="5" cy="19" r="1.9" fill="#fff" />
+        <circle cx="19" cy="19" r="1.9" fill="#fff" />
+      {:else if key === 'block'}
+        <path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="#fff" />
+      {:else if key === 'vendetta'}
+        <path d="M12 3 V14 M8.4 14 H15.6 M12 14 V18" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+        <circle cx="12" cy="19.6" r="1.7" fill="#fff" />
+      {:else if key === 'elan'}
+        <path d="M13 2 L5 13 H10.5 L9 22 L18.5 10 H12 Z" fill="#fff" />
+      {:else if key === 'cover'}
+        <rect x="4" y="8" width="13.5" height="8" rx="1.6" fill="none" stroke="#fff" stroke-width="2" />
+        <rect x="18.4" y="10.4" width="2.6" height="3.2" rx="0.6" fill="#fff" />
+        <rect x="6.2" y="10" width="2.6" height="4" fill="#fff" />
+        <rect x="9.8" y="10" width="2.6" height="4" fill="#fff" />
+      {:else if key === 'appui'}
+        <path d="M12 3 C16 9 17 12 17 15 A5 5 0 0 1 7 15 C7 12 8 9 12 3 Z" fill="#fff" />
+      {:else if key === 'stuncharge'}
+        <path d="M12 2 L13.8 10.2 L22 12 L13.8 13.8 L12 22 L10.2 13.8 L2 12 L10.2 10.2 Z" fill="#fff" />
+      {:else if key === 'mark'}
+        <path d="M12 3 L20 12 L12 21 L4 12 Z" fill="#fff" />
+        <circle cx="12" cy="12" r="2.4" fill="#c9543a" />
+      {:else if key === 'cripple'}
+        <path d="M12 3 V15 M6 12 L12 19 L18 12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      {:else if key === 'stun'}
+        <path d="M16 8 A5.2 5.2 0 1 1 7 11.5 A2.7 2.7 0 1 0 14.2 13" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" />
+      {:else if key === 'silence'}
+        <circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2" />
+        <path d="M6.3 6.3 L17.7 17.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+      {/if}
+    {/snippet}
     {#each geo.tiles as t (t.id)}
       {@const occ = unitAt(combat, t.id)}
       {#if occ && !over}
         {@const states = pieceStates(occ)}
         {@const r = t.small ? 9 : 12}
-        {@const bw = Math.max(states.length, 1) * 10 + 6}
-        <rect x={t.cx - bw / 2} y={t.cy - r - 22} width={bw} height="13" rx="6" fill={bubbleColor} class="statebubble" />
+        {@const cs = t.small ? 11 : 13}
+        {@const gap = 2.5}
+        {@const cyc = t.cy - r - 12}
         {#each states as st, i}
-          <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
+          {@const cxc = t.cx + (i - (states.length - 1) / 2) * (cs + gap)}
+          <g class="stchip">
+            <circle cx={cxc} cy={cyc} r={cs / 2} fill={STATE_FAM_COLOR[st.fam]} stroke="#0e1015" stroke-width="1" />
+            <g transform="translate({cxc - cs / 2} {cyc - cs / 2}) scale({cs / 24})">
+              {@render stateGlyph(st.key)}
+            </g>
+          </g>
         {/each}
       {/if}
     {/each}
@@ -941,8 +985,6 @@
   }
   .settings { font-size: .8rem; color: #9aa3b5; }
   .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
-  .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
-  .setrow input[type="color"] { width: 34px; height: 22px; padding: 0; border: 1px solid #3a4555; border-radius: 4px; background: none; cursor: pointer; }
   .menu-link { width: 100%; margin-top: .4rem; background: #1c2438; border: 1px solid #3a4860; color: #aec6f0; border-radius: 5px; padding: .4rem .6rem; cursor: pointer; font-size: .82rem; text-align: left; }
   .menu-link:hover { background: #243150; }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(6, 8, 12, 0.72); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
@@ -972,8 +1014,7 @@
   .utxt { fill: #0e1015; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .statebubble { stroke: #0e1015; stroke-width: 0.7; pointer-events: none; }
-  .statemark { font-size: 10px; text-anchor: middle; pointer-events: none; }
+  .stchip { pointer-events: none; }
   .pname { fill: #e8ecf2; font-size: 7px; font-weight: 600; text-anchor: middle; pointer-events: none; }
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
