@@ -52,17 +52,24 @@ describe('combat/déplacement — portée', () => {
   });
 });
 
-describe('combat/déplacement — appliquer + coût en PA', () => {
-  it('moveUnit déplace et déduit la distance des PA de la pièce', () => {
+describe('combat/déplacement — appliquer (DÉCOUPLÉ des PA)', () => {
+  it('moveUnit déplace et NE touche PAS aux PA (compte les pas dans `moved`)', () => {
     const s = moveUnit(fresh('A', 'E', 4), 'a', 'C'); // distance 2
     expect(unitAt(s, 'C')?.id).toBe('a');
     expect(unitAt(s, 'A')).toBeUndefined();
-    expect(unitById(s, 'a')!.ap).toBe(2); // 4 − 2
+    expect(unitById(s, 'a')!.ap).toBe(4);    // PA inchangés (marcher est gratuit)
+    expect(unitById(s, 'a')!.moved).toBe(2); // 2 pas comptés sur le plafond de mobilité
   });
 
-  it('moveUnit sans effet si au-delà des PA', () => {
-    const s0 = fresh('A', 'E', 1); // 1 PA → C (distance 2) hors d'atteinte
-    expect(moveUnit(s0, 'a', 'C')).toBe(s0);
+  it('le déplacement N’est PAS bridé par des PA bas (gated par moveCap seul)', () => {
+    const s = moveUnit(fresh('A', 'E', 1), 'a', 'C'); // 1 PA mais C (distance 2) reste atteignable
+    expect(unitAt(s, 'C')?.id).toBe('a');
+    expect(unitById(s, 'a')!.ap).toBe(1);    // PA intacts
+  });
+
+  it('moveUnit sans effet au-delà du plafond moveCap', () => {
+    const s0 = makeCombatState(LINE, [u({ id: 'a', owner: 'alice', hex: 'A', moveCap: 1 })], 'alice');
+    expect(moveUnit(s0, 'a', 'C')).toBe(s0); // C (distance 2) > moveCap 1
   });
 
   it('moveUnit sans effet vers une case occupée', () => {
@@ -75,16 +82,17 @@ describe('combat/déplacement — appliquer + coût en PA', () => {
     expect(moveUnit(s0, 'b', 'D')).toBe(s0); // bob n'est pas actif
   });
 
-  it('les pièces ont des PA indépendants', () => {
+  it('découplage : une pièce peut se déplacer ET attaquer le même tour', () => {
     const s0 = makeCombatState(LINE, [
-      u({ id: 'a1', owner: 'alice', hex: 'A', ap: 4 }),
-      u({ id: 'a2', owner: 'alice', hex: 'C', ap: 4 }),
-      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
+      u({ id: 'a', owner: 'alice', hex: 'A', ap: 4, damage: 4, attackCost: 2 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
     ], 'alice');
-    const s1 = moveUnit(s0, 'a1', 'B'); // a1 dépense 1
-    expect(unitById(s1, 'a1')!.ap).toBe(3);
-    expect(unitById(s1, 'a2')!.ap).toBe(4); // inchangé
-    expect(activeUnits(s1)).toHaveLength(2);
+    const s1 = moveUnit(s0, 'a', 'B');       // A→B (1 pas), PA intacts
+    expect(unitById(s1, 'a')!.ap).toBe(4);
+    expect(canAttack(s1, 'a', 'b')).toBe(true); // B adjacent à C
+    const s2 = attack(s1, 'a', 'b');
+    expect(unitById(s2, 'a')!.ap).toBe(2);   // seule l'attaque coûte (4 − 2)
+    expect(unitById(s2, 'b')!.hp).toBe(6);   // 10 − 4
   });
 });
 

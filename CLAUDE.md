@@ -81,9 +81,22 @@
   `profileFor(rangeTier)` + override (la portée reste sur la droite).
 - **Axe MOBILITÉ (séparé de la droite) — `moveCap` (livré 2026-06-18)** : plafond de **pas/tour**
   indépendant des PA (les attaques restent payées sur les PA pleins). `Unit.moveCap`/`Unit.moved`
-  (pas faits ce tour, remis à 0 à `endTurn`) ; `moveBudget = min(ap−estropie, moveCap−moved)`. **La
-  Lourde est LENTE (`moveCap: 3`)** → le Tireur (4 pas) peut enfin **kiter** (rééquilibrage de la
-  mêlée sans toucher au calibrage portée/robustesse). 1ᵉʳ levier du triangle anti-mêlée (cf. plus bas).
+  (pas faits ce tour, remis à 0 à `endTurn`). **La Lourde est LENTE (`moveCap: 3`)** → le Tireur
+  (4 pas) peut enfin **kiter** (rééquilibrage de la mêlée sans toucher au calibrage portée/robustesse).
+  1ᵉʳ levier du triangle anti-mêlée (cf. plus bas).
+- **DÉPLACEMENT DÉCOUPLÉ DES PA (livré 2026-06-18)** — *bug constaté : le buff `charge` des Lourdes
+  était inerte car les PA bridaient le mouvement avant le `moveCap`*. Correctif : **marcher ne coûte
+  plus de PA** (`moveUnit` ne touche plus à `ap`) ; le déplacement est gated **uniquement** par le
+  `moveCap` → `moveBudget = max(0, (moveCap + haste) − moved − estropie)` (plus aucun terme `ap`).
+  Les **PA ne paient que les attaques + verbes** (garde/tir réservé/riposte/futur soin). **Garde-fou**
+  (sinon les pièces sans `moveCap` bougeraient à l'infini) : `DEFAULT_MOVE_CAP = 4` (= ancien plafond
+  PA implicite) + **Tireur & Duelliste passent à `moveCap: 4` explicite** → comportement préservé
+  (4 = ancien mur PA). **`estropie` (`cripple`) redirigée** du pool PA vers le budget de déplacement
+  (enfin cohérente avec son libellé « − déplacement »). **Conséquences** : (1) une pièce peut **bouger
+  ET agir** le même tour ; (2) la **charge** (`haste +2`) atteint enfin son plein effet (cap 3→5, plus
+  bridé) → les deux leviers « mobilité » des Lourdes deviennent lisibles ; (3) le **Duelliste** est le
+  plus renforcé (déplacement plein + jusqu'à 4× attaque à 1 PA) → **curseur à surveiller au playtest**
+  (levier : son `moveCap`/ses PA). La promesse « `moveCap` indépendant des PA » est désormais **réellement** tenue.
 - **Verbes** (capacités à nombres personnalisables, portés par la pièce) :
   - **Garde** (`guard`, CAC) — Lourde : 3 PA → ×0.5 dégâts subis.
   - **Tir réservé** (`overwatch`, distance) — Tireur : 3 PA, réflexe à l'arrivée d'un ennemi.

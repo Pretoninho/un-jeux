@@ -43,13 +43,13 @@ export const ARCHETYPES: Record<string, Archetype> = {
   // La Lourde (CAC) sait se garder : 3 PA (→ pas d'attaque le même tour) pour ×0.5 dégâts subis.
   lourde: { key: 'lourde', name: 'Lourde', glyph: 'L', rangeTier: 1, moveCap: 3, guard: { cost: 3, damageTakenMul: 0.5 } }, // 1/4 — mêlée-tank, LENTE (3 pas/tour) → le Tireur peut kiter
   // Le Tireur (distance) réserve son tir : 3 PA (→ pas d'attaque le même tour) pour un réflexe.
-  tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4, overwatch: { cost: 3 } }, // 4/1 — distance-verre
+  tireur: { key: 'tireur', name: 'Tireur', glyph: 'T', rangeTier: 4, moveCap: 4, overwatch: { cost: 3 } }, // 4/1 — distance-verre, 4 pas/tour
   // Le Duelliste : pièce HORS-DROITE. Mêlée (portée 1) mais fragile et qui gratte (PV 9, dégâts 2),
   // en échange d'une attaque à 1 PA → frappe deux fois par tour. Verbe atypique : Riposte (2 PA →
   // contre tout attaquant adjacent jusqu'au prochain coup). Escarmouche/harcèlement.
   // (Ses Résonances sont portées au niveau PERSONNAGE — voir CHARACTERS — pas au niveau classe.)
   duelliste: {
-    key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1,
+    key: 'duelliste', name: 'Duelliste', glyph: 'D', rangeTier: 1, moveCap: 4,
     profile: { maxHp: 9, damage: 2, attackCost: 1 },
     riposte: { cost: 2 },
   },

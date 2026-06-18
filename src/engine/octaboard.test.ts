@@ -66,6 +66,7 @@ describe('octaboard/le moteur tourne dessus sans modification', () => {
     expect(reach.get('o:2,2')).toBe(2);
     const s1 = moveUnit(s0, 'a', 'o:2,2'); // route Lourde → carrefour → octogone
     expect(unitById(s1, 'a')!.hex).toBe('o:2,2');
-    expect(unitById(s1, 'a')!.ap).toBe(2); // 4 − 2 pas
+    expect(unitById(s1, 'a')!.ap).toBe(4);     // déplacement découplé : PA intacts
+    expect(unitById(s1, 'a')!.moved).toBe(2);  // 2 pas comptés sur le plafond de mobilité
   });
 });

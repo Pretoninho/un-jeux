@@ -214,19 +214,22 @@ export function reachable(state: CombatState, unitId: string, steps: number): Ma
   return dist;
 }
 
+/** Plafond de pas/tour par défaut, quand un archétype n'en déclare pas (= ancien plafond PA implicite). */
+export const DEFAULT_MOVE_CAP = 4;
+
 /**
- * Pas de déplacement disponibles pour une pièce : ses PA, moins l'éventuel malus « estropié »,
- * et borné par le plafond de mobilité `moveCap` (déduction faite des pas déjà faits ce tour).
- * Les attaques restent payées sur les PA pleins — seul le mouvement est bridé. Plancher 0.
+ * Pas de déplacement disponibles pour une pièce. DÉCOUPLÉ des PA : le mouvement n'est borné QUE par
+ * le plafond de mobilité `moveCap` (moins les pas déjà faits ce tour, plus l'éventuelle « charge »,
+ * moins le malus « estropié »). Les PA ne paient que les attaques/verbes. Plancher 0.
  */
 export function moveBudget(unit: Unit): number {
   if ((unit.root?.expiresIn ?? 0) > 0) return 0; // enraciné : plus aucun pas (attaques/verbes intacts)
-  const cap = (unit.moveCap ?? Infinity) + (unit.haste?.amount ?? 0); // « charge » relève le plafond
-  const capLeft = cap - (unit.moved ?? 0);
-  return Math.max(0, Math.min(unit.ap - (unit.cripple?.amount ?? 0), capLeft));
+  const cap = (unit.moveCap ?? DEFAULT_MOVE_CAP) + (unit.haste?.amount ?? 0); // « charge » relève le plafond
+  const capLeft = cap - (unit.moved ?? 0) - (unit.cripple?.amount ?? 0);      // « estropié » mord le déplacement
+  return Math.max(0, capLeft);
 }
 
-/** Déplace une pièce du camp actif vers `dest` si atteignable ; déduit la distance de SES PA. */
+/** Déplace une pièce du camp actif vers `dest` si atteignable. NE coûte PAS de PA (mouvement découplé). */
 export function moveUnit(state: CombatState, unitId: string, dest: HexId): CombatState {
   const unit = unitById(state, unitId);
   if (!unit || unit.owner !== state.active) return state;
@@ -234,7 +237,7 @@ export function moveUnit(state: CombatState, unitId: string, dest: HexId): Comba
   if (d === undefined) return state;
   return {
     ...state,
-    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest, ap: u.ap - d, moved: (u.moved ?? 0) + d } : u)),
+    units: state.units.map((u) => (u.id === unitId ? { ...u, hex: dest, moved: (u.moved ?? 0) + d } : u)),
   };
 }
 
