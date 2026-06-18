@@ -1457,6 +1457,41 @@ describe('combat — Soin (verbe heal, burst payé)', () => {
   });
 });
 
+describe('combat — Résonance Baume × Bastion (regen, soin réactif — pur soin)', () => {
+  const bastionGuard = (over: Partial<Unit> = {}): Unit =>
+    u({ id: 'bastion', owner: 'alice', hex: 'B', kind: 'lourde', characterId: 'bastion',
+        guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 8, maxHp: 16, ...over });
+  const baume = (over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter('baume', 'alice', 'A', CHARACTERS.baume!, 4), ...over });
+
+  it('Bastion encaisse en garde → Baume lui pose la régénération (+2×2) + CD', () => {
+    const st = makeCombatState(LINE, [
+      bastionGuard(), baume(),
+      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(st, 'foe', 'bastion'); // garde encaissée → Résonance regen
+    expect(unitById(s, 'bastion')!.regen).toMatchObject({ owner: 'alice', amount: 2, expiresIn: 2 });
+    expect(unitById(s, 'baume')!.cooldowns!.regen_baume_bastion).toBe(3);
+  });
+
+  it('la régén soigne Bastion à ses 2 prochains rechargements (plafonné) et NE fait que soigner', () => {
+    const st = makeCombatState(LINE, [
+      bastionGuard({ hp: 8 }), baume(),
+      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    let s = attack(st, 'foe', 'bastion');           // garde : 8 − (4×0.5)=2 → 6
+    expect(unitById(s, 'bastion')!.hp).toBe(6);
+    expect(unitById(s, 'foe')!.hp).toBe(10);        // PUR SOIN : aucun effet sur l'ennemi (≠ épines)
+    s = endTurn(s, 4);                               // alice rechargée → +2 (#1)
+    expect(unitById(s, 'bastion')!.hp).toBe(8);
+    s = endTurn(endTurn(s, 4), 4);                   // alice finit (tick) → bob finit → alice → +2 (#2)
+    expect(unitById(s, 'bastion')!.hp).toBe(10);
+    s = endTurn(endTurn(s, 4), 4);                   // … → la régén expire
+    expect(unitById(s, 'bastion')!.regen).toBeUndefined();
+    expect(unitById(s, 'bastion')!.hp).toBe(10);    // plus de soin au-delà
+  });
+});
+
 describe('combat — Régénération (regen, soin réactif HoT)', () => {
   it('soigne +amount au rechargement, sur `duration` tours, puis tombe', () => {
     const st = makeCombatState(LINE, [

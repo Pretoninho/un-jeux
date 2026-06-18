@@ -54,6 +54,11 @@ export const ARCHETYPES: Record<string, Archetype> = {
     profile: { maxHp: 9, damage: 2, attackCost: 1 },
     riposte: { cost: 2 },
   },
+  // Le Soigneur (distance, support) : 4ᵉ archétype. Sur-droite tier 3 (portée 3 · PV 10 · dégâts 3),
+  // `moveCap: 4`. Verbe SOIN : 3 PA → +4 PV à un allié à ≤2 cases (plafonné). IDENTITÉ DE RANGÉE =
+  // PUR SOIN : son verbe et toutes ses Résonances ne font QUE soigner (jamais de contrôle/dégâts/buff).
+  // EN RÉSERVE pour l'instant (présent dans le vivier, mais pas dans les SLOTS de l'escouade par défaut).
+  soigneur: { key: 'soigneur', name: 'Soigneur', glyph: 'S', rangeTier: 3, moveCap: 4, heal: { cost: 3, amount: 4, range: 2 } },
   // Exotiques (réserve, sur la même droite) :
   // hallebardier: { key:'hallebardier', name:'Hallebardier', glyph:'H', rangeTier:2 }, // 2/3
   // eclaireur:    { key:'eclaireur',    name:'Éclaireur',    glyph:'É', rangeTier:3 }, // 3/2
@@ -284,6 +289,18 @@ const CHARGE_BASTION_FLECHE: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
 };
 
+// ── Rangée SOIGNEUR (support) = PUR SOIN (jamais de contrôle/dégâts). Signature des héros soigneurs. ──
+/**
+ * Résonance signature « Baume × Bastion » (1ᵉʳ Soigneur). Quand Bastion (en garde) encaisse, Baume lui
+ * pose une RÉGÉNÉRATION (`kind: 'regen'`, soin réactif) : +2 PV au début de chacun de ses 2 prochains
+ * tours, plafonné au maxHp. « Le tank encaisse, le médecin recolle. » Portée escouade, CD 3. Soin réactif
+ * « court » (miroir thématique du burst de Bastion) — Mélisse portera la variante sustain plus longue.
+ */
+const REGEN_BAUME_BASTION: ReactionSpec = {
+  id: 'regen_baume_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -305,6 +322,7 @@ export const CHARACTERS: Record<string, Character> = {
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION, ESTROPIER_ORSO_REMPART, ESTROPIER_ORSO_ESTOC, RACINE_ORSO_FIL] },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
   fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION] },
+  baume:   { id: 'baume',   name: 'Baume',   archetype: 'soigneur', reactions: [REGEN_BAUME_BASTION] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

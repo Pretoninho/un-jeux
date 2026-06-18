@@ -137,3 +137,34 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(() => makeUnitFromCharacter('x', 'alice', 'Z', { id: 'x', name: 'X', archetype: 'nope' }, 4)).toThrow();
   });
 });
+
+describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve)', () => {
+  it('makeUnit : stats tier 3 + verbe Soin + moveCap 4', () => {
+    const s = makeUnit('a4', 'alice', 'X', ARCHETYPES.soigneur!, 4);
+    expect(s).toMatchObject({
+      kind: 'soigneur', hp: 10, maxHp: 10, range: 3, damage: 3, attackCost: 2, moveCap: 4,
+      heal: { cost: 3, amount: 4, range: 2 },
+    });
+  });
+
+  it('seul le Soigneur porte le verbe heal', () => {
+    expect(ARCHETYPES.soigneur!.heal).toEqual({ cost: 3, amount: 4, range: 2 });
+    expect(ARCHETYPES.lourde!.heal).toBeUndefined();
+    expect(ARCHETYPES.tireur!.heal).toBeUndefined();
+    expect(ARCHETYPES.duelliste!.heal).toBeUndefined();
+  });
+
+  it('Baume : héros soigneur, verbe Soin + signature regen (pur soin)', () => {
+    const b = makeUnitFromCharacter('a4', 'alice', 'X', CHARACTERS.baume!, 4);
+    expect(b.name).toBe('Baume');
+    expect(b.kind).toBe('soigneur');
+    expect(b.heal).toEqual({ cost: 3, amount: 4, range: 2 });
+    const rg = b.reactions!.find((r) => r.id === 'regen_baume_bastion')!;
+    expect(rg).toMatchObject({ on: 'garde_encaissee', fromCharacter: 'bastion', kind: 'regen', amount: 2, duration: 2 });
+  });
+
+  it('le Soigneur n\'est PAS dans les SLOTS de l\'escouade par défaut (réserve)', () => {
+    // L'escouade = 1 Lourde + 1 Tireur + 1 Duelliste ; le Soigneur reste hors-roster pour l'instant.
+    expect(['lourde', 'tireur', 'duelliste']).not.toContain('soigneur');
+  });
+});
