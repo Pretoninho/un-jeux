@@ -538,17 +538,20 @@
           {@render reson(selected, resonAlly, () => (resonAlly = !resonAlly))}
           <div class="pacts">
             {#if selected.guard}
-              <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}>
+              <button class="defend" class:on={selected.guarding} onclick={defendSelected} disabled={!canGuard}
+                title={`GARDE (${selected.guard.cost} PA) : posture défensive jusqu'à ton prochain tour — dégâts subis réduits (×${selected.guard.damageTakenMul}). Encaisser une attaque en garde déclenche les Résonances de tes alliés.`}>
                 {selected.guarding ? '🛡 En garde' : `🛡 Défendre (${selected.guard.cost})`}
               </button>
             {/if}
             {#if selected.overwatch}
-              <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}>
+              <button class="watch" class:on={selected.watching} onclick={reserveSelected} disabled={!canWatch}
+                title={`TIR RÉSERVÉ (${selected.overwatch.cost} PA) : prépare un tir réflexe jusqu'à ton prochain tour — frappe la 1ʳᵉ pièce ennemie qui s'arrête dans ta zone de menace. Déclenche les Résonances « tir réservé ».`}>
                 {selected.watching ? '🎯 Tir réservé' : `🎯 Réserver (${selected.overwatch.cost})`}
               </button>
             {/if}
             {#if selected.riposte}
-              <button class="riposte" class:on={selected.riposting} onclick={riposteSelected} disabled={!canParry}>
+              <button class="riposte" class:on={selected.riposting} onclick={riposteSelected} disabled={!canParry}
+                title={`RIPOSTE (${selected.riposte.cost} PA) : arme un contre jusqu'à ton prochain tour ou ton 1ᵉʳ contre — si un ennemi adjacent t'attaque et que tu survis, tu le frappes en retour. Déclenche les Résonances « riposte ».`}>
                 {selected.riposting ? '🗡 Riposte armée' : `🗡 Riposter (${selected.riposte.cost})`}
               </button>
             {/if}
