@@ -1,8 +1,9 @@
 <script lang="ts">
   // NOYAU TACTIQUE — 2 pièces par camp, PA par pièce. Échecs + Divinity (esprit).
-  // À ton tour : clique une de TES pièces pour la sélectionner, puis dépense ses PA —
-  // bouger (1 PA/case) et/ou frapper une pièce adverse à portée. Joue tes deux pièces
-  // dans l'ordre que tu veux, puis « Finir le tour ».
+  // À ton tour : clique une de TES pièces pour la sélectionner. Le DÉPLACEMENT est gratuit
+  // (gated par la mobilité `moveCap`, pas par les PA) ; les PA paient les attaques et verbes
+  // → une pièce peut bouger ET agir le même tour. Joue tes pièces dans l'ordre que tu veux,
+  // puis « Finir le tour » (PA rechargés, pas remis à zéro).
   //
   // La vue est AGNOSTIQUE À LA FORME : elle dessine une liste de tuiles {id, points, shape}
   // et délègue toute la logique au moteur (topologie pure). Deux plateaux interchangeables :
@@ -881,7 +882,7 @@
           <div class="pv">PV <b>{selected.hp}/{selected.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
-          <div class="pstats"><span>PA <b>{selected.ap}</b>/{AP_PER_TURN}</span><span>Portée <b>{selected.range}</b></span><span>Dégâts <b>{selected.damage}</b></span></div>
+          <div class="pstats"><span>PA <b>{selected.ap}</b>/{AP_PER_TURN}</span><span>Mobilité <b>{moveBudget(selected)}</b> pas</span><span>Portée <b>{selected.range}</b></span><span>Dégâts <b>{selected.damage}</b></span></div>
           {#if selected.guarding || selected.watching || selected.riposting}
             <div class="ptags">{#if selected.guarding}<span class="tag g">🛡 En garde</span>{/if}{#if selected.watching}<span class="tag w">🎯 Tir réservé</span>{/if}{#if selected.riposting}<span class="tag r">🗡 Riposte armée</span>{/if}</div>
           {/if}
@@ -1158,9 +1159,10 @@
 
       <h3>🕹 Le tour de jeu</h3>
       <ul>
-        <li>Chaque pièce a des <b>PA</b> : bouger coûte <b>1 PA/case</b>, attaquer coûte son coût. Tu joues tes pièces dans <b>l'ordre que tu veux</b>.</li>
+        <li><b>Se déplacer est gratuit</b> : chaque pièce a un <b>plafond de pas par tour</b> (sa <i>mobilité</i>) — elle peut donc <b>bouger ET agir le même tour</b>.</li>
+        <li>Les <b>PA</b> paient les <b>actions</b> : attaquer et les verbes (Garde, Tir réservé, Riposte) coûtent des PA. Tu joues tes pièces dans <b>l'ordre que tu veux</b>.</li>
         <li>Les <b>pièces sont des obstacles</b> — on ne les traverse pas.</li>
-        <li><b>Finir le tour</b> passe la main à l'autre joueur ; les PA <b>rechargent</b>.</li>
+        <li><b>Finir le tour</b> passe la main à l'autre joueur ; les PA <b>rechargent</b> et les pas se <b>remettent à zéro</b>.</li>
       </ul>
 
       <h3>🖱 Agir</h3>
@@ -1171,9 +1173,9 @@
 
       <h3>♟ Les archétypes</h3>
       <ul>
-        <li><b>Lourde</b> (L) — robuste, mêlée · verbe <b>Garde</b>.</li>
-        <li><b>Tireur</b> (T) — fragile, longue portée · verbe <b>Tir réservé</b>.</li>
-        <li><b>Duelliste</b> (D) — frappe 2×/tour · verbe <b>Riposte</b>.</li>
+        <li><b>Lourde</b> (L) — robuste, mêlée, <b>lente (3 pas)</b> · verbe <b>Garde</b>.</li>
+        <li><b>Tireur</b> (T) — fragile, longue portée, <b>mobile (4 pas) → kite</b> · verbe <b>Tir réservé</b>.</li>
+        <li><b>Duelliste</b> (D) — frappe 2×/tour, <b>4 pas</b> · verbe <b>Riposte</b>.</li>
       </ul>
       <p class="muted small">Le détail d'un verbe s'affiche en <b>survolant son bouton</b> dans le panneau.</p>
 
