@@ -214,6 +214,40 @@ const CHARGE_BASTION_MIREILLE: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
 };
 
+// ── Rangée ORSO (Tireur) = CONTRÔLE : ralentir (`estropier`) / enraciner (`racine`) l'agresseur d'un allié.
+/** « Orso × Rempart » — Rempart (en garde) encaisse → Orso ESTROPIE l'attaquant (−2 dépl., 3 tours). CD 2. */
+const ESTROPIER_ORSO_REMPART: ReactionSpec = {
+  id: 'estropier_orso_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { squad: true }, cooldown: 2, kind: 'estropier', amount: 2, duration: 3,
+};
+/** « Orso × Estoc » — la Riposte d'Estoc part → Orso ESTROPIE l'attaquant (−1 dépl., léger). CD 2. */
+const ESTROPIER_ORSO_ESTOC: ReactionSpec = {
+  id: 'estropier_orso_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 2, kind: 'estropier', amount: 1, duration: 2,
+};
+/** « Orso × Fil » — la Riposte de Fil part → Orso ENRACINE l'attaquant (dépl. → 0). CD 3. */
+const RACINE_ORSO_FIL: ReactionSpec = {
+  id: 'racine_orso_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 3, kind: 'racine', duration: 2,
+};
+
+// ── Rangée BASTION (Lourde) = MOBILITÉ : se CHARGER quand un allié agit (kite/engage à pleine vitesse).
+/** « Bastion × Orso » — le Tir réservé d'Orso part → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
+const CHARGE_BASTION_ORSO: ReactionSpec = {
+  id: 'charge_bastion_orso', on: 'tir_reserve', fromCharacter: 'orso',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+/** « Bastion × Estoc » — la Riposte d'Estoc part → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
+const CHARGE_BASTION_ESTOC: ReactionSpec = {
+  id: 'charge_bastion_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+/** « Bastion × Fil » — la Riposte de Fil part → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
+const CHARGE_BASTION_FIL: ReactionSpec = {
+  id: 'charge_bastion_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -228,11 +262,11 @@ export interface Character {
  * NOMS = PLACEHOLDERS provisoires. Le draft (qui choisit quoi) reste une couche au-dessus, ajournée.
  */
 export const CHARACTERS: Record<string, Character> = {
-  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE] },
+  bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE, CHARGE_BASTION_ORSO, CHARGE_BASTION_ESTOC, CHARGE_BASTION_FIL] },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
   rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
-  orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION] },
+  orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION, ESTROPIER_ORSO_REMPART, ESTROPIER_ORSO_ESTOC, RACINE_ORSO_FIL] },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
 };
 

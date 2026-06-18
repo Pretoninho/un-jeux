@@ -5,6 +5,7 @@ import {
   unitAt, unitById, graphDistance, activeUnits, type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
+import { CHARACTERS, makeUnitFromCharacter } from './pieces';
 
 // Carte en ligne : A — B — C — D — E.
 const LINE: GameMap = {
@@ -1145,6 +1146,57 @@ describe('combat — Résonance Bastion × Mireille (charge — bonus de déplac
       u({ id: 'b', owner: 'bob', hex: 'E', ap: 4 }),
     ], 'alice');
     expect(unitById(endTurn(s, 4), 'L')!.haste).toBeUndefined(); // alice finit → charge tombe
+  });
+});
+
+describe('combat — matrice : rangées Orso (contrôle) & Bastion (mobilité) complétées', () => {
+  // Héros RÉELS (vrai câblage des Résonances) ; `over` ajuste posture/position.
+  const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
+  const foe = (hex: string): Unit => u({ id: 'b', owner: 'bob', hex, ap: 4, damage: 4, hp: 20 });
+
+  it('Orso × Rempart : Rempart encaisse en garde → l’attaquant est estropié', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('rempart', 'alice', 'B', { guarding: true }), hero('orso', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'rempart');
+    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 2 });
+  });
+
+  it('Orso × Estoc : la Riposte d’Estoc part → l’attaquant est estropié', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('estoc', 'alice', 'B', { riposting: true }), hero('orso', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'estoc');
+    expect(unitById(s, 'b')!.cripple).toMatchObject({ amount: 1 });
+  });
+
+  it('Orso × Fil : la Riposte de Fil part → l’attaquant est enraciné', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('fil', 'alice', 'B', { riposting: true }), hero('orso', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'fil');
+    expect(unitById(s, 'b')!.root).toMatchObject({ expiresIn: 2 });
+  });
+
+  it('Bastion × Orso : le Tir réservé d’Orso part → Bastion se charge', () => {
+    const base = makeCombatState(LINE, [
+      hero('orso', 'alice', 'A', { watching: true }), hero('bastion', 'alice', 'B'),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),
+    ], 'bob');
+    const s = resolveOverwatch(moveUnit(base, 'b', 'C'), 'b'); // E→C dans la portée d'Orso → tir
+    expect(unitById(s, 'bastion')!.haste).toMatchObject({ amount: 2 });
+  });
+
+  it('Bastion × Estoc : la Riposte d’Estoc part → Bastion se charge', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('estoc', 'alice', 'B', { riposting: true }), hero('bastion', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'estoc');
+    expect(unitById(s, 'bastion')!.haste).toMatchObject({ amount: 2 });
+  });
+
+  it('Bastion × Fil : la Riposte de Fil part → Bastion se charge', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('fil', 'alice', 'B', { riposting: true }), hero('bastion', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'fil');
+    expect(unitById(s, 'bastion')!.haste).toMatchObject({ amount: 2 });
   });
 });
 

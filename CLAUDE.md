@@ -17,11 +17,10 @@
 ## Feuille de route — priorités (décidé 2026-06-18)
 > Ordre de travail validé. Méthode inchangée : **un lot = une cellule validée** (proposer → valider → coder → gates verts).
 1. **Terminer les Résonances des autres personnages** — densifier la matrice « possesseur × déclencheur ».
-   Aujourd'hui Mireille a sa ligne complète (4 duos) et Estoc/Fil leurs 4 duos ; reste à compléter les
-   **lignes des Lourdes (Bastion, Rempart)** et des **Tireurs/Duellistes manquants** (Orso, etc.) →
-   viser la **réciprocité** (remplir les deux sens de chaque arête). *Rappel garde-fou* : un duo n'existe
-   que si le partenaire **émet un signal** (cf. revue de conception, point 1) — élargir le vocabulaire de
-   signaux est une décision active.
+   **Estoc, Fil, Mireille, Orso, Bastion ont leur rangée complète (4 duos)** ; reste **la rangée de
+   Rempart** (possesseur vide) → puis viser la **réciprocité** (remplir les deux sens de chaque arête).
+   *Rappel garde-fou* : un duo n'existe que si le partenaire **émet un signal** (cf. revue de conception,
+   point 1) — élargir le vocabulaire de signaux est une décision active.
 2. **Création de nouveaux personnages** — enrichir le **vivier plat** (`CHARACTERS`), un héros à la fois
    (procédé : `docs/personnages.md`). Inclut les **spécialistes** en réserve (Soigneur = 4ᵉ archétype visé,
    Hallebardier/Saboteur) « nés résonants ».
@@ -217,13 +216,18 @@
     déplacement** pour son prochain tour (statut `Unit.haste` lu dans `moveBudget`, décompté à `endTurn`) →
     la Lourde lente (3) **s'engage à pleine vitesse** quand la Tireuse ouvre le feu. **L'axe mobilité a
     maintenant ses deux signes** : malus (`cripple`/`racine`) ↔ bonus (`haste`/`charge`).
+  - **Rangées Orso & Bastion COMPLÉTÉES (2026-06-18)** — 6 duos ajoutés (effets/signaux existants, pures
+    cellules de matrice). **Orso (Tireur, contrôle)** : ×Rempart (`estropier` 2, sur garde), ×Estoc
+    (`estropier` 1, sur riposte), ×Fil (`racine`, sur riposte) → 4 duos. **Bastion (Lourde, mobilité)** :
+    ×Orso (sur tir réservé), ×Estoc & ×Fil (sur riposte) → tous `charge` +2, 4 duos. **Estoc, Fil, Mireille,
+    Orso, Bastion ont leur rangée complète** ; reste **Rempart** (rangée de possesseur vide).
   - **THÈME DE RANGÉE — identité par possesseur (orientation 2026-06-18)** : pour rendre la matrice lisible
     et créer un gabarit de héros, chaque archétype-possesseur porte un *thème* — **Lourde = mobilité/charge**
     (`charge` → +déplacement, posé chez Bastion), **Tireur = contrôle** (ralentir `estropier` / enraciner
     `racine`, posé chez Orso), **Duelliste = burst** (`marquage` → bonus dégâts, déjà chez Estoc). Sert le
     **rééquilibrage anti-mêlée** (« triangle » LIVRÉ : `moveCap` Lourde lente + contrôle Tireur + charge
-    Lourde conditionnelle). Façonnage des **rangées vides en priorité** (Orso/Bastion ✓ commencés ; reste à
-    compléter leurs lignes + la rangée de Rempart).
+    Lourde conditionnelle). Façonnage des **rangées vides en priorité** (Orso/Bastion ✓ **complètes** ;
+    reste la rangée de **Rempart**).
   - **UI** : badge `RÉSONANCE ✦ {effet}` (duos dormants masqués) + cooldown (⏳n/prêt) dans les panneaux,
     bouton `?` pour déplier le détail ; statuts subis affichés (marque/estropié/vendetta/enraciné) sur les pièces.
 - **Suite (la matrice se remplit une cellule = un lot validé)** : nouveaux signaux
