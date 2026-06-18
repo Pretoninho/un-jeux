@@ -432,13 +432,12 @@
       {@const occ = unitAt(combat, t.id)}
       {#if occ && !over}
         {@const states = pieceStates(occ)}
-        {#if states.length}
-          {@const r = t.small ? 9 : 12}
-          <rect x={t.cx - (states.length * 10 + 6) / 2} y={t.cy - r - 22} width={states.length * 10 + 6} height="13" rx="6" fill={bubbleColor} class="statebubble" />
-          {#each states as st, i}
-            <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
-          {/each}
-        {/if}
+        {@const r = t.small ? 9 : 12}
+        {@const bw = Math.max(states.length, 1) * 10 + 6}
+        <rect x={t.cx - bw / 2} y={t.cy - r - 22} width={bw} height="13" rx="6" fill={bubbleColor} class="statebubble" />
+        {#each states as st, i}
+          <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
+        {/each}
       {/if}
     {/each}
   </svg>
