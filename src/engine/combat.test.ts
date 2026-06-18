@@ -1200,6 +1200,35 @@ describe('combat — matrice : rangées Orso (contrôle) & Bastion (mobilité) c
   });
 });
 
+describe('combat — matrice : rangée Rempart (mobilité soutenue, charge 2 tours)', () => {
+  const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
+  const foe = (hex: string): Unit => u({ id: 'b', owner: 'bob', hex, ap: 4, damage: 4, hp: 20 });
+
+  it('Rempart × Mireille : Tir réservé de Mireille → Rempart chargé 2 tours', () => {
+    const base = makeCombatState(LINE, [
+      hero('mireille', 'alice', 'A', { watching: true }), hero('rempart', 'alice', 'B'),
+      u({ id: 'b', owner: 'bob', hex: 'E', ap: 4, hp: 20 }),
+    ], 'bob');
+    const s = resolveOverwatch(moveUnit(base, 'b', 'C'), 'b');
+    expect(unitById(s, 'rempart')!.haste).toMatchObject({ amount: 2, expiresIn: 2 }); // soutenu (vs Bastion 1)
+  });
+
+  it('Rempart × Estoc : la Riposte d’Estoc part → Rempart chargé', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('estoc', 'alice', 'B', { riposting: true }), hero('rempart', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'estoc');
+    expect(unitById(s, 'rempart')!.haste).toMatchObject({ amount: 2, expiresIn: 2 });
+  });
+
+  it('Rempart × Fil : la Riposte de Fil part → Rempart chargé', () => {
+    const s = attack(makeCombatState(LINE, [
+      hero('fil', 'alice', 'B', { riposting: true }), hero('rempart', 'alice', 'A'), foe('C'),
+    ], 'bob'), 'b', 'fil');
+    expect(unitById(s, 'rempart')!.haste).toMatchObject({ amount: 2, expiresIn: 2 });
+  });
+});
+
 describe('combat — Résonance Mireille × Estoc (tir réplique sur la riposte)', () => {
   const estoc = (over: Partial<Unit> & Pick<Unit, 'id' | 'owner' | 'hex'>): Unit =>
     u({ kind: 'duelliste', hp: 9, maxHp: 9, damage: 2, riposte: { cost: 2 }, riposting: true, characterId: 'estoc', ...over });

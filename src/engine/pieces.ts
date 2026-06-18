@@ -248,6 +248,29 @@ const CHARGE_BASTION_FIL: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
 };
 
+// ── Rangée REMPART (Lourde) = MOBILITÉ, variante SOUTENUE : même `charge` que Bastion mais `duration: 2`
+//    (Bastion = charge-éclair 1 tour ; Rempart = mobilité prolongée 2 tours) → deux Lourdes distinctes.
+/** « Rempart × Mireille » — Tir réservé de Mireille → Rempart se CHARGE (+2 dépl., 2 tours). CD 3. */
+const CHARGE_REMPART_MIREILLE: ReactionSpec = {
+  id: 'charge_rempart_mireille', on: 'tir_reserve', fromCharacter: 'mireille',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
+};
+/** « Rempart × Orso » — Tir réservé d'Orso → Rempart se CHARGE (+2 dépl., 2 tours). CD 3. */
+const CHARGE_REMPART_ORSO: ReactionSpec = {
+  id: 'charge_rempart_orso', on: 'tir_reserve', fromCharacter: 'orso',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
+};
+/** « Rempart × Estoc » — Riposte d'Estoc → Rempart se CHARGE (+2 dépl., 2 tours). CD 3. */
+const CHARGE_REMPART_ESTOC: ReactionSpec = {
+  id: 'charge_rempart_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
+};
+/** « Rempart × Fil » — Riposte de Fil → Rempart se CHARGE (+2 dépl., 2 tours). CD 3. */
+const CHARGE_REMPART_FIL: ReactionSpec = {
+  id: 'charge_rempart_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
+};
+
 export interface Character {
   id: string;                 // identifiant unique du héros
   name: string;               // nom affiché (identité)
@@ -265,7 +288,7 @@ export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE, CHARGE_BASTION_ORSO, CHARGE_BASTION_ESTOC, CHARGE_BASTION_FIL] },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, REPLIQUE_MIREILLE_ESTOC, COUVERTURE_MIREILLE_REMPART, APPUI_MIREILLE_FIL] },
   estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, MARQUAGE_ESTOC_MIREILLE, ESTROPIER_ESTOC_REMPART, PROVOCATION_ESTOC_ORSO] },
-  rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde' },
+  rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde', reactions: [CHARGE_REMPART_MIREILLE, CHARGE_REMPART_ORSO, CHARGE_REMPART_ESTOC, CHARGE_REMPART_FIL] },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION, ESTROPIER_ORSO_REMPART, ESTROPIER_ORSO_ESTOC, RACINE_ORSO_FIL] },
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, RALLIEMENT_FIL_MIREILLE, ETOURDIR_FIL_REMPART, RUEE_FIL_ORSO] },
 };
