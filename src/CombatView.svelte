@@ -35,6 +35,9 @@
   const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃', silence: '🔇', couverture: '🔋', appui: '🔥' };
   const HEROES = Object.values(CHARACTERS);
   let showMatrix = $state(false);
+  // Couleur des bulles d'état — réglable par le joueur (menu Réglages), persistée.
+  let bubbleColor = $state((typeof localStorage !== 'undefined' && localStorage.getItem('bubbleColor')) || '#3d4658');
+  $effect(() => { try { localStorage.setItem('bubbleColor', bubbleColor); } catch { /* stockage indispo */ } });
 
   // États actifs d'une pièce (postures + statuts de Résonance) : une icône + une description chacun.
   // Servent à la fois les petites icônes SUR la pièce et le tooltip au survol (`<title>` natif).
@@ -364,6 +367,12 @@
     <button class="undo" onclick={undo} disabled={!acted}>↩ Annuler</button>
     <button class="end-turn" onclick={finishTurn} disabled={over}>Finir le tour ⏩</button>
     <button class="restart" onclick={restart}>Recommencer</button>
+    <details class="settings">
+      <summary>⚙ Réglages</summary>
+      <label class="setrow">Couleur des bulles d'état
+        <input type="color" bind:value={bubbleColor} aria-label="Couleur des bulles d'état" />
+      </label>
+    </details>
     </aside>
 
     <div class="board">
@@ -403,7 +412,6 @@
           {@const r = t.small ? 9 : 12}
           {@const w = t.small ? 16 : 22}
           {@const by = t.small ? 9 : 12}
-          {@const states = pieceStates(occ)}
           <title>{pieceTitle(occ)}</title>
           <circle cx={t.cx} cy={t.cy - 3} {r} fill={COLORS[occ.owner]} stroke={isSel ? '#f0f3f9' : '#0e1015'} stroke-width={isSel ? 3 : 2} />
           <text x={t.cx} y={t.cy + 1} class="utxt">{KIND_GLYPH[occ.kind] ?? '?'}</text>
@@ -414,17 +422,24 @@
           <rect x={t.cx - w / 2} y={t.cy + by} width={w * frac} height="3.5" rx="1.5" fill={frac > 0.4 ? '#5ab0a0' : '#e0604a'} />
           <!-- PA restants (pièces du camp actif) -->
           {#if mine}<text x={t.cx + r + 2} y={t.cy - 6} class="apbadge">{occ.ap}</text>{/if}
-          <!-- bulle d'état (postures + statuts), regroupée au-dessus du nom pour ressortir du plateau -->
-          {#if states.length}
-            <rect x={t.cx - (states.length * 10 + 6) / 2} y={t.cy - r - 22} width={states.length * 10 + 6} height="13" rx="6" class="statebubble" />
-            {#each states as st, i}
-              <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
-            {/each}
-          {/if}
         {:else if inReach}
           <text x={t.cx} y={t.cy + 4} class="dist">{d}</text>
         {/if}
       </g>
+    {/each}
+    <!-- OVERLAY : bulles d'état rendues APRÈS tous les hexes → jamais masquées par un voisin -->
+    {#each geo.tiles as t (t.id)}
+      {@const occ = unitAt(combat, t.id)}
+      {#if occ && !over}
+        {@const states = pieceStates(occ)}
+        {#if states.length}
+          {@const r = t.small ? 9 : 12}
+          <rect x={t.cx - (states.length * 10 + 6) / 2} y={t.cy - r - 22} width={states.length * 10 + 6} height="13" rx="6" fill={bubbleColor} class="statebubble" />
+          {#each states as st, i}
+            <text x={t.cx + (i - (states.length - 1) / 2) * 10} y={t.cy - r - 13} class="statemark">{st.icon}</text>
+          {/each}
+        {/if}
+      {/if}
     {/each}
   </svg>
     </div>
@@ -706,6 +721,10 @@
   .end-turn:hover:not(:disabled) { border-color: #5a70b0; }
   .end-turn:disabled { opacity: .4; cursor: not-allowed; }
   .restart { background: #1a2030; border: 1px solid #3a4555; color: #9aa3b5; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .settings { font-size: .8rem; color: #9aa3b5; }
+  .settings summary { cursor: pointer; padding: .25rem 0; user-select: none; }
+  .setrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .4rem; }
+  .setrow input[type="color"] { width: 34px; height: 22px; padding: 0; border: 1px solid #3a4555; border-radius: 4px; background: none; cursor: pointer; }
   .banner { background: #1e2435; border: 1px solid var(--c); border-radius: 8px; padding: .6rem 1rem; display: flex; align-items: center; gap: 1rem; }
   .banner b { color: var(--c); }
   .rematch { margin-left: auto; background: #1a2030; border: 1px solid var(--c); color: #e6ebf5; border-radius: 5px; padding: .35rem .8rem; cursor: pointer; }
@@ -721,7 +740,7 @@
   .utxt { fill: #0e1015; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .apbadge { fill: #ffd479; font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
   .dist { fill: #6fae9a; font-size: 11px; text-anchor: middle; pointer-events: none; }
-  .statebubble { fill: rgba(8, 10, 16, 0.86); stroke: #424a59; stroke-width: 0.7; pointer-events: none; }
+  .statebubble { stroke: #0e1015; stroke-width: 0.7; pointer-events: none; }
   .statemark { font-size: 10px; text-anchor: middle; pointer-events: none; }
   .pname { fill: #e8ecf2; font-size: 7px; font-weight: 600; text-anchor: middle; pointer-events: none; }
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
