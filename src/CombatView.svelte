@@ -32,7 +32,10 @@
   const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence', couverture: 'Couverture', appui: 'Appui-feu' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué', riposte: 'Riposte déclenchée' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
-  const EFFECT_ICON: Record<string, string> = { epines: '🌵', marquage: '✖', estropier: '🦿', provocation: '🧲', vendetta: '⚔', ralliement: '🚩', etourdir: '💫', ruee: '🏃', silence: '🔇', couverture: '🔋', appui: '🔥' };
+  // Matrice : chaque EFFET de duo → un pictogramme SVG (clé du snippet `stateGlyph`) + une couleur
+  // de pastille selon l'INTENTION (rouge = nuit à l'ennemi · vert = soutient un allié · bleu = déplacement).
+  const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui' };
+  const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad' };
   const HEROES = Object.values(CHARACTERS);
   let showMatrix = $state(false);
   // Tuto « Comment jouer » : affiché au 1er lancement, ré-ouvrable via le bouton ? Aide.
@@ -479,6 +482,66 @@
 </script>
 
 <div class="combat">
+  <!-- Pictogrammes SVG d'état / d'effet — partagés par le plateau ET la matrice de Résonance.
+       Définis au niveau racine pour être visibles des deux. À rendre DANS un <svg>. -->
+  {#snippet stateGlyph(key: string)}
+    {#if key === 'guard'}
+      <path d="M12 2 L20 5.5 V12 C20 16.5 16.5 19.8 12 21.5 C7.5 19.8 4 16.5 4 12 V5.5 Z" fill="#fff" />
+      <path d="M12 5.2 L17.2 7.5 V12 C17.2 15.2 15 17.2 12 18.4 C9 17.2 6.8 15.2 6.8 12 V7.5 Z" fill="none" stroke="#3266ad" stroke-width="1.5" />
+    {:else if key === 'watch'}
+      <circle cx="12" cy="12" r="6.8" fill="none" stroke="#fff" stroke-width="2.2" />
+      <path d="M12 2.5 V5.4 M12 18.6 V21.5 M2.5 12 H5.4 M18.6 12 H21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+      <circle cx="12" cy="12" r="1.7" fill="#fff" />
+    {:else if key === 'riposte'}
+      <path d="M17 9 H7 M11 5.5 L6.5 9 L11 12.5" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M7 15 H17 M13 11.5 L17.5 15 L13 18.5" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
+    {:else if key === 'block'}
+      <path d="M12 2.5 L20 7 V16.5 L12 21 L4 16.5 V7 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" />
+    {:else if key === 'vendetta'}
+      <path d="M12 3 V14 M8.4 14 H15.6 M12 14 V18" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+      <circle cx="12" cy="19.6" r="1.7" fill="#fff" />
+    {:else if key === 'elan'}
+      <path d="M13 2 L5 13 H10.5 L9 22 L18.5 10 H12 Z" fill="#fff" />
+    {:else if key === 'cover'}
+      <rect x="4" y="8" width="13.5" height="8" rx="1.6" fill="none" stroke="#fff" stroke-width="2" />
+      <rect x="18.4" y="10.4" width="2.6" height="3.2" rx="0.6" fill="#fff" />
+      <rect x="6.2" y="10" width="2.6" height="4" fill="#fff" />
+      <rect x="9.8" y="10" width="2.6" height="4" fill="#fff" />
+    {:else if key === 'appui'}
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="#fff" stroke-width="2" />
+      <circle cx="12" cy="12" r="4.6" fill="none" stroke="#fff" stroke-width="2" />
+      <circle cx="12" cy="12" r="1.7" fill="#fff" />
+    {:else if key === 'stuncharge'}
+      <path d="M12 2 L13.8 10.2 L22 12 L13.8 13.8 L12 22 L10.2 13.8 L2 12 L10.2 10.2 Z" fill="#fff" />
+    {:else if key === 'mark'}
+      <path d="M12 3.2 L19.5 12 L12 20.8 L4.5 12 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" />
+      <path d="M7 12 H17" stroke="#fff" stroke-width="1.8" stroke-linecap="round" />
+      <circle cx="12" cy="12" r="1.7" fill="#fff" />
+    {:else if key === 'cripple'}
+      <ellipse cx="12" cy="10.2" rx="4.3" ry="3.4" fill="#fff" />
+      <ellipse cx="12" cy="16.2" rx="2.7" ry="2.9" fill="#fff" />
+      <circle cx="8.9" cy="6.1" r="1.05" fill="#fff" />
+      <circle cx="11" cy="5.3" r="1.15" fill="#fff" />
+      <circle cx="13.2" cy="5.5" r="1.05" fill="#fff" />
+      <circle cx="15" cy="6.4" r="0.95" fill="#fff" />
+      <path d="M5.6 14.6 L14.4 8.2 M7.1 17.4 L16.6 10.4 M9 19.8 L18.2 13" stroke="#c9543a" stroke-width="2" stroke-linecap="round" />
+    {:else if key === 'stun'}
+      <path d="M12 4 A8 8 0 1 1 4 12 A5 5 0 1 1 14 12 A2.2 2.2 0 1 1 10 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" />
+    {:else if key === 'silence'}
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2" />
+      <path d="M6.3 6.3 L17.7 17.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+    {:else if key === 'epines'}
+      <path d="M12 2 L13.4 8.6 L18.5 5.5 L15.4 10.6 L22 12 L15.4 13.4 L18.5 18.5 L13.4 15.4 L12 22 L10.6 15.4 L5.5 18.5 L8.6 13.4 L2 12 L8.6 10.6 L5.5 5.5 L10.6 8.6 Z" fill="#fff" />
+    {:else if key === 'provocation'}
+      <circle cx="8" cy="12" r="2.1" fill="#fff" />
+      <path d="M21 12 H12 M15 8.4 L11.4 12 L15 15.6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+    {:else if key === 'ralliement'}
+      <path d="M7 3 V21" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+      <path d="M7.8 4 H17 L14 7.5 L17 11 H7.8 Z" fill="#fff" />
+    {:else if key === 'ruee'}
+      <path d="M5 5 L12 12 L5 19 M12 5 L19 12 L12 19" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+    {/if}
+  {/snippet}
   <div class="layout">
     <aside class="controls">
     <div class="turn">Tour <b>{combat.turn}</b></div>
@@ -577,54 +640,6 @@
     {/each}
     <!-- OVERLAY : marqueurs d'état — pastilles colorées (famille) + pictogramme SVG sur mesure.
          Rendus APRÈS tous les hexes → jamais masqués par un voisin. -->
-    {#snippet stateGlyph(key: string)}
-      {#if key === 'guard'}
-        <path d="M12 2 L20 5.5 V12 C20 16.5 16.5 19.8 12 21.5 C7.5 19.8 4 16.5 4 12 V5.5 Z" fill="#fff" />
-        <path d="M12 5.2 L17.2 7.5 V12 C17.2 15.2 15 17.2 12 18.4 C9 17.2 6.8 15.2 6.8 12 V7.5 Z" fill="none" stroke="#3266ad" stroke-width="1.5" />
-      {:else if key === 'watch'}
-        <circle cx="12" cy="12" r="6.8" fill="none" stroke="#fff" stroke-width="2.2" />
-        <path d="M12 2.5 V5.4 M12 18.6 V21.5 M2.5 12 H5.4 M18.6 12 H21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
-        <circle cx="12" cy="12" r="1.7" fill="#fff" />
-      {:else if key === 'riposte'}
-        <path d="M17 9 H7 M11 5.5 L6.5 9 L11 12.5" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M7 15 H17 M13 11.5 L17.5 15 L13 18.5" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
-      {:else if key === 'block'}
-        <path d="M12 2.5 L20 7 V16.5 L12 21 L4 16.5 V7 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" />
-      {:else if key === 'vendetta'}
-        <path d="M12 3 V14 M8.4 14 H15.6 M12 14 V18" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
-        <circle cx="12" cy="19.6" r="1.7" fill="#fff" />
-      {:else if key === 'elan'}
-        <path d="M13 2 L5 13 H10.5 L9 22 L18.5 10 H12 Z" fill="#fff" />
-      {:else if key === 'cover'}
-        <rect x="4" y="8" width="13.5" height="8" rx="1.6" fill="none" stroke="#fff" stroke-width="2" />
-        <rect x="18.4" y="10.4" width="2.6" height="3.2" rx="0.6" fill="#fff" />
-        <rect x="6.2" y="10" width="2.6" height="4" fill="#fff" />
-        <rect x="9.8" y="10" width="2.6" height="4" fill="#fff" />
-      {:else if key === 'appui'}
-        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#fff" stroke-width="2" />
-        <circle cx="12" cy="12" r="4.6" fill="none" stroke="#fff" stroke-width="2" />
-        <circle cx="12" cy="12" r="1.7" fill="#fff" />
-      {:else if key === 'stuncharge'}
-        <path d="M12 2 L13.8 10.2 L22 12 L13.8 13.8 L12 22 L10.2 13.8 L2 12 L10.2 10.2 Z" fill="#fff" />
-      {:else if key === 'mark'}
-        <path d="M12 3.2 L19.5 12 L12 20.8 L4.5 12 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" />
-        <path d="M7 12 H17" stroke="#fff" stroke-width="1.8" stroke-linecap="round" />
-        <circle cx="12" cy="12" r="1.7" fill="#fff" />
-      {:else if key === 'cripple'}
-        <ellipse cx="12" cy="10.2" rx="4.3" ry="3.4" fill="#fff" />
-        <ellipse cx="12" cy="16.2" rx="2.7" ry="2.9" fill="#fff" />
-        <circle cx="8.9" cy="6.1" r="1.05" fill="#fff" />
-        <circle cx="11" cy="5.3" r="1.15" fill="#fff" />
-        <circle cx="13.2" cy="5.5" r="1.05" fill="#fff" />
-        <circle cx="15" cy="6.4" r="0.95" fill="#fff" />
-        <path d="M5.6 14.6 L14.4 8.2 M7.1 17.4 L16.6 10.4 M9 19.8 L18.2 13" stroke="#c9543a" stroke-width="2" stroke-linecap="round" />
-      {:else if key === 'stun'}
-        <path d="M12 4 A8 8 0 1 1 4 12 A5 5 0 1 1 14 12 A2.2 2.2 0 1 1 10 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" />
-      {:else if key === 'silence'}
-        <circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2" />
-        <path d="M6.3 6.3 L17.7 17.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
-      {/if}
-    {/snippet}
     {#each geo.tiles as t (t.id)}
       {@const occ = unitAt(combat, t.id)}
       {#if occ && !over}
@@ -855,7 +870,7 @@
                   {@const nemesis = row.id !== col.id && row.archetype === col.archetype}
                   <td class:self={row.id === col.id} class:has={!!duo} class:nemcell={nemesis}>
                     {#if row.id === col.id}<span class="diag">·</span>
-                    {:else if duo}<span class="cell" title={`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}>{EFFECT_ICON[duo.kind] ?? '✦'}</span>
+                    {:else if duo}<svg class="cellico" viewBox="0 0 24 24" width="22" height="22" role="img" aria-label={RESON_LABEL[duo.kind] ?? duo.kind}><title>{`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}</title><circle cx="12" cy="12" r="11.5" fill={EFFECT_COLOR[duo.kind] ?? '#3a8a76'} stroke="#0e1015" stroke-width="1" />{@render stateGlyph(EFFECT_GLYPH[duo.kind] ?? duo.kind)}</svg>
                     {:else if nemesis}<span class="nemmark" title={`${row.name} × ${col.name} — Némésis (même archétype : ennemis, jamais coéquipiers)`}>N</span>{/if}
                   </td>
                 {/each}
@@ -864,10 +879,10 @@
           </tbody>
         </table>
         <div class="matrix-legend small muted">
-          {#each Object.entries(EFFECT_ICON) as [kind, icon]}
-            <span><b>{icon}</b> {RESON_LABEL[kind] ?? kind}</span>
+          {#each Object.entries(EFFECT_GLYPH) as [kind, gk]}
+            <span class="legico"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="11.5" fill={EFFECT_COLOR[kind] ?? '#3a8a76'} />{@render stateGlyph(gk)}</svg> {RESON_LABEL[kind] ?? kind}</span>
           {/each}
-          <span><b class="nemmark">N</b> Némésis (même archétype)</span>
+          <span class="legico"><b class="nemmark">N</b> Némésis (même archétype)</span>
         </div>
       </div>
     {/if}
@@ -1091,7 +1106,8 @@
   table.matrix td.has { background: #221d33; }
   table.matrix td.nemcell { background: #2a1a1e; }
   .nemmark { color: #e0a0a0; font-weight: 700; cursor: help; }
-  table.matrix .cell { font-size: 1rem; cursor: help; }
+  .cellico { display: block; margin: 0 auto; cursor: help; }
   table.matrix .diag { color: #3a4150; }
   .matrix-legend { display: flex; flex-wrap: wrap; gap: .2rem 1rem; margin-top: .5rem; }
+  .legico { display: inline-flex; align-items: center; gap: .3rem; }
 </style>
