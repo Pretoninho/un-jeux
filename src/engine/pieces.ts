@@ -229,16 +229,48 @@ const CHARGE_REMPART_FIL: ReactionSpec = {
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
 };
 
-// ── Héros FLÈCHE (Tireur, thème « focus / exécution ») — fiche : docs/heros/fleche.md ──
-/** « Flèche × Bastion » — Bastion (en garde) encaisse → Flèche MARQUE l'attaquant (+1 à son prochain tir). CD 2. */
+// ── Héros FLÈCHE (Tireur) = MARQUAGE (+1 au prochain coup sur la cible). Partenaires : Lourdes + Duellistes. ──
+/** « Flèche × Bastion » — Bastion (en garde) encaisse → Flèche MARQUE l'attaquant (+1 au prochain tir). CD 2. */
 const MARQUAGE_FLECHE_BASTION: ReactionSpec = {
   id: 'marquage_fleche_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
   scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
 };
-/** « Bastion × Flèche » (réciprocité de l'arête) — Tir réservé de Flèche → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
+/** « Flèche × Rempart » — Rempart (en garde) encaisse → Flèche MARQUE l'attaquant. CD 2. */
+const MARQUAGE_FLECHE_REMPART: ReactionSpec = {
+  id: 'marquage_fleche_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+/** « Flèche × Estoc » — Riposte d'Estoc → Flèche MARQUE l'attaquant. CD 2. */
+const MARQUAGE_FLECHE_ESTOC: ReactionSpec = {
+  id: 'marquage_fleche_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+/** « Flèche × Fil » — Riposte de Fil → Flèche MARQUE l'attaquant. CD 2. */
+const MARQUAGE_FLECHE_FIL: ReactionSpec = {
+  id: 'marquage_fleche_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 2, kind: 'marquage', amount: 1, duration: 2,
+};
+
+// Réciproques de l'arête « × Flèche » (Flèche émet `tir_reserve`) — chaque possesseur réagit avec SON effet.
+/** « Bastion × Flèche » — Tir réservé de Flèche → Bastion se CHARGE (+2 dépl., 1 tour). CD 3. */
 const CHARGE_BASTION_FLECHE: ReactionSpec = {
   id: 'charge_bastion_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
   scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 1,
+};
+/** « Rempart × Flèche » — Tir réservé de Flèche → Rempart se CHARGE (+2 dépl., 2 tours). CD 3. */
+const CHARGE_REMPART_FLECHE: ReactionSpec = {
+  id: 'charge_rempart_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
+  scope: { squad: true }, cooldown: 3, kind: 'charge', amount: 2, duration: 2,
+};
+/** « Estoc × Flèche » — Tir réservé de Flèche → Estoc pince la cible touchée (épines 2). CD 2. */
+const EPINES_ESTOC_FLECHE: ReactionSpec = {
+  id: 'epines_estoc_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
+  scope: { squad: true }, cooldown: 2, kind: 'epines', amount: 2,
+};
+/** « Fil × Flèche » — Tir réservé de Flèche → Fil octroie la vendetta (+2 prochaine att.). CD 3. */
+const VENDETTA_FIL_FLECHE: ReactionSpec = {
+  id: 'vendetta_fil_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
+  scope: { squad: true }, cooldown: 3, kind: 'vendetta', amount: 2,
 };
 
 // ── Rangée SOIGNEUR (support) = PUR SOIN (jamais de contrôle/dégâts). Signature des héros soigneurs. ──
@@ -252,7 +284,39 @@ const REGEN_BAUME_BASTION: ReactionSpec = {
   id: 'regen_baume_bastion', on: 'garde_encaissee', fromCharacter: 'bastion',
   scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
 };
+/** « Baume × Rempart » — Rempart (en garde) encaisse → Baume le régénère (+2×2). CD 3. */
+const REGEN_BAUME_REMPART: ReactionSpec = {
+  id: 'regen_baume_rempart', on: 'garde_encaissee', fromCharacter: 'rempart',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+/** « Baume × Mireille » — Tir réservé de Mireille → Baume la régénère (+2×2). CD 3. */
+const REGEN_BAUME_MIREILLE: ReactionSpec = {
+  id: 'regen_baume_mireille', on: 'tir_reserve', fromCharacter: 'mireille',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+/** « Baume × Orso » — Tir réservé d'Orso → Baume le régénère (+2×2). CD 3. */
+const REGEN_BAUME_ORSO: ReactionSpec = {
+  id: 'regen_baume_orso', on: 'tir_reserve', fromCharacter: 'orso',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+/** « Baume × Flèche » — Tir réservé de Flèche → Baume la régénère (+2×2). CD 3. */
+const REGEN_BAUME_FLECHE: ReactionSpec = {
+  id: 'regen_baume_fleche', on: 'tir_reserve', fromCharacter: 'fleche',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+/** « Baume × Estoc » — Riposte d'Estoc → Baume le régénère (+2×2). CD 3. */
+const REGEN_BAUME_ESTOC: ReactionSpec = {
+  id: 'regen_baume_estoc', on: 'riposte', fromCharacter: 'estoc',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
+/** « Baume × Fil » — Riposte de Fil → Baume le régénère (+2×2). CD 3. */
+const REGEN_BAUME_FIL: ReactionSpec = {
+  id: 'regen_baume_fil', on: 'riposte', fromCharacter: 'fil',
+  scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
+};
 // Mélisse (2ᵉ Soigneur) n'a PAS encore de Résonance — on lui en créera une (lot à venir).
+// NB : le Soigneur émet AUCUN signal (Soin = burst, regen = statut) → il est possesseur-only :
+// personne ne peut avoir un duo « × Baume/Mélisse » tant qu'un soin n'émet pas de signal.
 
 export interface Character {
   id: string;                 // identifiant unique du héros
@@ -270,12 +334,12 @@ export interface Character {
 export const CHARACTERS: Record<string, Character> = {
   bastion: { id: 'bastion', name: 'Bastion', archetype: 'lourde', reactions: [CHARGE_BASTION_MIREILLE, CHARGE_BASTION_ORSO, CHARGE_BASTION_ESTOC, CHARGE_BASTION_FIL, CHARGE_BASTION_FLECHE] },
   mireille: { id: 'mireille', name: 'Mireille', archetype: 'tireur', reactions: [SILENCE_MIREILLE_BASTION, SILENCE_MIREILLE_ESTOC, SILENCE_MIREILLE_REMPART, SILENCE_MIREILLE_FIL] },
-  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, EPINES_ESTOC_MIREILLE, EPINES_ESTOC_REMPART, EPINES_ESTOC_ORSO] },
-  rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde', reactions: [CHARGE_REMPART_MIREILLE, CHARGE_REMPART_ORSO, CHARGE_REMPART_ESTOC, CHARGE_REMPART_FIL] },
+  estoc:   { id: 'estoc',   name: 'Estoc',   archetype: 'duelliste', reactions: [EPINES_ESTOC_BASTION, EPINES_ESTOC_MIREILLE, EPINES_ESTOC_REMPART, EPINES_ESTOC_ORSO, EPINES_ESTOC_FLECHE] },
+  rempart: { id: 'rempart', name: 'Rempart', archetype: 'lourde', reactions: [CHARGE_REMPART_MIREILLE, CHARGE_REMPART_ORSO, CHARGE_REMPART_ESTOC, CHARGE_REMPART_FIL, CHARGE_REMPART_FLECHE] },
   orso:    { id: 'orso',    name: 'Orso',    archetype: 'tireur', reactions: [RACINE_ORSO_BASTION, RACINE_ORSO_REMPART, RACINE_ORSO_ESTOC, RACINE_ORSO_FIL] },
-  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, VENDETTA_FIL_MIREILLE, VENDETTA_FIL_REMPART, VENDETTA_FIL_ORSO] },
-  fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION] },
-  baume:   { id: 'baume',   name: 'Baume',   archetype: 'soigneur', reactions: [REGEN_BAUME_BASTION] },
+  fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, VENDETTA_FIL_MIREILLE, VENDETTA_FIL_REMPART, VENDETTA_FIL_ORSO, VENDETTA_FIL_FLECHE] },
+  fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION, MARQUAGE_FLECHE_REMPART, MARQUAGE_FLECHE_ESTOC, MARQUAGE_FLECHE_FIL] },
+  baume:   { id: 'baume',   name: 'Baume',   archetype: 'soigneur', reactions: [REGEN_BAUME_BASTION, REGEN_BAUME_REMPART, REGEN_BAUME_MIREILLE, REGEN_BAUME_ORSO, REGEN_BAUME_FLECHE, REGEN_BAUME_ESTOC, REGEN_BAUME_FIL] },
   melisse: { id: 'melisse', name: 'Mélisse', archetype: 'soigneur', reactions: [] },
 };
 

@@ -185,7 +185,14 @@
     par-duo détaillées ci-dessous (Estoc×Mireille=marque, Fil×Rempart=étourdir, etc.) sont OBSOLÈTES** :
     seul compte désormais « possesseur → son effet unique ».
   - **Mélisse (2ᵉ Soigneur) n'a PLUS de Résonance** (`reactions: []`) — on lui en créera une (lot à venir).
-    Baume conserve `regen` (Baume × Bastion).
+  - **MATRICE COMPLÉTÉE pour les nouveaux héros (2026-06-18)** — les rangées de **Flèche** et **Baume**
+    (jadis 1 seul duo × Bastion) sont remplies avec leur effet unique : **Flèche = `marquage` × 4**
+    (Bastion, Rempart, Estoc, Fil — ses partenaires Lourdes + Duellistes) + **réciproques × Flèche**
+    (Bastion/Rempart `charge`, Estoc `epines`, Fil `vendetta`, sur le `tir_reserve` de Flèche) ; **Baume
+    = `regen` × 7** (Bastion, Rempart, Mireille, Orso, Flèche, Estoc, Fil = TOUS les non-Soigneurs).
+    **ASYMÉTRIE assumée — le Soigneur est POSSESSEUR-ONLY** : il n'émet **aucun signal** (Soin = burst,
+    `regen` = statut) → **personne ne peut avoir un duo « × Baume/Mélisse »** tant qu'un soin n'émet pas
+    de signal (levier futur si on veut la réciprocité). Mélisse reste vide.
   - **1ᵉʳ duo livré — *Estoc × Bastion*** : quand **Bastion** (`bastion`, en garde, rayon 2)
     encaisse, **Estoc** pince l'attaquant pour 2 (`fromCharacter: 'bastion'`), CD 2 tours.
   - **2ᵉ duo livré — *Estoc × Mireille*** : nouveau signal `tir_reserve` (émis par `resolveOverwatch`

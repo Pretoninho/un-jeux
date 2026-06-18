@@ -90,12 +90,12 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
   it('makeUnitFromCharacter applique nom + stats de classe + Résonance signature', () => {
     const d = makeUnitFromCharacter('a3', 'alice', 'Z', CHARACTERS.estoc!, 4);
     expect(d).toMatchObject({ name: 'Estoc', characterId: 'estoc', kind: 'duelliste', hp: 9, damage: 2, attackCost: 1 });
-    expect(d.reactions).toHaveLength(4);                                    // quatre duos
+    expect(d.reactions).toHaveLength(5);                                    // 5 partenaires (2 Lourdes + 3 Tireurs)
     const ids = d.reactions!.map((r) => r.id);
     // « Un possesseur = un effet » : tous les duos d'Estoc sont des ÉPINES, seul le partenaire change.
-    expect(ids).toEqual(['epines_estoc_bastion', 'epines_estoc_mireille', 'epines_estoc_rempart', 'epines_estoc_orso']);
+    expect(ids).toEqual(['epines_estoc_bastion', 'epines_estoc_mireille', 'epines_estoc_rempart', 'epines_estoc_orso', 'epines_estoc_fleche']);
     expect(d.reactions!.every((r) => r.kind === 'epines')).toBe(true);
-    expect(d.reactions!.map((r) => r.fromCharacter)).toEqual(['bastion', 'mireille', 'rempart', 'orso']);
+    expect(d.reactions!.map((r) => r.fromCharacter)).toEqual(['bastion', 'mireille', 'rempart', 'orso', 'fleche']);
     expect(d.riposte).toEqual({ cost: 2 }); // verbe de classe conservé
   });
 
@@ -122,7 +122,7 @@ describe('pieces/Personnages — couche héros (socle de classe + signature)', (
     expect(a.reactions).not.toEqual(b.reactions);            // duos distincts
     expect(a.reactions!.every((r) => r.kind === 'epines')).toBe(true);   // Estoc = épines
     expect(b.reactions!.every((r) => r.kind === 'vendetta')).toBe(true); // Fil = vendetta
-    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'vendetta_fil_mireille', 'vendetta_fil_rempart', 'vendetta_fil_orso']);
+    expect(b.reactions!.map((r) => r.id)).toEqual(['vendetta_fil_bastion', 'vendetta_fil_mireille', 'vendetta_fil_rempart', 'vendetta_fil_orso', 'vendetta_fil_fleche']);
   });
 
   it('Mireille (Tireuse) — un possesseur = un effet : tous ses duos SILENCENT', () => {
@@ -177,5 +177,41 @@ describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve
   it('Baume & Mélisse sont deux Soigneurs (paire d\'archétype → Némésis mutuelle)', () => {
     expect(CHARACTERS.baume!.archetype).toBe('soigneur');
     expect(CHARACTERS.melisse!.archetype).toBe('soigneur');
+  });
+});
+
+describe('pieces/Matrice — rangées des NOUVEAUX héros complétées (un possesseur = un effet)', () => {
+  it('Flèche (Tireur) = MARQUAGE × 4 partenaires (2 Lourdes + 2 Duellistes)', () => {
+    const f = makeUnitFromCharacter('a', 'alice', 'Z', CHARACTERS.fleche!, 4);
+    expect(f.reactions!.every((r) => r.kind === 'marquage')).toBe(true);
+    expect(f.reactions!.map((r) => r.fromCharacter)).toEqual(['bastion', 'rempart', 'estoc', 'fil']);
+  });
+
+  it('Baume (Soigneur) = REGEN × 7 partenaires (tous les non-Soigneurs)', () => {
+    const b = makeUnitFromCharacter('a', 'alice', 'Z', CHARACTERS.baume!, 4);
+    expect(b.reactions!.every((r) => r.kind === 'regen')).toBe(true);
+    expect(b.reactions!.map((r) => r.fromCharacter))
+      .toEqual(['bastion', 'rempart', 'mireille', 'orso', 'fleche', 'estoc', 'fil']);
+  });
+
+  it('réciprocité × Flèche : chaque possesseur réagit à Flèche avec SON effet', () => {
+    const kindFor = (id: string) =>
+      makeUnitFromCharacter('a', 'alice', 'Z', CHARACTERS[id]!, 4)
+        .reactions!.find((r) => r.fromCharacter === 'fleche')?.kind;
+    expect(kindFor('bastion')).toBe('charge');
+    expect(kindFor('rempart')).toBe('charge');
+    expect(kindFor('estoc')).toBe('epines');
+    expect(kindFor('fil')).toBe('vendetta');
+  });
+
+  it('le Soigneur est possesseur-only : personne n\'a de duo « × Baume » (Soigneur n\'émet aucun signal)', () => {
+    for (const id of Object.keys(CHARACTERS)) {
+      const u = makeUnitFromCharacter('a', 'alice', 'Z', CHARACTERS[id]!, 4);
+      expect((u.reactions ?? []).some((r) => r.fromCharacter === 'baume' || r.fromCharacter === 'melisse')).toBe(false);
+    }
+  });
+
+  it('Mélisse reste vide (aucune Résonance)', () => {
+    expect(CHARACTERS.melisse!.reactions).toEqual([]);
   });
 });
