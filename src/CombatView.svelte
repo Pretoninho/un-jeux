@@ -18,8 +18,12 @@
   import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
 
-  const RADIUS = 4;
-  const OCTA_N = 23;
+  const RADIUS = 4;                 // plateau hexagonal — MIS DE CÔTÉ (code conservé, plus exposé dans l'UI)
+  // Deux tailles d'octogone : petit = Entraînement (tuto + practice), grand = Partie.
+  const OCTA_TRAIN = 9;             // 145 cases (n² + (n-1)²)
+  const OCTA_GAME = 23;             // 1013 cases
+  type Mode = 'entrainement' | 'partie';
+  const MODE_N: Record<Mode, number> = { entrainement: OCTA_TRAIN, partie: OCTA_GAME };
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -75,10 +79,11 @@
   interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; bounds: { x: number; y: number; w: number; h: number } }
 
   // Construit la géométrie ET la topologie d'un plateau (le moteur ne lit que `map`).
-  function buildBoard(shape: Shape): Geo {
+  // `octaN` = taille de l'octogone (selon le mode). Le hex reste pour réactivation future.
+  function buildBoard(shape: Shape, octaN: number = OCTA_GAME): Geo {
     let map: CombatState['map'], corners: [string, string], tiles: Tile[];
     if (shape === 'octa') {
-      const ob = makeOctaBoard(OCTA_N);
+      const ob = makeOctaBoard(octaN);
       map = ob.map; corners = ob.corners;
       tiles = ob.map.hexes.map((h) => {
         const L = ob.layout[h.id]!;
@@ -128,8 +133,8 @@
     ], 'alice');
   }
 
-  const startGeo = buildBoard('hex'); // const ordinaire → pas de capture de $state à l'init
-  let boardShape = $state<Shape>('hex');
+  const startGeo = buildBoard('octa', OCTA_TRAIN); // démarrage sur l'Entraînement (petit octogone)
+  let mode = $state<Mode>('entrainement');
   let geo = $state<Geo>(startGeo);
   let combat = $state<CombatState>(initialFor(startGeo));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
@@ -350,9 +355,9 @@
     inspectedId = '';
   }
 
-  function setShape(s: Shape) {
-    boardShape = s;
-    geo = buildBoard(s);
+  function setMode(m: Mode) {
+    mode = m;
+    geo = buildBoard('octa', MODE_N[m]);
     resetView();
     restart();
   }
@@ -470,6 +475,8 @@
   });
 
   function startTutorial() {
+    // Le tuto se joue sur le petit octogone d'Entraînement (plateau resserré, lisible).
+    if (mode !== 'entrainement') { mode = 'entrainement'; geo = buildBoard('octa', OCTA_TRAIN); resetView(); }
     combat = tutorialState(geo);
     history = [];
     inspectedId = '';
@@ -636,8 +643,8 @@
       </div>
     {/if}
     <div class="shape">
-      <button class:on={boardShape === 'hex'} onclick={() => setShape('hex')}>⬡ Hexagone</button>
-      <button class:on={boardShape === 'octa'} onclick={() => setShape('octa')}>⯃ Octogone</button>
+      <button class:on={mode === 'entrainement'} onclick={() => setMode('entrainement')} title="Petit octogone — tuto & practice">🎓 Entraînement</button>
+      <button class:on={mode === 'partie'} onclick={() => setMode('partie')} title="Grand octogone — vraie partie">⚔ Partie</button>
     </div>
     <div class="zoom">
       <button onclick={() => zoomCenter(1 / 1.3)} title="Dézoomer" aria-label="Dézoomer">−</button>
@@ -1008,7 +1015,8 @@
       <br/>🔍 <b>Molette</b> pour zoomer, <b>glisse</b> pour déplacer la carte, <b>⤢</b> pour tout réafficher.
       La <b>Lourde</b> peut <b style="color:#aec6f0">🛡 Garder (3 PA)</b> : dégâts subis réduits de moitié jusqu'à son prochain tour (au prix de son attaque).
       Le <b>Tireur</b> peut <b style="color:#f0c0a0">🎯 Réserver (3 PA)</b> son tir : il <b>tire en réflexe</b> sur la première pièce qui s'arrête dans sa <b style="color:#c07a6a">zone de menace</b> (teintée pendant ton tour).
-      {#if boardShape === 'octa'}<b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.{/if}
+      <b>Octogone 4.8.8</b> : les petits carrés sont des <b>carrefours</b> jouables — la diagonale passe par eux (2 pas). Pose ta Lourde dessus pour verrouiller 4 directions.
+      <b>🎓 Entraînement</b> = petit plateau (tuto & practice) · <b>⚔ Partie</b> = grand plateau.
     {/if}
   </div>
 </div>

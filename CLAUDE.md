@@ -21,9 +21,14 @@
 ## État du jeu (décisions de design en vigueur)
 - **Mode actuel : hotseat local** (Alice et Bob à tour de rôle sur le même écran). Pas
   encore de multijoueur en réseau.
-- **Plateau octogonal porté à `OCTA_N = 23`** (1013 cases : `n² + (n-1)²`) : board volontairement
-  vaste (priorité = plus d'octogones, pas l'affichage), centre dégagé réservé aux futurs
-  camps/objectifs. Le plateau hexagonal reste dispo (toggle).
+- **Plateau = octogone, deux tailles (décidé 2026-06-18)** : on quitte le toggle forme et on
+  passe **tout en octogone**. Le sélecteur est désormais un **MODE** :
+  - **🎓 Entraînement** = petit octogone **`OCTA_TRAIN = 9`** (145 cases) — plateau resserré, sert
+    le **tuto jouable** (forcé dessus) et la practice. **Démarrage par défaut** au chargement.
+  - **⚔ Partie** = grand octogone **`OCTA_GAME = 23`** (1013 cases : `n² + (n-1)²`) — board
+    volontairement vaste (priorité = plus d'octogones), centre dégagé réservé aux futurs camps/objectifs.
+  - L'**hexagone** (`makeBoard`, `RADIUS = 4`) est **mis de côté** : code conservé (`buildBoard('hex')`
+    fonctionne) mais **plus exposé dans l'UI**, réactivable plus tard.
 - **Disposition en 3 colonnes** (grid) : **contrôles à gauche** (tour, forme, zoom, annuler,
   finir le tour, recommencer), **board au centre**, **panneaux d'info à droite** (alliée puis
   adverse, empilés). La légende d'aide reste **en bas, pleine largeur**. Repasse en une colonne
