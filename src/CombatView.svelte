@@ -18,7 +18,7 @@
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
-  import { planTurn, applyAction, DIFFICULTIES, type Difficulty } from './engine/ai';
+  import { planTurn, applyAction, DIFFICULTIES, type Difficulty, type AiAction } from './engine/ai';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, squarePoints, genBounds } from './lib/layout';
 
   // FORME du plateau (topologie) — le moteur ne lit que `neighbors`, il est agnostique : on peut
@@ -181,6 +181,72 @@
   let resonFoe = $state(false);           // détail « Résonance » déplié (panneau adverse)
   const acted = $derived(history.length > 0);
 
+  // ── Journal des actions + flash d'attaque sur le board ──────────────────────
+  interface LogEntry { text: string; owner?: string; sub?: boolean; sep?: boolean }
+  let log = $state<LogEntry[]>([]);
+  let logMarks: number[] = [];              // longueur du journal à chaque coup (pour l'annulation)
+  let logBox = $state<HTMLDivElement>();
+  interface AttackFx { x1: number; y1: number; x2: number; y2: number; owner: string; n: number }
+  let attacks = $state<AttackFx[]>([]);     // flèches d'attaque transitoires (origine → cible)
+  let atkSeq = 0;
+  const tileById = $derived(new Map(geo.tiles.map((t) => [t.id, t] as const)));
+  const unitName = (un: Unit) => un.name ?? KIND_NAME[un.kind] ?? un.kind;
+
+  function pushLog(text: string, owner?: string, opts: { sub?: boolean; sep?: boolean } = {}) {
+    log = [...log, { text, owner, ...opts }];
+    if (log.length > 200) log = log.slice(-200);
+  }
+  // Conséquences d'une action (dégâts / soins / morts) par DIFF d'état → robuste : couvre aussi
+  // le tir réservé et les Résonances (épines…), pas seulement l'attaque directe.
+  function diffLog(before: CombatState, after: CombatState) {
+    for (const b of before.units) {
+      const a = after.units.find((un) => un.id === b.id);
+      if (!a) { pushLog(`✶ ${unitName(b)} éliminé`, b.owner, { sub: true }); continue; }
+      const d = a.hp - b.hp;
+      if (d < 0) pushLog(`${unitName(a)} −${-d} PV`, a.owner, { sub: true });
+      else if (d > 0) pushLog(`${unitName(a)} +${d} PV`, a.owner, { sub: true });
+    }
+  }
+  function flashAttack(fromHex: string, toHex: string, owner: string) {
+    const f = tileById.get(fromHex), t = tileById.get(toHex);
+    if (!f || !t) return;
+    const n = ++atkSeq;
+    attacks = [...attacks, { x1: f.cx, y1: f.cy, x2: t.cx, y2: t.cy, owner, n }];
+    setTimeout(() => { attacks = attacks.filter((a) => a.n !== n); }, 1500);
+  }
+  // Tirs réservés déclenchés par un déplacement : flèche de chaque guetteur qui a tiré → la cible.
+  function flashOverwatch(before: CombatState, after: CombatState, targetHex: string) {
+    for (const b of before.units) {
+      const a = after.units.find((un) => un.id === b.id);
+      if (b.watching && a && !a.watching) flashAttack(b.hex, targetHex, b.owner);
+    }
+  }
+  // Snapshot pour l'annulation : empile l'état ET la longueur courante du journal.
+  function snapshot() { history = [...history, combat]; logMarks = [...logMarks, log.length]; }
+  function clearLog() { log = []; logMarks = []; attacks = []; }
+  function newTurnLog() { pushLog(`— Tour de ${NAMES[combat.active]} —`, combat.active, { sep: true }); }
+  // Journalise une action de l'IA (miroir des handlers humains).
+  function logAiAction(before: CombatState, after: CombatState, act: AiAction) {
+    if (act.type === 'move') {
+      const m = before.units.find((u) => u.id === act.unitId);
+      if (m) { pushLog(`${unitName(m)} se déplace`, m.owner); flashOverwatch(before, after, act.dest); }
+      diffLog(before, after);
+    } else if (act.type === 'attack') {
+      const atk = before.units.find((u) => u.id === act.attackerId);
+      const def = before.units.find((u) => u.id === act.targetId);
+      if (atk && def) { flashAttack(atk.hex, def.hex, atk.owner); pushLog(`⚔ ${unitName(atk)} → ${unitName(def)}`, atk.owner); }
+      diffLog(before, after);
+    } else if (act.type === 'guard') {
+      const u = before.units.find((x) => x.id === act.unitId); if (u) pushLog(`🛡 ${unitName(u)} se met en garde`, u.owner);
+    } else if (act.type === 'reserve') {
+      const u = before.units.find((x) => x.id === act.unitId); if (u) pushLog(`🎯 ${unitName(u)} réserve son tir`, u.owner);
+    } else if (act.type === 'endTurn') {
+      pushLog(`— Tour de ${NAMES[after.active]} —`, after.active, { sep: true });
+    }
+  }
+  // Auto-scroll du journal vers le bas à chaque nouvelle ligne.
+  $effect(() => { void log.length; if (logBox) logBox.scrollTop = logBox.scrollHeight; });
+
   // ── Navigation de la carte (zoom + pan) — pur SVG via le viewBox, sans dépendance ──
   const MAXZOOM = 8;
   let svgEl: SVGSVGElement | undefined;
@@ -306,9 +372,15 @@
 
   function attackFoe() {
     if (!selected || !foe || !canAttack(combat, selected.id, foe.id)) return;
-    history = [...history, combat];
-    const who = selected.characterId;   // capturé avant la mutation d'état
+    snapshot();
+    const before = combat;
+    const who = selected.characterId;                                  // capturés avant la mutation d'état
+    const atkHex = selected.hex, defHex = foe.hex, owner = selected.owner;
+    const atkName = unitName(selected), defName = unitName(foe);
     combat = attack(combat, selected.id, foe.id);
+    flashAttack(atkHex, defHex, owner);
+    pushLog(`⚔ ${atkName} → ${defName}`, owner);
+    diffLog(before, combat);
     unlock('m_attack');
     if (who === 'bastion' && ++bastionHits >= 3) unlock('h_bastion3');  // objectif « 3 attaques avec Bastion »
   }
@@ -329,8 +401,13 @@
     if (!selected) return;
     // Clic sur une case atteignable → s'y déplacer (puis tirs réflexes des guetteurs adverses).
     if (reach.has(hexId)) {
-      history = [...history, combat];
-      combat = resolveOverwatch(moveUnit(combat, selected.id, hexId), selected.id);
+      snapshot();
+      const before = combat;
+      const moverName = unitName(selected), moverOwner = selected.owner, moverId = selected.id;
+      combat = resolveOverwatch(moveUnit(combat, moverId, hexId), moverId);
+      pushLog(`${moverName} se déplace`, moverOwner);
+      flashOverwatch(before, combat, hexId);   // tirs réservés adverses déclenchés à l'arrivée
+      diffLog(before, combat);
       unlock('m_move');
     }
   }
@@ -353,32 +430,41 @@
 
   function defendSelected() {
     if (!selected || !canDefend(combat, selected.id)) return;
-    history = [...history, combat];
+    snapshot();
+    const n = unitName(selected), o = selected.owner;
     combat = defend(combat, selected.id);
+    pushLog(`🛡 ${n} se met en garde`, o);
   }
 
   function reserveSelected() {
     if (!selected || !canReserve(combat, selected.id)) return;
-    history = [...history, combat];
+    snapshot();
+    const n = unitName(selected), o = selected.owner;
     combat = reserve(combat, selected.id);
+    pushLog(`🎯 ${n} réserve son tir`, o);
   }
 
   function riposteSelected() {
     if (!selected || !canRiposte(combat, selected.id)) return;
-    history = [...history, combat];
+    snapshot();
+    const n = unitName(selected), o = selected.owner;
     combat = riposte(combat, selected.id);
+    pushLog(`🗡 ${n} arme sa riposte`, o);
   }
 
   function undo() {
     if (history.length === 0) return;
     combat = history[history.length - 1]!;
     history = history.slice(0, -1);
+    const mark = logMarks.pop();
+    if (mark !== undefined) { log = log.slice(0, mark); attacks = []; }
   }
 
   function finishTurn() {
     if (over || aiThinking) return;
     combat = endTurn(combat, AP_PER_TURN);
-    history = [];
+    history = []; logMarks = [];
+    newTurnLog();
     inspectedId = '';
     // UNIQUEMENT EN TUTO : l'adversaire est scripté (le moteur, lui, reste neutre).
     if (tutoActive && combat.active === 'bob') tutoEnemyTurn();
@@ -400,7 +486,10 @@
     const step = () => {
       aiTimer = undefined;
       if (i >= actions.length || winner(combat)) { aiThinking = false; selectDefault(); return; }
-      combat = applyAction(combat, actions[i++]!, AP_PER_TURN);
+      const before = combat;
+      const act = actions[i++]!;
+      combat = applyAction(combat, act, AP_PER_TURN);
+      logAiAction(before, combat, act);
       aiTimer = setTimeout(step, AI_STEP_MS);
     };
     aiTimer = setTimeout(step, AI_STEP_MS);
@@ -412,6 +501,8 @@
     history = [];
     selectedId = 'a1';
     inspectedId = '';
+    clearLog();
+    newTurnLog();
   }
 
   function setMode(m: Mode) {
@@ -438,6 +529,8 @@
     history = [];
     selectedId = 'a1';
     inspectedId = '';
+    clearLog();
+    newTurnLog();
     phase = 'combat';
   }
   function newGame() { cancelAi(); phase = 'setup'; }
@@ -517,12 +610,18 @@
       if (!canAttack(combat, eId, lId)) {               // pas au contact → s'approcher (avance)
         const e = tunit(eId);
         const step = e ? tutoStepToward(e.hex, tunitHex(lId)) : null;
-        if (step) combat = resolveOverwatch(moveUnit(combat, eId, step), eId);
+        if (step) { const b = combat; const nm = unitName(tunit(eId)!); combat = resolveOverwatch(moveUnit(combat, eId, step), eId); pushLog(`${nm} se déplace`, 'bob'); diffLog(b, combat); }
       }
-      if (canAttack(combat, eId, lId)) combat = attack(combat, eId, lId);  // frappe
+      if (canAttack(combat, eId, lId)) {                // frappe
+        const b = combat; const atk = tunit(eId)!, def = tunit(lId)!;
+        const ah = atk.hex, dh = def.hex, an = unitName(atk), dn = unitName(def);
+        combat = attack(combat, eId, lId);
+        flashAttack(ah, dh, 'bob'); pushLog(`⚔ ${an} → ${dn}`, 'bob'); diffLog(b, combat);
+      }
     }
     tutoEnemyTurns += 1;
     combat = endTurn(combat, AP_PER_TURN);              // repasse à Alice
+    newTurnLog();
   }
 
   type TutoBtn = 'attack' | 'watch' | 'guard' | 'end';
@@ -566,6 +665,8 @@
     history = [];
     inspectedId = '';
     selectedId = '';  // l'étape 1 EST de sélectionner la Lourde
+    clearLog();
+    newTurnLog();
     tutoEnemyTurns = 0;
     tuto = { lourde: 'a1', tireur: 'a2', enemy: 'b1', enemyHp: tunit('b1')!.hp };
     tutoStep = 0;
@@ -786,6 +887,12 @@
        role="application" aria-label="Plateau de jeu — molette pour zoomer, glisser pour déplacer"
        onwheel={onWheel} onpointerdown={onPointerDown} onpointermove={onPointerMove}
        onpointerup={onPointerUp} onpointercancel={onPointerUp}>
+    <defs>
+      <marker id="atkhead-alice" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="7" refY="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill={COLORS.alice} /></marker>
+      <marker id="atkhead-bob" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="7" refY="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill={COLORS.bob} /></marker>
+    </defs>
     {#each geo.tiles as t (t.id)}
       {@const occ = unitAt(combat, t.id)}
       {@const d = reach.get(t.id)}
@@ -847,6 +954,11 @@
           </g>
         {/each}
       {/if}
+    {/each}
+    <!-- OVERLAY : flèches d'attaque transitoires (origine → cible) + halo sur la victime. -->
+    {#each attacks as a (a.n)}
+      <line class="atkfx" x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={COLORS[a.owner]} marker-end="url(#atkhead-{a.owner})" />
+      <circle class="atkpulse" cx={a.x2} cy={a.y2} stroke={COLORS[a.owner]} />
     {/each}
   </svg>
     </div>
@@ -1035,6 +1147,14 @@
       </div>
     </div>
     {/if}
+      <div class="journal">
+        <div class="jhead">📜 Journal</div>
+        <div class="jbody" bind:this={logBox}>
+          {#each log as e}
+            <div class="jline" class:sub={e.sub} class:sep={e.sep} style={e.owner && !e.sep ? `--jc:${COLORS[e.owner]}` : ''}>{e.text}</div>
+          {/each}
+        </div>
+      </div>
     </aside>
   </div>
 
@@ -1339,6 +1459,20 @@
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
   /* Panneaux d'info — pièce alliée sélectionnée (gauche) et pièce adverse inspectée (droite). */
+  /* Flèches d'attaque transitoires sur le board (origine → cible). */
+  .atkfx { stroke-width: 3.5; stroke-linecap: round; pointer-events: none; animation: atkfade 1.5s ease-out forwards; }
+  .atkpulse { fill: none; stroke-width: 3; pointer-events: none; animation: atkpulse 1.5s ease-out forwards; }
+  @keyframes atkfade { 0% { opacity: 0; } 12% { opacity: .95; } 100% { opacity: 0; } }
+  @keyframes atkpulse { 0% { r: 5; opacity: .9; } 100% { r: 22; opacity: 0; } }
+
+  /* Journal des actions (colonne de droite). */
+  .journal { background: #14161c; border: 1px solid #2a2f3a; border-radius: 8px; display: flex; flex-direction: column; min-height: 0; }
+  .jhead { font-weight: 700; font-size: .82rem; color: #aec6f0; padding: .45rem .7rem; border-bottom: 1px solid #2a2f3a; }
+  .jbody { overflow-y: auto; max-height: 38vh; padding: .35rem .55rem; display: flex; flex-direction: column; gap: 1px; font-size: .8rem; }
+  .jline { color: #cdd3df; border-left: 2px solid var(--jc, transparent); padding: .08rem .45rem; line-height: 1.3; }
+  .jline.sub { color: #8b93a4; font-size: .74rem; padding-left: 1.1rem; }
+  .jline.sep { color: #aec6f0; font-weight: 700; text-align: center; border-left: none; margin: .25rem 0 .1rem; border-top: 1px dashed #333a47; padding-top: .25rem; }
+
   .panels { display: grid; grid-template-columns: 1fr; gap: .7rem; }
   .panel { background: #14161c; border: 1px solid #2a2f3a; border-left: 3px solid var(--c); border-radius: 8px; padding: .6rem .85rem; min-height: 96px; }
   .phead { display: flex; align-items: center; gap: .45rem; font-weight: 700; color: #e6ebf5; font-size: .95rem; }

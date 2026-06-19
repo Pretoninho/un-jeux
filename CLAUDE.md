@@ -79,6 +79,12 @@
   états (garde/tir réservé) et les boutons d'action.
 - **Attaque = inspecter puis bouton ⚔ Attaquer** (mode A validé) : le clic sur un ennemi
   l'inspecte, il n'attaque plus directement. L'attaque part du panneau adverse.
+- **Lisibilité du combat (LIVRÉ 2026-06-19)** : (1) **flèche d'attaque transitoire** sur le board
+  (origine → cible, couleur du camp attaquant, halo sur la victime, fondu ~1,5 s) — couvre attaque
+  directe, **tir réservé** et coups de l'IA (`attacks`/`flashAttack`/`flashOverwatch`, markers SVG) ;
+  (2) **Journal** (encart scrollable à droite) : 1 ligne/action (déplacement, `⚔ atk → def`, verbes,
+  morts, séparateurs de tour), **dégâts/morts calculés par DIFF d'état** (robuste : capture aussi tir
+  réservé + Résonances). Vidé au restart ; **annulation** synchronisée (`logMarks`). IA & tuto journalisés.
 
 ## Classes, verbes & Résonance (avancement — détail : `docs/classes.md`)
 > **Créer un personnage : processus pas-à-pas → `docs/personnages.md`.**
