@@ -60,10 +60,10 @@
   type Slot = (typeof SLOTS)[number];
   type Opponent = 'hotseat' | 'ia';
   const heroesOf = (arch: string) => HEROES.filter((h) => h.archetype === arch);
-  // Vivier à 2 héros/archétype → dès que TU choisis tes 3, l'adversaire prend les complémentaires.
+  // MIROIR (décidé 2026-06-19) : les deux camps jouent la MÊME escouade (3 pièces identiques de
+  // chaque côté, façon échecs). Plus de « complément » adverse ; Bob aligne exactement ton escouade.
+  // → l'équité est structurelle (zéro asymétrie de roster). Le vivier/draft restent en réserve.
   const lineupOf = (p: Record<Slot, string>) => SLOTS.map((s) => p[s]);
-  const complementOf = (p: Record<Slot, string>) =>
-    SLOTS.map((s) => (heroesOf(s).find((h) => h.id !== p[s]) ?? heroesOf(s)[0]!).id);
   const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc' };
   const LEVEL_LABEL: Record<Difficulty, string> = { facile: 'Facile', normal: 'Normal', difficile: 'Difficile' };
   const AI_STEP_MS = 480; // délai entre deux actions de l'IA (auto-play animé)
@@ -181,12 +181,12 @@
   let phase = $state<'setup' | 'combat'>('combat');
   let opponent = $state<Opponent>('ia');
   let aiLevel = $state<Difficulty>('normal');
-  let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade d'Alice (toi) ; Bob = complément
+  let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade choisie ; jouée À L'IDENTIQUE par les deux camps
   let aiThinking = $state(false);                                // l'IA joue son tour → entrées gelées
   let mode = $state<Mode>('entrainement');
   let shape = $state<Shape>('hex'); // forme du plateau — hexagone (forme retenue pour le tuto et les parties)
   let geo = $state<Geo>(startGeo);
-  let combat = $state<CombatState>(initialFor(startGeo, lineupOf(DEFAULT_PICK), complementOf(DEFAULT_PICK)));
+  let combat = $state<CombatState>(initialFor(startGeo, lineupOf(DEFAULT_PICK), lineupOf(DEFAULT_PICK)));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
   let selectedId = $state<string>('a1');
   let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
@@ -549,7 +549,7 @@
 
   function restart() {
     cancelAi();
-    combat = initialFor(geo, lineupOf(pick), complementOf(pick));
+    combat = initialFor(geo, lineupOf(pick), lineupOf(pick));
     history = [];
     selectedId = 'a1';
     inspectedId = '';
@@ -577,7 +577,7 @@
     cancelAi();
     geo = buildBoard(shape, SIZE[shape][mode]);
     resetView();
-    combat = initialFor(geo, lineupOf(pick), complementOf(pick));
+    combat = initialFor(geo, lineupOf(pick), lineupOf(pick));
     history = [];
     selectedId = 'a1';
     inspectedId = '';
@@ -588,7 +588,7 @@
   function newGame() { cancelAi(); phase = 'setup'; }
   // Aperçu des deux escouades dans l'écran de setup.
   const aliceLineup = $derived(lineupOf(pick).map((id) => CHAR_NAME[id] ?? id));
-  const bobLineup = $derived(complementOf(pick).map((id) => CHAR_NAME[id] ?? id));
+  const bobLineup = $derived(lineupOf(pick).map((id) => CHAR_NAME[id] ?? id));
 
   // ── TUTORIEL JOUABLE ───────────────────────────────────────────────────────
   // Mini-scénario RÉEL (vraie CombatState, mêmes handlers que la partie) : la Lourde
@@ -1267,7 +1267,7 @@
         </div>
       {/if}
 
-      <h3>Ton escouade <span class="muted small">— l'adversaire prend les héros complémentaires</span></h3>
+      <h3>L'escouade <span class="muted small">— miroir : les deux camps jouent les MÊMES 3 pièces</span></h3>
       {#each SLOTS as slot}
         <div class="pickrow">
           <span class="slotname">{KIND_GLYPH[slot]} {KIND_NAME[slot]}</span>
