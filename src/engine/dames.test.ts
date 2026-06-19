@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  initialState, legalMoves, movesForPiece, applyMove, winner,
-  idx, xy, isDark, SIZE,
+  initialState, legalMoves, movesForPiece, applyMove, winner, isPromoting,
+  idx, xy, isDark, SIZE, KINDS, PROMOTION_KINDS,
   type DamesState, type Piece, type Move,
 } from './dames';
 
@@ -16,14 +16,10 @@ const find = (ms: Move[], from: number, to: number) => ms.find((m) => m.from ===
 describe('position de départ', () => {
   it('place 12 pions par camp sur cases foncées', () => {
     const s = initialState();
-    const b = s.board.filter((p) => p && p.player === 'b').length;
-    const n = s.board.filter((p) => p && p.player === 'n').length;
-    expect(b).toBe(12);
-    expect(n).toBe(12);
-    // toutes sur des cases foncées
-    s.board.forEach((p, i) => {
-      if (p) expect(isDark(xy(i).x, xy(i).y)).toBe(true);
-    });
+    expect(s.board.filter((p) => p && p.player === 'b').length).toBe(12);
+    expect(s.board.filter((p) => p && p.player === 'n').length).toBe(12);
+    s.board.forEach((p, i) => { if (p) expect(isDark(xy(i).x, xy(i).y)).toBe(true); });
+    expect(s.board.every((p) => !p || p.kind === 'pion')).toBe(true);
     expect(s.turn).toBe('b');
   });
 
@@ -32,108 +28,150 @@ describe('position de départ', () => {
   });
 });
 
-describe('pion — déplacement avant uniquement', () => {
+describe('pion — avant uniquement', () => {
   it('avance en diagonale vers le haut (blanc)', () => {
-    const s = stateWith((b) => { b[idx(2, 5)] = { player: 'b', king: false }; });
-    const ms = movesForPiece(s, idx(2, 5));
-    expect(ms.map((m) => m.to).sort()).toEqual([idx(1, 4), idx(3, 4)].sort());
+    const s = stateWith((b) => { b[idx(2, 5)] = { player: 'b', kind: 'pion' }; });
+    expect(movesForPiece(s, idx(2, 5)).map((m) => m.to).sort()).toEqual([idx(1, 4), idx(3, 4)].sort());
   });
 
-  it('ne peut pas reculer', () => {
-    const s = stateWith((b) => { b[idx(2, 5)] = { player: 'b', king: false }; });
-    const ms = movesForPiece(s, idx(2, 5));
-    expect(ms.some((m) => xy(m.to).y > 5)).toBe(false);
-  });
-});
-
-describe('pion — prise', () => {
-  it('prend en avant et la prise est obligatoire', () => {
+  it('ne recule pas et ne prend pas en arrière', () => {
     const s = stateWith((b) => {
-      b[idx(3, 4)] = { player: 'b', king: false };
-      b[idx(2, 3)] = { player: 'n', king: false };
+      b[idx(3, 4)] = { player: 'b', kind: 'pion' };
+      b[idx(4, 5)] = { player: 'n', kind: 'pion' }; // derrière
     });
     const ms = legalMoves(s);
-    expect(ms.length).toBe(1);
-    const m = ms[0]!;
-    expect(m.from).toBe(idx(3, 4));
-    expect(m.to).toBe(idx(1, 2));
-    expect(m.captures).toEqual([idx(2, 3)]);
+    expect(ms.every((m) => m.captures.length === 0 && xy(m.to).y < 4)).toBe(true);
   });
 
-  it('ne prend PAS en arrière', () => {
+  it('prend en avant, prise obligatoire, et enchaîne une rafle', () => {
     const s = stateWith((b) => {
-      b[idx(3, 4)] = { player: 'b', king: false };
-      b[idx(4, 5)] = { player: 'n', king: false }; // derrière le pion blanc
+      b[idx(1, 6)] = { player: 'b', kind: 'pion' };
+      b[idx(2, 5)] = { player: 'n', kind: 'pion' };
+      b[idx(2, 3)] = { player: 'n', kind: 'pion' };
     });
     const ms = legalMoves(s);
-    expect(ms.every((m) => m.captures.length === 0)).toBe(true);
-  });
-
-  it('enchaîne une rafle (double prise)', () => {
-    const s = stateWith((b) => {
-      b[idx(1, 6)] = { player: 'b', king: false };
-      b[idx(2, 5)] = { player: 'n', king: false };
-      b[idx(2, 3)] = { player: 'n', king: false };
-    });
-    const ms = legalMoves(s);
-    // (1,6) -> saute (2,5) -> (3,4) -> saute (2,3) -> (1,2)
+    expect(ms.every((m) => m.captures.length > 0)).toBe(true); // obligatoire
     const m = find(ms, idx(1, 6), idx(1, 2));
-    expect(m).toBeTruthy();
-    expect(m!.captures.sort()).toEqual([idx(2, 5), idx(2, 3)].sort());
+    expect(m?.captures.sort()).toEqual([idx(2, 5), idx(2, 3)].sort());
   });
 });
 
-describe('dame volante', () => {
-  it('glisse sur toute la diagonale (toutes directions)', () => {
-    const s = stateWith((b) => { b[idx(3, 4)] = { player: 'b', king: true }; });
+describe('dame STANDARD (courte, avant + arrière)', () => {
+  it('se déplace d\'1 case dans les 4 diagonales', () => {
+    const s = stateWith((b) => { b[idx(3, 4)] = { player: 'b', kind: 'dame' }; });
     const ms = movesForPiece(s, idx(3, 4));
-    expect(ms.some((m) => m.to === idx(0, 1))).toBe(true); // longue glissade haut-gauche
-    expect(ms.some((m) => m.to === idx(6, 7))).toBe(true); // vers le bas (arrière) aussi
-    expect(ms.length).toBeGreaterThan(4);
+    expect(ms.length).toBe(4);
+    expect(ms.map((m) => m.to).sort()).toEqual([idx(2, 3), idx(4, 3), idx(2, 5), idx(4, 5)].sort());
   });
 
-  it('prend à distance et peut choisir où atterrir', () => {
-    const s = stateWith((b) => {
-      b[idx(5, 6)] = { player: 'b', king: true };
-      b[idx(2, 3)] = { player: 'n', king: false };
-    });
-    const ms = legalMoves(s);
-    const lands = ms.filter((m) => m.captures.includes(idx(2, 3))).map((m) => m.to).sort();
-    expect(lands).toEqual([idx(1, 2), idx(0, 1)].sort());
+  it('ne glisse PAS au loin (plus volante)', () => {
+    const s = stateWith((b) => { b[idx(3, 4)] = { player: 'b', kind: 'dame' }; });
+    expect(movesForPiece(s, idx(3, 4)).some((m) => m.to === idx(0, 1))).toBe(false);
   });
 
-  it('ne saute pas deux pièces alignées', () => {
+  it('prend en ARRIÈRE (1 case)', () => {
     const s = stateWith((b) => {
-      b[idx(5, 6)] = { player: 'b', king: true };
-      b[idx(3, 4)] = { player: 'n', king: false };
-      b[idx(2, 3)] = { player: 'n', king: false };
+      b[idx(3, 4)] = { player: 'b', kind: 'dame' };
+      b[idx(4, 5)] = { player: 'n', kind: 'pion' }; // en arrière du blanc
     });
-    const ms = legalMoves(s);
-    expect(ms.every((m) => m.captures.length <= 1)).toBe(true);
+    const m = find(legalMoves(s), idx(3, 4), idx(5, 6));
+    expect(m?.captures).toEqual([idx(4, 5)]);
   });
 });
 
-describe('promotion', () => {
-  it('un pion qui s\'arrête sur la dernière rangée devient dame', () => {
-    const s = stateWith((b) => { b[idx(2, 1)] = { player: 'b', king: false }; });
-    const next = applyMove(s, { from: idx(2, 1), to: idx(1, 0), captures: [] });
-    expect(next.board[idx(1, 0)]).toEqual({ player: 'b', king: true });
+describe('dame BONDISSANTE (porte 2)', () => {
+  it('se déplace jusqu\'à 2 cases en diagonale', () => {
+    const s = stateWith((b) => { b[idx(3, 4)] = { player: 'b', kind: 'dame-bond' }; });
+    const ms = movesForPiece(s, idx(3, 4));
+    expect(ms.length).toBe(8); // 4 directions × 2 cases (toutes dans le plateau)
+    expect(ms.some((m) => m.to === idx(1, 2))).toBe(true); // 2 cases haut-gauche
+    expect(ms.some((m) => m.to === idx(5, 6))).toBe(true); // 2 cases bas-droite
+  });
+
+  it('un obstacle borne la glissade', () => {
+    const s = stateWith((b) => {
+      b[idx(3, 4)] = { player: 'b', kind: 'dame-bond' };
+      b[idx(2, 3)] = { player: 'b', kind: 'pion' }; // bloque la diagonale haut-gauche dès la 1ʳᵉ
+    });
+    expect(movesForPiece(s, idx(3, 4)).some((m) => m.to === idx(1, 2))).toBe(false);
+  });
+});
+
+describe('dame PERCE-LIGNE (double prise, additif)', () => {
+  it('prend 2 ennemis alignés d\'un coup', () => {
+    const s = stateWith((b) => {
+      b[idx(5, 6)] = { player: 'b', kind: 'dame-perce' };
+      b[idx(4, 5)] = { player: 'n', kind: 'pion' };
+      b[idx(3, 4)] = { player: 'n', kind: 'pion' };
+    });
+    const m = find(legalMoves(s), idx(5, 6), idx(2, 3));
+    expect(m?.captures.sort()).toEqual([idx(4, 5), idx(3, 4)].sort());
+  });
+
+  it('garde la prise SIMPLE (additif)', () => {
+    const s = stateWith((b) => {
+      b[idx(4, 5)] = { player: 'b', kind: 'dame-perce' };
+      b[idx(3, 4)] = { player: 'n', kind: 'pion' }; // un seul ennemi, vide derrière
+    });
+    const m = find(legalMoves(s), idx(4, 5), idx(2, 3));
+    expect(m?.captures).toEqual([idx(3, 4)]);
+  });
+});
+
+describe('dame ÉQUERRE (prise orthogonale, additif)', () => {
+  it('prend orthogonalement (par-dessus une case adjacente)', () => {
+    // NB : sur le damier d'origine les ennemis sont sur cases foncées (orthogonale = case claire,
+    // vide) → on place ici l'ennemi sur la case orthogonale pour valider la MÉCANIQUE.
+    const s = stateWith((b) => {
+      b[idx(3, 4)] = { player: 'b', kind: 'dame-equerre' };
+      b[idx(3, 5)] = { player: 'n', kind: 'pion' }; // juste en dessous (orthogonal)
+    });
+    const m = find(legalMoves(s), idx(3, 4), idx(3, 6));
+    expect(m?.captures).toEqual([idx(3, 5)]);
+  });
+
+  it('garde la prise diagonale (additif)', () => {
+    const s = stateWith((b) => {
+      b[idx(3, 4)] = { player: 'b', kind: 'dame-equerre' };
+      b[idx(2, 3)] = { player: 'n', kind: 'pion' };
+    });
+    const m = find(legalMoves(s), idx(3, 4), idx(1, 2));
+    expect(m?.captures).toEqual([idx(2, 3)]);
+  });
+});
+
+describe('promotion — choix du type', () => {
+  it('détecte la promotion d\'un pion sur la dernière rangée', () => {
+    const s = stateWith((b) => { b[idx(2, 1)] = { player: 'b', kind: 'pion' }; });
+    const mv = { from: idx(2, 1), to: idx(1, 0), captures: [] };
+    expect(isPromoting(s, mv)).toBe(true);
+  });
+
+  it('promeut vers le type CHOISI', () => {
+    const s = stateWith((b) => { b[idx(2, 1)] = { player: 'b', kind: 'pion' }; });
+    const mv = { from: idx(2, 1), to: idx(1, 0), captures: [] };
+    expect(applyMove(s, mv, 'dame-perce').board[idx(1, 0)]).toEqual({ player: 'b', kind: 'dame-perce' });
+    // défaut = dame standard si aucun choix
+    expect(applyMove(s, mv).board[idx(1, 0)]).toEqual({ player: 'b', kind: 'dame' });
+  });
+
+  it('le registre expose 4 dames promouvables', () => {
+    expect(PROMOTION_KINDS).toEqual(['dame', 'dame-bond', 'dame-perce', 'dame-equerre']);
+    expect(KINDS['pion']?.promotable).toBeFalsy();
   });
 });
 
 describe('fin de partie', () => {
   it('victoire si l\'adversaire n\'a plus de pièces', () => {
-    const s = stateWith((b) => { b[idx(2, 5)] = { player: 'b', king: false }; }, 'b');
+    const s = stateWith((b) => { b[idx(2, 5)] = { player: 'b', kind: 'pion' }; }, 'b');
     expect(winner(s)).toBe('b');
   });
 
   it('victoire si l\'adversaire au trait est bloqué', () => {
-    // Noir au trait, son unique pion est coincé dans un coin par un blocage.
     const s = stateWith((b) => {
-      b[idx(0, 7)] = { player: 'n', king: false }; // noir avance vers y croissant -> y=7 = mur
-      b[idx(7, 0)] = { player: 'b', king: true };  // blanc existe encore (ailleurs)
+      b[idx(0, 7)] = { player: 'n', kind: 'pion' }; // noir avance vers y croissant -> y=7 = mur
+      b[idx(7, 0)] = { player: 'b', kind: 'dame' };
     }, 'n');
-    // (0,7) ne peut aller qu'en (1,8)/(−1,8) hors plateau -> aucun coup.
     expect(legalMoves(s).length).toBe(0);
     expect(winner(s)).toBe('b');
   });
