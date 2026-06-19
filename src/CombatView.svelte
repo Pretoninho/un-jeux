@@ -51,7 +51,10 @@
   const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', charge: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad', regen: '#2a9d76', soin: '#2a9d76' };
   const HEROES = Object.values(CHARACTERS);
   // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
-  const SLOTS = ['lourde', 'tireur', 'duelliste', 'soigneur'] as const; // une escouade = 1 de chaque archétype
+  const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
+  // NB : le SOIGNEUR est mis SOUS SILENCE — retiré du vivier (escouade revenue à 3 archétypes). Tout
+  // le code Soin (verbe, UI ✚, effets regen/soin, héros Baume/Mélisse) reste en place, simplement
+  // injoignable (ni fieldé, ni offert au setup, ni joué par l'IA). Le rebrancher = remettre 'soigneur' ici.
   type Slot = (typeof SLOTS)[number];
   type Opponent = 'hotseat' | 'ia';
   const heroesOf = (arch: string) => HEROES.filter((h) => h.archetype === arch);
@@ -59,7 +62,7 @@
   const lineupOf = (p: Record<Slot, string>) => SLOTS.map((s) => p[s]);
   const complementOf = (p: Record<Slot, string>) =>
     SLOTS.map((s) => (heroesOf(s).find((h) => h.id !== p[s]) ?? heroesOf(s)[0]!).id);
-  const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc', soigneur: 'baume' };
+  const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc' };
   const LEVEL_LABEL: Record<Difficulty, string> = { facile: 'Facile', normal: 'Normal', difficile: 'Difficile' };
   const AI_STEP_MS = 480; // délai entre deux actions de l'IA (auto-play animé)
   let showMatrix = $state(false);
