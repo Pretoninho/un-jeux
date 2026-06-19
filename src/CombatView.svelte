@@ -171,7 +171,7 @@
     return makeCombatState(geo.map, [...place('alice', c0, alice), ...place('bob', c1, bob)], 'alice');
   }
 
-  const startGeo = buildBoard('octa', SIZE.octa.entrainement); // démarrage sur l'Entraînement (petit octogone)
+  const startGeo = buildBoard('hex', SIZE.hex.entrainement); // démarrage sur l'hexagone resserré (r=4)
   // PHASE : l'appli démarre DIRECTEMENT en combat (config par défaut : Entraînement, vs IA normal,
   // escouade par défaut). L'écran de pré-partie (setup) reste accessible via « ⚙ Nouvelle partie ».
   let phase = $state<'setup' | 'combat'>('combat');
@@ -180,7 +180,7 @@
   let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade d'Alice (toi) ; Bob = complément
   let aiThinking = $state(false);                                // l'IA joue son tour → entrées gelées
   let mode = $state<Mode>('entrainement');
-  let shape = $state<Shape>('octa'); // forme du plateau (comparaison octogone / hexagone / carré)
+  let shape = $state<Shape>('hex'); // forme du plateau — hexagone (forme retenue pour le tuto et les parties)
   let geo = $state<Geo>(startGeo);
   let combat = $state<CombatState>(initialFor(startGeo, lineupOf(DEFAULT_PICK), complementOf(DEFAULT_PICK)));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
@@ -686,9 +686,9 @@
   });
 
   function startTutorial() {
-    // Le tuto se joue toujours sur le petit octogone d'Entraînement (plateau resserré, lisible).
-    if (mode !== 'entrainement' || shape !== 'octa') {
-      mode = 'entrainement'; shape = 'octa'; geo = buildBoard('octa', SIZE.octa.entrainement); resetView();
+    // Le tuto se joue toujours sur le petit hexagone d'Entraînement (plateau resserré, lisible).
+    if (mode !== 'entrainement' || shape !== 'hex') {
+      mode = 'entrainement'; shape = 'hex'; geo = buildBoard('hex', SIZE.hex.entrainement); resetView();
     }
     combat = tutorialState(geo);
     history = [];
