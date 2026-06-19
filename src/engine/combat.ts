@@ -131,6 +131,7 @@ export interface Unit {
   ap: number;
   moveCap?: number;   // plafond de PAS par tour (axe MOBILITÉ, hors droite portée/robustesse) — ex. Lourde lente
   moved?: number;     // pas déjà effectués ce tour (alimente le plafond `moveCap`) ; remis à 0 à `endTurn`
+  acted?: boolean;    // a déjà AGI ce tour (attaque/verbe) → ne peut plus se déplacer (règle « déplacer OU agir »)
   range: number;      // portée d'attaque (1 = adjacent)
   damage: number;     // dégâts par coup
   attackCost: number; // coût en PA d'une attaque
@@ -235,6 +236,7 @@ export const DEFAULT_MOVE_CAP = 4;
  * moins le malus « estropié »). Les PA ne paient que les attaques/verbes. Plancher 0.
  */
 export function moveBudget(unit: Unit): number {
+  if (unit.acted) return 0;                       // a déjà agi ce tour → « déplacer OU agir » : plus de pas
   if ((unit.root?.expiresIn ?? 0) > 0) return 0; // enraciné : plus aucun pas (attaques/verbes intacts)
   const cap = (unit.moveCap ?? DEFAULT_MOVE_CAP) + (unit.haste?.amount ?? 0); // « charge » relève le plafond
   const capLeft = cap - (unit.moved ?? 0) - (unit.cripple?.amount ?? 0);      // « estropié » mord le déplacement
@@ -287,10 +289,14 @@ export function isSilenced(u: Unit): boolean {
   return (u.silence?.expiresIn ?? 0) > 0;
 }
 
+/** A déjà bougé ce tour ? → « déplacer OU agir » : interdit d'attaquer/poser un verbe ensuite. */
+const hasMoved = (u: Unit): boolean => (u.moved ?? 0) > 0;
+
 export function canAttack(state: CombatState, attackerId: string, targetId: string): boolean {
   const attacker = unitById(state, attackerId);
   const target = unitById(state, targetId);
   if (!attacker || attacker.owner !== state.active) return false;
+  if (hasMoved(attacker)) return false;   // « déplacer OU agir »
   if (isSilenced(attacker)) return false; // silencée : pas d'attaque
   if (!target || target.owner === state.active) return false;
   if (attacker.ap < attacker.attackCost) return false;
@@ -320,7 +326,7 @@ function strike(state: CombatState, attackerId: string, targetId: string): { sta
   const stunning = attacker.stunCharge; // « Coup étourdissant » : consommé, étourdit la cible
   // 1) Le coup porté : l'attaquant dépense ses PA, la cible encaisse (réduit si en garde).
   let units = state.units.map((u) => {
-    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, ...(attacker.vendetta ? { vendetta: undefined } : {}), ...(stunning ? { stunCharge: undefined } : {}) };
+    if (u.id === attackerId) return { ...u, ap: u.ap - attacker.attackCost, acted: true, ...(attacker.vendetta ? { vendetta: undefined } : {}), ...(stunning ? { stunCharge: undefined } : {}) };
     if (u.id === targetId) {
       const dealt = damageTaken(u, raw);
       return { ...u, hp: u.hp - dealt, ...(marked ? { mark: undefined } : {}), ...(stunning ? { stun: { owner: u.owner, expiresIn: stunning.stun } } : {}), ...(dealt > 0 ? { lastHitBy: attackerId } : {}) };
@@ -647,6 +653,7 @@ export function resolveReactions(state: CombatState, signal: Signal): CombatStat
 export function canDefend(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (hasMoved(u)) return false;          // « déplacer OU agir »
   if (isSilenced(u)) return false;
   if (!u.guard || u.guarding) return false;
   return u.ap >= u.guard.cost;
@@ -662,7 +669,7 @@ export function defend(state: CombatState, unitId: string): CombatState {
   return {
     ...state,
     units: state.units.map((x) =>
-      x.id === unitId ? { ...x, ap: x.ap - u.guard!.cost, guarding: true } : x),
+      x.id === unitId ? { ...x, ap: x.ap - u.guard!.cost, guarding: true, acted: true } : x),
   };
 }
 
@@ -675,6 +682,7 @@ export function defend(state: CombatState, unitId: string): CombatState {
 export function canReserve(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (hasMoved(u)) return false;          // « déplacer OU agir »
   if (isSilenced(u)) return false;
   if (!u.overwatch || u.watching) return false;
   return u.ap >= u.overwatch.cost;
@@ -690,7 +698,7 @@ export function reserve(state: CombatState, unitId: string): CombatState {
   return {
     ...state,
     units: state.units.map((x) =>
-      x.id === unitId ? { ...x, ap: x.ap - u.overwatch!.cost, watching: true } : x),
+      x.id === unitId ? { ...x, ap: x.ap - u.overwatch!.cost, watching: true, acted: true } : x),
   };
 }
 
@@ -732,6 +740,7 @@ export function resolveOverwatch(state: CombatState, movedUnitId: string): Comba
 export function canRiposte(state: CombatState, unitId: string): boolean {
   const u = unitById(state, unitId);
   if (!u || u.owner !== state.active) return false;
+  if (hasMoved(u)) return false;          // « déplacer OU agir »
   if (isSilenced(u)) return false;
   if (!u.riposte || u.riposting) return false;
   return u.ap >= u.riposte.cost;
@@ -748,7 +757,7 @@ export function riposte(state: CombatState, unitId: string): CombatState {
   return {
     ...state,
     units: state.units.map((x) =>
-      x.id === unitId ? { ...x, ap: x.ap - u.riposte!.cost, riposting: true } : x),
+      x.id === unitId ? { ...x, ap: x.ap - u.riposte!.cost, riposting: true, acted: true } : x),
   };
 }
 
@@ -763,6 +772,7 @@ export function canHeal(state: CombatState, healerId: string, targetId: string):
   const h = unitById(state, healerId);
   const t = unitById(state, targetId);
   if (!h || !t || h.owner !== state.active) return false;
+  if (hasMoved(h)) return false;          // « déplacer OU agir »
   if (isSilenced(h) || !h.heal) return false;
   if (t.owner !== h.owner || t.id === h.id) return false;                     // soigne un ALLIÉ, pas soi
   if (t.hp >= t.maxHp) return false;                                          // déjà plein → soin gâché, interdit
@@ -780,7 +790,7 @@ export function healUnit(state: CombatState, healerId: string, targetId: string)
   return {
     ...state,
     units: state.units.map((u) => {
-      if (u.id === healerId) return { ...u, ap: u.ap - h.heal!.cost };
+      if (u.id === healerId) return { ...u, ap: u.ap - h.heal!.cost, acted: true };
       if (u.id === targetId) return { ...u, hp: Math.min(u.maxHp, u.hp + h.heal!.amount) };
       return u;
     }),
@@ -836,7 +846,7 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
         u.owner === next
           // recharge SES PA (+ couverture persistante) et applique la régénération
           // (+regen PV plafonnés) — sauf si étourdie : PA forcés à 0 (gel). Le soin, lui, opère toujours.
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.cover?.amount ?? 0), moved: 0, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns), ...(u.regen ? { hp: Math.min(u.maxHp, u.hp + u.regen.amount) } : {}) }
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.cover?.amount ?? 0), moved: 0, acted: false, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns), ...(u.regen ? { hp: Math.min(u.maxHp, u.hp + u.regen.amount) } : {}) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };

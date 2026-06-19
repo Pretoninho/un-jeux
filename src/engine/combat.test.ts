@@ -83,17 +83,37 @@ describe('combat/déplacement — appliquer (DÉCOUPLÉ des PA)', () => {
     expect(moveUnit(s0, 'b', 'D')).toBe(s0); // bob n'est pas actif
   });
 
-  it('découplage : une pièce peut se déplacer ET attaquer le même tour', () => {
+  it('« déplacer OU agir » : avoir bougé interdit d\'attaquer ce tour', () => {
     const s0 = makeCombatState(LINE, [
       u({ id: 'a', owner: 'alice', hex: 'A', ap: 4, damage: 4, attackCost: 2 }),
       u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
     ], 'alice');
-    const s1 = moveUnit(s0, 'a', 'B');       // A→B (1 pas), PA intacts
+    const s1 = moveUnit(s0, 'a', 'B');          // A→B (1 pas), PA intacts…
     expect(unitById(s1, 'a')!.ap).toBe(4);
-    expect(canAttack(s1, 'a', 'b')).toBe(true); // B adjacent à C
-    const s2 = attack(s1, 'a', 'b');
-    expect(unitById(s2, 'a')!.ap).toBe(2);   // seule l'attaque coûte (4 − 2)
-    expect(unitById(s2, 'b')!.hp).toBe(6);   // 10 − 4
+    expect(canAttack(s1, 'a', 'b')).toBe(false); // …mais avoir bougé verrouille l'action
+  });
+
+  it('« déplacer OU agir » : avoir agi (attaque/verbe) interdit de bouger ce tour', () => {
+    const s0 = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4, damage: 4, attackCost: 2 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
+    ], 'alice');
+    const s1 = attack(s0, 'a', 'b');            // l'attaque marque `acted`
+    expect(unitById(s1, 'a')!.acted).toBe(true);
+    expect(moveBudget(unitById(s1, 'a')!)).toBe(0); // plus aucun pas après avoir agi
+    expect(moveUnit(s1, 'a', 'A')).toBe(s1);        // le déplacement est refusé (no-op)
+  });
+
+  it('le verrou se lève au tour suivant (acted/moved remis à 0 par endTurn)', () => {
+    const s0 = makeCombatState(LINE, [
+      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4, damage: 4, attackCost: 2 }),
+      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
+    ], 'alice');
+    const s1 = attack(s0, 'a', 'b');
+    const s2 = endTurn(s1, 4);   // → bob
+    const s3 = endTurn(s2, 4);   // → alice : a est rechargée
+    expect(unitById(s3, 'a')!.acted).toBe(false);
+    expect(moveBudget(unitById(s3, 'a')!)).toBeGreaterThan(0);
   });
 });
 
