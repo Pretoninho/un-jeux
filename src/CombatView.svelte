@@ -10,6 +10,7 @@
   // hexagonal (6 voisins) ou octogonal 4.8.8 (octogones + carrés-carrefours jouables).
   import { makeBoard } from './engine/board';
   import { makeOctaBoard } from './engine/octaboard';
+  import { makeSquareBoard } from './engine/squareboard';
   import {
     makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend,
     reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
@@ -18,14 +19,19 @@
   } from './engine/combat';
   import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
   import { planTurn, applyAction, DIFFICULTIES, type Difficulty } from './engine/ai';
-  import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, genBounds } from './lib/layout';
+  import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, squarePoints, genBounds } from './lib/layout';
 
-  const RADIUS = 4;                 // plateau hexagonal — MIS DE CÔTÉ (code conservé, plus exposé dans l'UI)
-  // Deux tailles d'octogone : petit = Entraînement (tuto + practice), grand = Partie.
-  const OCTA_TRAIN = 9;             // 145 cases (n² + (n-1)²)
-  const OCTA_GAME = 23;             // 1013 cases
+  // FORME du plateau (topologie) — le moteur ne lit que `neighbors`, il est agnostique : on peut
+  // comparer librement octogone / hexagone / carré sans rien changer au combat.
+  type Shape = 'octa' | 'hex' | 'square';
   type Mode = 'entrainement' | 'partie';
-  const MODE_N: Record<Mode, number> = { entrainement: OCTA_TRAIN, partie: OCTA_GAME };
+  // Taille du plateau par (forme × mode) : entraînement = petit/lisible, partie = grand.
+  const SIZE: Record<Shape, Record<Mode, number>> = {
+    octa:   { entrainement: 9, partie: 23 }, // n d'octogones (n² + (n-1)² cases)
+    hex:    { entrainement: 4, partie: 8 },  // rayon du disque hexagonal
+    square: { entrainement: 9, partie: 19 }, // côté de la grille n×n
+  };
+  const FORME_LABEL: Record<Shape, string> = { octa: '⯃ Octogone', hex: '⬡ Hexagone', square: '▢ Carré' };
   const OCTA_FRAC = 0.15; // côté droit octogone (frac. de l'espacement) ; < OCTA_REGULAR → carrés plus gros
   const AP_PER_TURN = 4;
   const COLORS: Record<string, string> = { alice: '#5ab0a0', bob: '#e07a3a' };
@@ -90,16 +96,15 @@
     return st.length ? `${head}\n${st.join('\n')}` : head;
   }
 
-  type Shape = 'hex' | 'octa';
   interface Tile { id: string; cx: number; cy: number; points: string; small: boolean }
   interface Geo { map: CombatState['map']; corners: [string, string]; tiles: Tile[]; bounds: { x: number; y: number; w: number; h: number } }
 
   // Construit la géométrie ET la topologie d'un plateau (le moteur ne lit que `map`).
-  // `octaN` = taille de l'octogone (selon le mode). Le hex reste pour réactivation future.
-  function buildBoard(shape: Shape, octaN: number = OCTA_GAME): Geo {
+  // `n` = taille selon la forme : n d'octogones / rayon hexagonal / côté de la grille carrée.
+  function buildBoard(shape: Shape, n: number): Geo {
     let map: CombatState['map'], corners: [string, string], tiles: Tile[];
     if (shape === 'octa') {
-      const ob = makeOctaBoard(octaN);
+      const ob = makeOctaBoard(n);
       map = ob.map; corners = ob.corners;
       tiles = ob.map.hexes.map((h) => {
         const L = ob.layout[h.id]!;
@@ -110,8 +115,16 @@
             : octagonPoints(L.cx, L.cy, ob.spacing, OCTA_FRAC),
         };
       });
+    } else if (shape === 'square') {
+      const sb = makeSquareBoard(n);
+      map = sb.map; corners = sb.corners;
+      const S = 60; // espacement (pas de la grille)
+      tiles = sb.map.hexes.map((h) => {
+        const cx = h.coord!.q * S, cy = h.coord!.r * S;
+        return { id: h.id, cx, cy, small: false, points: squarePoints(cx, cy, S) };
+      });
     } else {
-      const hb = makeBoard(RADIUS);
+      const hb = makeBoard(n);
       map = hb.map; corners = hb.corners;
       tiles = hb.map.hexes.map((h) => {
         const [cx, cy] = axialToPixel(h.coord!.q, h.coord!.r);
@@ -149,7 +162,7 @@
     ], 'alice');
   }
 
-  const startGeo = buildBoard('octa', OCTA_TRAIN); // démarrage sur l'Entraînement (petit octogone)
+  const startGeo = buildBoard('octa', SIZE.octa.entrainement); // démarrage sur l'Entraînement (petit octogone)
   // PHASE : l'appli démarre DIRECTEMENT en combat (config par défaut : Entraînement, vs IA normal,
   // escouade par défaut). L'écran de pré-partie (setup) reste accessible via « ⚙ Nouvelle partie ».
   let phase = $state<'setup' | 'combat'>('combat');
@@ -158,6 +171,7 @@
   let pick = $state<Record<Slot, string>>({ ...DEFAULT_PICK }); // escouade d'Alice (toi) ; Bob = complément
   let aiThinking = $state(false);                                // l'IA joue son tour → entrées gelées
   let mode = $state<Mode>('entrainement');
+  let shape = $state<Shape>('octa'); // forme du plateau (comparaison octogone / hexagone / carré)
   let geo = $state<Geo>(startGeo);
   let combat = $state<CombatState>(initialFor(startGeo, lineupOf(DEFAULT_PICK), complementOf(DEFAULT_PICK)));
   let history = $state<CombatState[]>([]); // pile d'annulation (vidée au passage de main)
@@ -402,7 +416,15 @@
 
   function setMode(m: Mode) {
     mode = m;
-    geo = buildBoard('octa', MODE_N[m]);
+    geo = buildBoard(shape, SIZE[shape][m]);
+    resetView();
+    restart();
+  }
+
+  // Change la FORME du plateau (comparaison live) : reconstruit la topologie + redéploie.
+  function setShape(s: Shape) {
+    shape = s;
+    geo = buildBoard(s, SIZE[s][mode]);
     resetView();
     restart();
   }
@@ -410,7 +432,7 @@
   // Lance une partie depuis l'écran de setup (plateau + escouades choisies).
   function startGame() {
     cancelAi();
-    geo = buildBoard('octa', MODE_N[mode]);
+    geo = buildBoard(shape, SIZE[shape][mode]);
     resetView();
     combat = initialFor(geo, lineupOf(pick), complementOf(pick));
     history = [];
@@ -536,8 +558,10 @@
   });
 
   function startTutorial() {
-    // Le tuto se joue sur le petit octogone d'Entraînement (plateau resserré, lisible).
-    if (mode !== 'entrainement') { mode = 'entrainement'; geo = buildBoard('octa', OCTA_TRAIN); resetView(); }
+    // Le tuto se joue toujours sur le petit octogone d'Entraînement (plateau resserré, lisible).
+    if (mode !== 'entrainement' || shape !== 'octa') {
+      mode = 'entrainement'; shape = 'octa'; geo = buildBoard('octa', SIZE.octa.entrainement); resetView();
+    }
     combat = tutorialState(geo);
     history = [];
     inspectedId = '';
@@ -710,8 +734,13 @@
       </div>
     {/if}
     <div class="shape">
-      <button class:on={mode === 'entrainement'} onclick={() => setMode('entrainement')} disabled={aiThinking} title="Petit octogone — tuto & practice">🎓 Entraînement</button>
-      <button class:on={mode === 'partie'} onclick={() => setMode('partie')} disabled={aiThinking} title="Grand octogone — vraie partie">⚔ Partie</button>
+      <button class:on={mode === 'entrainement'} onclick={() => setMode('entrainement')} disabled={aiThinking} title="Petit plateau — tuto & practice">🎓 Entraînement</button>
+      <button class:on={mode === 'partie'} onclick={() => setMode('partie')} disabled={aiThinking} title="Grand plateau — vraie partie">⚔ Partie</button>
+    </div>
+    <div class="shape">
+      {#each ['octa', 'hex', 'square'] as const as sh}
+        <button class:on={shape === sh} onclick={() => setShape(sh)} disabled={aiThinking} title="Comparer la forme du plateau">{FORME_LABEL[sh]}</button>
+      {/each}
     </div>
     <div class="zoom">
       <button onclick={() => zoomCenter(1 / 1.3)} title="Dézoomer" aria-label="Dézoomer">−</button>
@@ -1107,6 +1136,13 @@
       <div class="seg">
         <button class:on={mode === 'entrainement'} onclick={() => (mode = 'entrainement')}>🎓 Entraînement <span class="muted small">petit</span></button>
         <button class:on={mode === 'partie'} onclick={() => (mode = 'partie')}>⚔ Partie <span class="muted small">grand</span></button>
+      </div>
+
+      <h3>Forme <span class="muted small">— même moteur, formes comparables</span></h3>
+      <div class="seg">
+        {#each ['octa', 'hex', 'square'] as const as sh}
+          <button class:on={shape === sh} onclick={() => (shape = sh)}>{FORME_LABEL[sh]}</button>
+        {/each}
       </div>
 
       <h3>Adversaire</h3>

@@ -81,6 +81,13 @@ export function diamondPoints(cx: number, cy: number, s: number, straightFrac = 
   return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
 }
 
+/** Points d'un carré axis-aligné centré en (cx, cy), demi-côté `s/2 · fillFrac` (léger interstice). */
+export function squarePoints(cx: number, cy: number, s: number, fillFrac = 0.92): string {
+  const h = (s / 2) * fillFrac;
+  const pts: [number, number][] = [[-h, -h], [h, -h], [h, h], [-h, h]];
+  return pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' ');
+}
+
 /** Couleur de remplissage par nature/cluster d'hexe. */
 export function hexFill(kind: string, cluster?: string): string {
   if (kind === 'noeud') return '#3a3f4b';

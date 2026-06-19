@@ -52,8 +52,17 @@
     le **tuto jouable** (forcé dessus) et la practice. **Démarrage par défaut** au chargement.
   - **⚔ Partie** = grand octogone **`OCTA_GAME = 23`** (1013 cases : `n² + (n-1)²`) — board
     volontairement vaste (priorité = plus d'octogones), centre dégagé réservé aux futurs camps/objectifs.
-  - L'**hexagone** (`makeBoard`, `RADIUS = 4`) est **mis de côté** : code conservé (`buildBoard('hex')`
-    fonctionne) mais **plus exposé dans l'UI**, réactivable plus tard.
+  - L'**hexagone** (`makeBoard`) reste dispo (cf. toggle de forme ci-dessous).
+- **TOGGLE DE FORME (RÉ-OUVERT 2026-06-18) — comparaison octogone / hexagone / carré** : on **réfléchit
+  à changer de forme** (octogone actuel vs hexagone vs carré). Comme le moteur est **agnostique à la
+  forme** (il ne lit que `neighbors`), c'est un choix **présentation/topologie** sans toucher au combat.
+  Sélecteur **`shape: 'octa' | 'hex' | 'square'`** dans le **setup** ET dans les contrôles en combat
+  (bascule live → `setShape`, redéploie). `SIZE[shape][mode]` donne la taille (entraînement/partie) par
+  forme. **Carré = `makeSquareBoard(n)`** (engine pur, testé) : grille n×n, **voisinage 8 directions**
+  (déplacement « roi » diagonales = 1 pas, esprit échecs/Divinity). **Le tuto reste forcé sur l'octogone.**
+  *Décision finale de forme = AJOURNÉE (comparaison au feeling : portées/kiting/lisibilité).* Rappel :
+  l'octogone garde son **grand centre dégagé** (futurs camps/objectifs) ; hex = adjacence uniforme
+  (distances non-ambiguës) ; carré = familier mais diagonale « gratuite ».
 - **Disposition en 3 colonnes** (grid) : **contrôles à gauche** (tour, forme, zoom, annuler,
   finir le tour, recommencer), **board au centre**, **panneaux d'info à droite** (alliée puis
   adverse, empilés). La légende d'aide reste **en bas, pleine largeur**. Repasse en une colonne
