@@ -589,6 +589,9 @@
   // Aperçu des deux escouades dans l'écran de setup.
   const aliceLineup = $derived(lineupOf(pick).map((id) => CHAR_NAME[id] ?? id));
   const bobLineup = $derived(lineupOf(pick).map((id) => CHAR_NAME[id] ?? id));
+  // Matrice de Résonance scopée à l'ESCOUADE EN JEU (miroir : les 3 héros choisis, des deux côtés).
+  // Seules les Résonances entre ces 3-là sont atteignables → la matrice ne montre qu'eux.
+  const matrixHeroes = $derived(lineupOf(pick).map((id) => CHARACTERS[id]!));
 
   // ── TUTORIEL JOUABLE ───────────────────────────────────────────────────────
   // Mini-scénario RÉEL (vraie CombatState, mêmes handlers que la partie) : la Lourde
@@ -1179,21 +1182,21 @@
     </button>
     {#if showMatrix}
       <div class="matrix-panel">
-        <p class="muted small">Lignes = <b>qui réagit</b> (possesseur) · Colonnes = <b>qui déclenche</b> (partenaire). Une cellule = un duo. Survole pour le détail.</p>
+        <p class="muted small">Escouade en jeu (miroir) · Lignes = <b>qui réagit</b> (possesseur) · Colonnes = <b>qui déclenche</b> (partenaire). Une cellule = un duo. Survole pour le détail.</p>
         <table class="matrix">
           <thead>
             <tr>
               <th class="corner">réagit ↓ / déclenché par →</th>
-              {#each HEROES as col}
+              {#each matrixHeroes as col}
                 <th title={KIND_NAME[col.archetype]}>{col.name}<span class="mk">{KIND_GLYPH[col.archetype]}</span></th>
               {/each}
             </tr>
           </thead>
           <tbody>
-            {#each HEROES as row}
+            {#each matrixHeroes as row}
               <tr>
                 <th class="rowhead" title={KIND_NAME[row.archetype]}><span class="mk">{KIND_GLYPH[row.archetype]}</span> {row.name}</th>
-                {#each HEROES as col}
+                {#each matrixHeroes as col}
                   {@const duo = row.id === col.id ? undefined : row.reactions?.find((r) => r.fromCharacter === col.id)}
                   <td class:self={row.id === col.id} class:has={!!duo}>
                     {#if row.id === col.id}<span class="diag">·</span>
