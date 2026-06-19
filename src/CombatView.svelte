@@ -49,7 +49,9 @@
   // de pastille selon l'INTENTION (rouge = nuit à l'ennemi · vert = soutient un allié · bleu = déplacement).
   const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui', racine: 'root', charge: 'charge', regen: 'heal', soin: 'heal' };
   const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', charge: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad', regen: '#2a9d76', soin: '#2a9d76' };
-  const HEROES = Object.values(CHARACTERS);
+  // Vivier visible — les SOIGNEURS sont exclus (mis sous silence) : ni dans le draft, ni dans la
+  // matrice de Résonance. « Comme s'ils n'existaient pas » (ils restent dans CHARACTERS côté moteur).
+  const HEROES = Object.values(CHARACTERS).filter((c) => c.archetype !== 'soigneur');
   // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
   const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
   // NB : le SOIGNEUR est mis SOUS SILENCE — retiré du vivier (escouade revenue à 3 archétypes). Tout
