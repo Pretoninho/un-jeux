@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend, damageTaken,
   reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
-  unitAt, unitById, graphDistance, activeUnits, canHeal, healUnit, resolveReactions,
+  unitAt, unitById, graphDistance, activeUnits, canHeal, healUnit, resolveReactions, stepToward,
   type CombatState, type Unit,
 } from './combat';
 import type { GameMap } from './types';
@@ -1574,5 +1574,33 @@ describe('combat — Régénération (regen, soin réactif HoT)', () => {
     expect(unitById(s, 'src')!.regen).toMatchObject({ owner: 'alice', amount: 2, expiresIn: 2 });
     expect(unitById(s, 'med')!.cooldowns!.rg).toBe(3); // CD posé sur le possesseur
     expect(unitById(s, 'med')!.regen).toBeUndefined(); // l'effet vise la SOURCE, pas le possesseur
+  });
+});
+
+describe('combat — stepToward (un pas vers une cible, partagé moteur + tuto)', () => {
+  it('cas simple : renvoie le voisin libre strictement plus proche', () => {
+    expect(stepToward(LINE, 'B', 'E', new Set())).toBe('C'); // C (d=2) < B (d=3)
+  });
+
+  it('case occupée : le seul voisin rapprochant est bloqué → undefined', () => {
+    expect(stepToward(LINE, 'B', 'E', new Set(['C']))).toBeUndefined(); // A est plus loin, C occupé
+  });
+
+  it('déjà au contact : la cible occupe la case adjacente → undefined', () => {
+    expect(stepToward(LINE, 'D', 'E', new Set(['E']))).toBeUndefined(); // E (but) occupé, C plus loin
+  });
+
+  it('départage déterministe par id croissant (pas par ordre du tableau neighbors)', () => {
+    // Losange : A relié à C puis B (ordre tableau), tous deux à distance 1 de D.
+    const DIAMOND: GameMap = {
+      id: 'diamond',
+      hexes: [
+        { id: 'A', label: 'A', kind: 'marche', neighbors: ['C', 'B'] },
+        { id: 'B', label: 'B', kind: 'marche', neighbors: ['A', 'D'] },
+        { id: 'C', label: 'C', kind: 'marche', neighbors: ['A', 'D'] },
+        { id: 'D', label: 'D', kind: 'marche', neighbors: ['B', 'C'] },
+      ],
+    };
+    expect(stepToward(DIAMOND, 'A', 'D', new Set())).toBe('B'); // B et C équidistants → 'B' (id) et non 'C' (1er du tableau)
   });
 });

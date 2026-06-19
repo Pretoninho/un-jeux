@@ -433,9 +433,9 @@ function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): bool
 /**
  * Un pas de déplacement forcé : le voisin LIBRE de `from` strictement plus proche de `toward`,
  * départage déterministe (distance puis id). `undefined` si aucun (déjà au contact / encerclé).
- * Agnostique à la forme (ne lit que `neighbors` + `graphDistance`). Sert provocation ET ruée.
+ * Agnostique à la forme (ne lit que `neighbors` + `graphDistance`). Sert provocation, ruée ET le tuto.
  */
-function stepToward(map: GameMap, from: HexId, toward: HexId, occupied: Set<HexId>): HexId | undefined {
+export function stepToward(map: GameMap, from: HexId, toward: HexId, occupied: Set<HexId>): HexId | undefined {
   const byId = new Map(map.hexes.map((h) => [h.id, h] as const));
   const cur = graphDistance(map, from, toward);
   return (byId.get(from)?.neighbors ?? [])

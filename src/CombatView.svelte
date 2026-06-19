@@ -14,11 +14,12 @@
   import {
     makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend,
     reserve, canReserve, resolveOverwatch, riposte, canRiposte, canHeal, healUnit, previewReactions, endTurn, winner,
-    type Unit,
+    stepToward, type Unit,
     unitAt, type CombatState,
   } from './engine/combat';
   import { makeUnitFromCharacter, ARCHETYPES, CHARACTERS } from './engine/pieces';
   import { planTurn, applyAction, DIFFICULTIES, type Difficulty, type AiAction } from './engine/ai';
+  import { OBJECTIVES, OBJ_CATS, detectUnlocks } from './engine/objectives';
   import { axialToPixel, hexPointsPointy, octagonPoints, diamondPoints, squarePoints, genBounds } from './lib/layout';
 
   // FORME du plateau (topologie) — le moteur ne lit que `neighbors`, il est agnostique : on peut
@@ -629,27 +630,6 @@
     return !!l && !!e && rangeSet(l.hex, l.range).has(e.hex);
   };
 
-  // Pas vers une cible (BFS pur) : voisin LIBRE de `from` le plus proche de `goal`. Tuto seulement.
-  function tutoStepToward(from: string, goal: string): string | null {
-    const byId = new Map(combat.map.hexes.map((h) => [h.id, h] as const));
-    const dist = new Map<string, number>([[goal, 0]]);
-    let frontier = [goal];
-    while (frontier.length) {
-      const next: string[] = [];
-      for (const h of frontier)
-        for (const x of byId.get(h)?.neighbors ?? [])
-          if (!dist.has(x)) { dist.set(x, (dist.get(h) ?? 0) + 1); next.push(x); }
-      frontier = next;
-    }
-    let best: string | null = null, bestD = Infinity;
-    for (const nb of byId.get(from)?.neighbors ?? []) {
-      if (unitAt(combat, nb)) continue;                 // case occupée → pas franchissable
-      const d = dist.get(nb) ?? Infinity;
-      if (d < bestD) { bestD = d; best = nb; }
-    }
-    return best;
-  }
-
   // TOUR ADVERSE SCRIPTÉ — uniquement appelé pendant le tuto (via finishTurn). Pilote les
   // fonctions PUBLIQUES du moteur, comme un humain : avance d'un pas si besoin, puis frappe
   // UNE fois (un seul coup → dégâts prévisibles), puis rend la main à Alice.
@@ -658,7 +638,7 @@
     if (eId && lId) {
       if (!canAttack(combat, eId, lId)) {               // pas au contact → s'approcher (avance)
         const e = tunit(eId);
-        const step = e ? tutoStepToward(e.hex, tunitHex(lId)) : null;
+        const step = e ? stepToward(combat.map, e.hex, tunitHex(lId), new Set(combat.units.map((u) => u.hex))) : undefined;
         if (step) { const b = combat; const nm = unitName(tunit(eId)!); combat = resolveOverwatch(moveUnit(combat, eId, step), eId); pushLog(`${nm} se déplace`, 'bob'); diffLog(b, combat); }
       }
       if (canAttack(combat, eId, lId)) {                // frappe
@@ -727,27 +707,9 @@
   }
 
   // ── OBJECTIFS / SUCCÈS ─────────────────────────────────────────────────────
-  // Checklist d'onboarding détectée 100 % côté UI (le moteur reste intact) : un
-  // observateur compare l'état AVANT/APRÈS chaque coup ; un compteur d'attaques sert
-  // le seul objectif qui demande une attribution fine (× Bastion). Débloqués une fois
-  // pour toutes (localStorage) → « archivage ».
-  interface Objective { id: string; cat: 'Mécanique' | 'Duos & héros'; label: string }
-  const OBJECTIVES: Objective[] = [
-    { id: 'm_move', cat: 'Mécanique', label: 'Déplacer une pièce' },
-    { id: 'm_attack', cat: 'Mécanique', label: 'Attaquer un ennemi' },
-    { id: 'm_guard', cat: 'Mécanique', label: 'Mettre une Lourde en Garde' },
-    { id: 'm_reserve', cat: 'Mécanique', label: 'Réserver un tir (Tireur)' },
-    { id: 'm_riposte', cat: 'Mécanique', label: 'Armer une Riposte (Duelliste)' },
-    { id: 'm_status', cat: 'Mécanique', label: 'Infliger un statut (marque/estropié/silence/étourdi)' },
-    { id: 'm_resonance', cat: 'Mécanique', label: 'Déclencher une Résonance' },
-    { id: 'm_nemesis', cat: 'Mécanique', label: 'Tuer un Némésis' },
-    { id: 'm_win', cat: 'Mécanique', label: 'Gagner une partie' },
-    { id: 'h_estoc_bastion', cat: 'Duos & héros', label: 'Résonance Estoc × Bastion (épines)' },
-    { id: 'h_mireille', cat: 'Duos & héros', label: 'Déclencher une Résonance de Mireille' },
-    { id: 'h_bastion3', cat: 'Duos & héros', label: 'Frapper 3 fois avec Bastion' },
-    { id: 'h_fil_nemesis', cat: 'Duos & héros', label: 'Tuer son Némésis avec Fil' },
-  ];
-  const OBJ_CATS = ['Mécanique', 'Duos & héros'] as const;
+  // Checklist d'onboarding : la DÉTECTION est pure (`engine/objectives.ts`, diff d'état) ; la vue ne
+  // garde que l'effet de bord (localStorage + toast). `m_move`/`m_attack`/`h_bastion3` restent hookés
+  // sur TES actions (handlers + compteur `bastionHits`) → on ne crédite jamais un coup adverse.
   function loadAch(): Set<string> {
     try { const r = localStorage.getItem('achievements'); return new Set<string>(r ? JSON.parse(r) : []); }
     catch { return new Set<string>(); }
@@ -772,39 +734,15 @@
     justUnlocked = null;
   }
 
-  // Observateur : diff de `combat` à chaque coup → déduit les objectifs atteints.
+  // Observateur : diff de `combat` à chaque coup → la détection PURE (`detectUnlocks`) rend les ids
+  // nouvellement atteints ; la vue ne fait que les `unlock` (toast + archivage).
   let prevSnap: CombatState | undefined;
   $effect(() => {
     const cur = combat;             // dépendance suivie
     const prev = prevSnap;
     prevSnap = cur;
     if (!prev || prev === cur) return;
-    const pById = new Map(prev.units.map((u) => [u.id, u] as const));
-    for (const u of cur.units) {
-      const p = pById.get(u.id);
-      // (m_move / m_attack sont hookés sur TES actions — pas ici — pour ne pas créditer un coup adverse)
-      if (u.guarding && !p?.guarding) unlock('m_guard');
-      if (u.watching && !p?.watching) unlock('m_reserve');
-      if (u.riposting && !p?.riposting) unlock('m_riposte');
-      if ((u.mark && !p?.mark) || (u.cripple && !p?.cripple) || (u.silence && !p?.silence) || (u.stun && !p?.stun)) unlock('m_status');
-      if (p && u.cooldowns) for (const [rid, cd] of Object.entries(u.cooldowns)) {
-        if (cd > 0 && !((p.cooldowns?.[rid] ?? 0) > 0)) {     // un cooldown qui SAUTE de 0 → la Résonance vient de partir
-          unlock('m_resonance');
-          if (rid === 'epines_estoc_bastion') unlock('h_estoc_bastion');
-          if (u.characterId === 'mireille') unlock('h_mireille');
-        }
-      }
-    }
-    // Morts → kills de Némésis (le tueur = lastHitBy, même archétype, camp adverse).
-    for (const dead of prev.units) {
-      if (cur.units.some((u) => u.id === dead.id)) continue;
-      const killer = dead.lastHitBy ? prev.units.find((u) => u.id === dead.lastHitBy) : undefined;
-      if (killer && killer.kind === dead.kind && killer.owner !== dead.owner) {
-        unlock('m_nemesis');
-        if (killer.characterId === 'fil') unlock('h_fil_nemesis');
-      }
-    }
-    if (winner(cur) !== null) unlock('m_win');
+    for (const id of detectUnlocks(prev, cur, achievements)) unlock(id);
   });
 </script>
 
