@@ -74,7 +74,7 @@ export interface ReactionSpec {
   on: SignalType;                          // type de signal écouté
   scope: Scope;                            // portée : rayon autour de la source, ou toute l'escouade
   cooldown: number;                        // en tours du possesseur (0 = sans CD)
-  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine' | 'charge' | 'regen'; // effet (le moteur dispatch dessus)
+  kind: 'epines' | 'marquage' | 'estropier' | 'provocation' | 'vendetta' | 'ralliement' | 'etourdir' | 'ruee' | 'silence' | 'couverture' | 'appui' | 'racine' | 'charge' | 'regen' | 'soin'; // effet (le moteur dispatch dessus)
   amount?: number;                         // valeur par défaut de l'effet
   duration?: number;                       // durée d'un effet PERSISTANT (ex. marquage), en tours du possesseur
   amountBySource?: Record<string, number>;    // override selon l'ARCHÉTYPE de la source (Unit.kind)
@@ -600,6 +600,14 @@ function applyReaction(state: CombatState, p: PendingReaction): CombatState {
       const units = state.units.map((u) => {
         if (u.id === p.listenerId) return arm(u);
         if (u.id === p.targetId) return { ...u, root: { owner: target.owner, expiresIn: p.spec.duration ?? 2 } };
+        return u;
+      });
+      return { ...state, units };
+    }
+    case 'soin': { // SOUTIEN-SOIN : soigne INSTANTANÉMENT l'allié SOURCE de +amount PV, plafonné au maxHp. Pur soin (burst réactif).
+      const units = state.units.map((u) => {
+        if (u.id === p.listenerId) return arm(u);
+        if (u.id === p.sourceId) return { ...u, hp: Math.min(u.maxHp, u.hp + p.amount) };
         return u;
       });
       return { ...state, units };

@@ -166,12 +166,14 @@ describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve
     expect(['lourde', 'tireur', 'duelliste']).not.toContain('soigneur');
   });
 
-  it('Mélisse : 2e Soigneur, verbe Soin mais AUCUNE Résonance pour l\'instant (à créer)', () => {
+  it('Mélisse : 2e Soigneur, verbe Soin + SOIN instantané × 7 (burst réactif, pur soin)', () => {
     const m = makeUnitFromCharacter('a4', 'alice', 'X', CHARACTERS.melisse!, 4);
     expect(m.name).toBe('Mélisse');
     expect(m.kind).toBe('soigneur');
     expect(m.heal).toEqual({ cost: 3, amount: 4, range: 2 });
-    expect(m.reactions ?? []).toHaveLength(0); // pas encore de signature
+    expect(m.reactions!.every((r) => r.kind === 'soin')).toBe(true);
+    expect(m.reactions!.map((r) => r.fromCharacter))
+      .toEqual(['bastion', 'rempart', 'mireille', 'orso', 'fleche', 'estoc', 'fil']);
   });
 
   it('Baume & Mélisse sont deux Soigneurs (paire d\'archétype → Némésis mutuelle)', () => {
@@ -211,7 +213,11 @@ describe('pieces/Matrice — rangées des NOUVEAUX héros complétées (un posse
     }
   });
 
-  it('Mélisse reste vide (aucune Résonance)', () => {
-    expect(CHARACTERS.melisse!.reactions).toEqual([]);
+  it('les deux Soigneuses ont une rangée complète mais DISTINCTE (Baume régén, Mélisse soin instantané)', () => {
+    const baume = makeUnitFromCharacter('a', 'alice', 'Z', CHARACTERS.baume!, 4);
+    const melisse = makeUnitFromCharacter('b', 'bob', 'Z', CHARACTERS.melisse!, 4);
+    expect(baume.reactions!.every((r) => r.kind === 'regen')).toBe(true);
+    expect(melisse.reactions!.every((r) => r.kind === 'soin')).toBe(true);
+    expect(melisse.reactions).toHaveLength(7);
   });
 });

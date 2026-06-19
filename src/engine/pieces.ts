@@ -7,7 +7,7 @@
 // Tous les archétypes vivent sur cette même droite : aucun n'est strictement meilleur,
 // tout est positionnel. Les valeurs ci-dessous sont des LEVIERS, à affiner au jeu.
 
-import type { GuardProfile, OverwatchProfile, RiposteProfile, HealProfile, ReactionSpec, Unit } from './combat';
+import type { GuardProfile, OverwatchProfile, RiposteProfile, HealProfile, ReactionSpec, SignalType, Unit } from './combat';
 
 export interface Profile {
   range: number;      // portée d'attaque (cases)
@@ -314,8 +314,20 @@ const REGEN_BAUME_FIL: ReactionSpec = {
   id: 'regen_baume_fil', on: 'riposte', fromCharacter: 'fil',
   scope: { squad: true }, cooldown: 3, kind: 'regen', amount: 2, duration: 2,
 };
-// Mélisse (2ᵉ Soigneur) n'a PAS encore de Résonance — on lui en créera une (lot à venir).
-// NB : le Soigneur émet AUCUN signal (Soin = burst, regen = statut) → il est possesseur-only :
+// ── Héros MÉLISSE (Soigneur) = SOIN INSTANTANÉ (`kind: 'soin'`, burst réactif) : quand un allié agit
+//    (garde / tir réservé / riposte), Mélisse le soigne d'un coup de +4 PV (plafonné). Variante BURST
+//    du soin réactif (miroir de Baume = régén étalée). 7 duos = tous les non-Soigneurs. CD 3.
+const SOIN_AMOUNT = 4;
+const soinMelisse = (id: string, on: SignalType, fromCharacter: string): ReactionSpec =>
+  ({ id, on, fromCharacter, scope: { squad: true }, cooldown: 3, kind: 'soin', amount: SOIN_AMOUNT });
+const SOIN_MELISSE_BASTION = soinMelisse('soin_melisse_bastion', 'garde_encaissee', 'bastion');
+const SOIN_MELISSE_REMPART = soinMelisse('soin_melisse_rempart', 'garde_encaissee', 'rempart');
+const SOIN_MELISSE_MIREILLE = soinMelisse('soin_melisse_mireille', 'tir_reserve', 'mireille');
+const SOIN_MELISSE_ORSO = soinMelisse('soin_melisse_orso', 'tir_reserve', 'orso');
+const SOIN_MELISSE_FLECHE = soinMelisse('soin_melisse_fleche', 'tir_reserve', 'fleche');
+const SOIN_MELISSE_ESTOC = soinMelisse('soin_melisse_estoc', 'riposte', 'estoc');
+const SOIN_MELISSE_FIL = soinMelisse('soin_melisse_fil', 'riposte', 'fil');
+// NB : le Soigneur émet AUCUN signal (Soin = burst, regen/soin = effets) → il reste possesseur-only :
 // personne ne peut avoir un duo « × Baume/Mélisse » tant qu'un soin n'émet pas de signal.
 
 export interface Character {
@@ -340,7 +352,7 @@ export const CHARACTERS: Record<string, Character> = {
   fil:     { id: 'fil',     name: 'Fil',     archetype: 'duelliste', reactions: [VENDETTA_FIL_BASTION, VENDETTA_FIL_MIREILLE, VENDETTA_FIL_REMPART, VENDETTA_FIL_ORSO, VENDETTA_FIL_FLECHE] },
   fleche:  { id: 'fleche',  name: 'Flèche',  archetype: 'tireur', reactions: [MARQUAGE_FLECHE_BASTION, MARQUAGE_FLECHE_REMPART, MARQUAGE_FLECHE_ESTOC, MARQUAGE_FLECHE_FIL] },
   baume:   { id: 'baume',   name: 'Baume',   archetype: 'soigneur', reactions: [REGEN_BAUME_BASTION, REGEN_BAUME_REMPART, REGEN_BAUME_MIREILLE, REGEN_BAUME_ORSO, REGEN_BAUME_FLECHE, REGEN_BAUME_ESTOC, REGEN_BAUME_FIL] },
-  melisse: { id: 'melisse', name: 'Mélisse', archetype: 'soigneur', reactions: [] },
+  melisse: { id: 'melisse', name: 'Mélisse', archetype: 'soigneur', reactions: [SOIN_MELISSE_BASTION, SOIN_MELISSE_REMPART, SOIN_MELISSE_MIREILLE, SOIN_MELISSE_ORSO, SOIN_MELISSE_FLECHE, SOIN_MELISSE_ESTOC, SOIN_MELISSE_FIL] },
 };
 
 /** Calque d'un personnage par-dessus le socle de classe (nom, stats, Résonances signature). */

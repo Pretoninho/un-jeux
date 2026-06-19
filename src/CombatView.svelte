@@ -41,13 +41,13 @@
   const CHAR_NAME: Record<string, string> = Object.fromEntries(Object.values(CHARACTERS).map((c) => [c.id, c.name]));
   const KIND_GLYPH: Record<string, string> = Object.fromEntries(Object.values(ARCHETYPES).map((a) => [a.key, a.glyph]));
   // « Résonance » : libellés courts pour les passifs en chaîne (effet + déclencheur).
-  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence', couverture: 'Couverture', appui: 'Appui-feu', racine: 'Enracinement', charge: 'Charge' };
+  const RESON_LABEL: Record<string, string> = { epines: 'Épines relayées', marquage: 'Marquage', estropier: 'Estropier', provocation: 'Provocation', vendetta: 'Vendetta', ralliement: 'Ralliement', etourdir: 'Coup étourdissant', ruee: 'Ruée', silence: 'Silence', couverture: 'Couverture', appui: 'Appui-feu', racine: 'Enracinement', charge: 'Charge', regen: 'Régénération', soin: 'Soin instantané' };
   const SIGNAL_LABEL: Record<string, string> = { garde_encaissee: 'Allié en garde touché', tir_reserve: 'Tir réservé déclenché', rale: 'Allié tué', riposte: 'Riposte déclenchée' };
   // Matrice de Résonance : une icône par EFFET (kind) + le vivier ordonné (lignes = possesseur, colonnes = déclencheur).
   // Matrice : chaque EFFET de duo → un pictogramme SVG (clé du snippet `stateGlyph`) + une couleur
   // de pastille selon l'INTENTION (rouge = nuit à l'ennemi · vert = soutient un allié · bleu = déplacement).
-  const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui', racine: 'root', charge: 'charge' };
-  const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', charge: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad' };
+  const EFFECT_GLYPH: Record<string, string> = { epines: 'epines', marquage: 'mark', estropier: 'cripple', provocation: 'provocation', vendetta: 'vendetta', ralliement: 'ralliement', etourdir: 'stun', ruee: 'ruee', silence: 'silence', couverture: 'cover', appui: 'appui', racine: 'root', charge: 'charge', regen: 'heal', soin: 'heal' };
+  const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', charge: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad', regen: '#2a9d76', soin: '#2a9d76' };
   const HEROES = Object.values(CHARACTERS);
   // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
   const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
@@ -823,6 +823,8 @@
       <path d="M7.8 4 H17 L14 7.5 L17 11 H7.8 Z" fill="#fff" />
     {:else if key === 'ruee'}
       <path d="M5 5 L12 12 L5 19 M12 5 L19 12 L12 19" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+    {:else if key === 'heal'}
+      <path d="M9.5 4 H14.5 V9.5 H20 V14.5 H14.5 V20 H9.5 V14.5 H4 V9.5 H9.5 Z" fill="#fff" />
     {/if}
   {/snippet}
   <div class="layout">
@@ -1005,6 +1007,10 @@
                   <div class="amt">le possesseur gagne +{rx.amount ?? 1} déplacement · {rx.duration ?? 1} tour(s)</div>
                 {:else if rx.kind === 'appui'}
                   <div class="amt">+{rx.amount ?? 1} dégâts aux attaques de l'allié · {rx.duration ?? 2} tours</div>
+                {:else if rx.kind === 'regen'}
+                  <div class="amt">régénère l'allié de +{rx.amount ?? 1} PV/tour · {rx.duration ?? 2} tours (plafonné)</div>
+                {:else if rx.kind === 'soin'}
+                  <div class="amt">soigne l'allié de +{rx.amount ?? 1} PV instantanément (plafonné)</div>
                 {:else}
                   <div class="amt">Dégâts {rx.amount ?? 1}{#if rx.amountBySource} · selon classe : {Object.entries(rx.amountBySource).map(([k, v]) => `${KIND_NAME[k] ?? k} ${v}`).join(', ')}{/if}{#if rx.amountByCharacter} · selon héros : {Object.entries(rx.amountByCharacter).map(([k, v]) => `${CHAR_NAME[k] ?? k} ${v}`).join(', ')}{/if}</div>
                 {/if}

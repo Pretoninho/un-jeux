@@ -123,15 +123,16 @@
 - **SOIGNEUR — 4ᵉ archétype LIVRÉ (2026-06-18, EN RÉSERVE)** : support « **pur soin** » (sur-droite
   **tier 3** : portée 3 / PV 10 / dégâts 3, `moveCap: 4`). **IDENTITÉ DE RANGÉE = PUR SOIN** : son
   verbe ET toutes ses Résonances ne font QUE soigner — **jamais** de contrôle/dégâts/buff offensif
-  (≠ Lourde=mobilité, Tireur=contrôle, Duelliste=burst). **2 facettes du soin** : (1) verbe **Soin**
+  (≠ Lourde=mobilité, Tireur=contrôle, Duelliste=burst). **3 facettes du soin** : (1) verbe **Soin**
   (burst payé) ; (2) effet réactif **`regen`** = statut `Unit.regen` (HoT) qui rend `+amount` PV **au
-  rechargement** pendant `duration` tours (plafonné, tické à `endTurn`, comme `cover` pour les PA) —
-  vise l'allié **SOURCE** du signal. **EN RÉSERVE** : présent dans `CHARACTERS`/`ARCHETYPES` mais
-  **PAS dans les `SLOTS`** de l'escouade par défaut (non fieldable, **pas d'UI/IA** — différés au lot
-  « fielder le Soigneur »). **2 héros (paire)** : **Baume** — signature **`regen`** (× Bastion,
-  `garde_encaissee` → +2×2, soin réactif) — et **Mélisse** — **AUCUNE Résonance pour l'instant**
-  (`reactions: []`, on lui en créera une au prochain lot). → **Némésis Soigneur↔Soigneur (Baume↔Mélisse)
-  ACTIVE** automatiquement (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`).
+  rechargement** pendant `duration` tours (plafonné, tické à `endTurn`) ; (3) effet réactif **`soin`** =
+  soin **instantané** (+amount PV plafonné, posé tout de suite) — (2) et (3) visent l'allié **SOURCE** du
+  signal. **EN RÉSERVE** : présent dans `CHARACTERS`/`ARCHETYPES` mais **PAS dans les `SLOTS`** de
+  l'escouade par défaut (non fieldable, IA/fielding différés ; libellés/glyphe UI `regen`/`soin` posés).
+  **2 héros (paire), rangées PLEINES + DISTINCTES** : **Baume** = **`regen`** × 7 (régén étalée, +2×2) ;
+  **Mélisse** = **`soin`** × 7 (burst instantané, +4) — *Baume soigne dans la durée, Mélisse recolle d'un
+  coup* (miroir burst/sustain, comme Bastion/Rempart pour la charge). → **Némésis Soigneur↔Soigneur
+  (Baume↔Mélisse) ACTIVE** automatiquement (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`).
   *Stats/nombres à affiner au playtest.*
 - **Effectif** : escouade par défaut = Lourde + Tireur + **Duelliste** (3/camp). Le **Soigneur** (4ᵉ
   archétype) est **créé mais en réserve** (pas encore dans l'escouade — passage à 4 = lot ultérieur).

@@ -1492,6 +1492,34 @@ describe('combat — Résonance Baume × Bastion (regen, soin réactif — pur s
   });
 });
 
+describe('combat — Résonance Mélisse × Bastion (soin instantané — pur soin, burst)', () => {
+  const bastionGuard = (over: Partial<Unit> = {}): Unit =>
+    u({ id: 'bastion', owner: 'alice', hex: 'B', kind: 'lourde', characterId: 'bastion',
+        guard: { cost: 3, damageTakenMul: 0.5 }, guarding: true, hp: 6, maxHp: 16, ...over });
+  const melisse = (over: Partial<Unit> = {}): Unit =>
+    ({ ...makeUnitFromCharacter('melisse', 'alice', 'A', CHARACTERS.melisse!, 4), ...over });
+
+  it('Bastion encaisse en garde → Mélisse le soigne INSTANTANÉMENT (+4) + CD', () => {
+    const st = makeCombatState(LINE, [
+      bastionGuard(), melisse(),
+      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 4 }),
+    ], 'bob');
+    const s = attack(st, 'foe', 'bastion');           // garde : 6 − 2 = 4, puis soin +4 → 8
+    expect(unitById(s, 'bastion')!.hp).toBe(8);
+    expect(unitById(s, 'bastion')!.regen).toBeUndefined(); // soin INSTANTANÉ (pas un HoT)
+    expect(unitById(s, 'melisse')!.cooldowns!.soin_melisse_bastion).toBe(3);
+  });
+
+  it('le soin instantané plafonne au maxHp', () => {
+    const st = makeCombatState(LINE, [
+      bastionGuard({ hp: 15 }), melisse(),
+      u({ id: 'foe', owner: 'bob', hex: 'C', ap: 4, hp: 10, damage: 2 }),
+    ], 'bob');
+    const s = attack(st, 'foe', 'bastion');           // 15 − 1 = 14, soin +4 → cap 16
+    expect(unitById(s, 'bastion')!.hp).toBe(16);
+  });
+});
+
 describe('combat — Némésis Soigneur↔Soigneur (Baume ↔ Mélisse)', () => {
   const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
     ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
