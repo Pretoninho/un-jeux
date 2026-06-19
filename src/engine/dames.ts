@@ -123,7 +123,7 @@ export const idx = (x: number, y: number): number => y * SIZE + x;
 export const xy = (i: number): { x: number; y: number } => ({ x: i % SIZE, y: Math.floor(i / SIZE) });
 const inBounds = (x: number, y: number): boolean => x >= 0 && x < SIZE && y >= 0 && y < SIZE;
 
-/** Cases jouables au DÉPART = cases foncées (somme des coordonnées impaire). */
+/** Cases « foncées » (somme des coordonnées impaire) — sert au damier décoratif et à l'orientation. */
 export const isDark = (x: number, y: number): boolean => (x + y) % 2 === 1;
 
 const other = (p: Player): Player => (p === 'b' ? 'n' : 'b');
@@ -141,14 +141,21 @@ function orient(dirs: readonly Vec[], player: Player, forwardOnly: boolean): rea
 
 // ---- Position de départ ---------------------------------------------------
 
-/** Position initiale : 3 rangées de pions par camp sur les cases foncées ; blanc joue. */
+/** Nombre de rangées PLEINES déployées par camp (plateau « toutes cases »). */
+export const START_ROWS = 2;
+
+/**
+ * Position initiale — plateau « TOUTES CASES » (variante exagérée) : les pièces occupent les 64
+ * cases, pas seulement les foncées. `START_ROWS` rangées pleines par camp (toutes colonnes) ; le
+ * déplacement reste diagonal → les pions vivent sur deux trames de couleur entrelacées, et seule
+ * la dame ÉQUERRE (prise orthogonale) franchit la frontière de couleur. Blanc joue.
+ */
 export function initialState(): DamesState {
   const board: (Piece | null)[] = new Array(SIZE * SIZE).fill(null);
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      if (!isDark(x, y)) continue;
-      if (y <= 2) board[idx(x, y)] = { player: 'n', kind: 'pion' };
-      else if (y >= SIZE - 3) board[idx(x, y)] = { player: 'b', kind: 'pion' };
+      if (y < START_ROWS) board[idx(x, y)] = { player: 'n', kind: 'pion' };
+      else if (y >= SIZE - START_ROWS) board[idx(x, y)] = { player: 'b', kind: 'pion' };
     }
   }
   return { board, turn: 'b' };

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   initialState, legalMoves, movesForPiece, applyMove, winner, isPromoting,
-  idx, xy, isDark, SIZE, KINDS, PROMOTION_KINDS,
+  idx, xy, SIZE, KINDS, PROMOTION_KINDS,
   type DamesState, type Piece, type Move,
 } from './dames';
 
@@ -13,18 +13,17 @@ const stateWith = (place: (b: (Piece | null)[]) => void, turn: 'b' | 'n' = 'b'):
 };
 const find = (ms: Move[], from: number, to: number) => ms.find((m) => m.from === from && m.to === to);
 
-describe('position de départ', () => {
-  it('place 12 pions par camp sur cases foncées', () => {
+describe('position de départ (plateau « toutes cases »)', () => {
+  it('place 16 pions par camp sur 2 rangées pleines', () => {
     const s = initialState();
-    expect(s.board.filter((p) => p && p.player === 'b').length).toBe(12);
-    expect(s.board.filter((p) => p && p.player === 'n').length).toBe(12);
-    s.board.forEach((p, i) => { if (p) expect(isDark(xy(i).x, xy(i).y)).toBe(true); });
+    expect(s.board.filter((p) => p && p.player === 'b').length).toBe(16); // 2 rangées × 8 colonnes
+    expect(s.board.filter((p) => p && p.player === 'n').length).toBe(16);
     expect(s.board.every((p) => !p || p.kind === 'pion')).toBe(true);
     expect(s.turn).toBe('b');
   });
 
-  it('ouverture blanche = 7 coups', () => {
-    expect(legalMoves(initialState()).length).toBe(7);
+  it('ouverture blanche = 14 coups (la rangée de front avance en diagonale)', () => {
+    expect(legalMoves(initialState()).length).toBe(14);
   });
 });
 

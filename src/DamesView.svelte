@@ -147,11 +147,12 @@
   </div>
 
   <p class="hint">
-    Hotseat. Clique une de tes pièces puis une case en surbrillance
-    (<span class="dot move"></span> déplacement, <span class="dot cap"></span> prise). Prise obligatoire, rafles
-    enchaînées. <strong>Pion</strong> : avant seulement. <strong>Dame</strong> (1 case avant/arrière) — à la
-    promotion tu choisis : ♛ standard, ⇕ <em>bondissante</em> (2 cases), ⇇ <em>perce-ligne</em> (prend 2 alignés),
-    ✛ <em>équerre</em> (prend en orthogonal).
+    Hotseat — plateau <strong>« toutes cases »</strong> (les pièces occupent les 64 cases). Clique une de tes
+    pièces puis une case en surbrillance (<span class="dot move"></span> déplacement,
+    <span class="dot cap"></span> prise). Prise obligatoire, rafles enchaînées. <strong>Pion</strong> : avance en
+    diagonale, avant seulement. <strong>Dame</strong> (1 case avant/arrière) — à la promotion tu choisis :
+    ♛ standard, ⇕ <em>bondissante</em> (2 cases), ⇇ <em>perce-ligne</em> (prend 2 alignés),
+    ✛ <em>équerre</em> (prend en orthogonal — la seule à franchir la couleur).
   </p>
 </div>
 
