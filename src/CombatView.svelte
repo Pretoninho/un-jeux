@@ -79,7 +79,6 @@
     if (u.riposting) s.push({ key: 'riposte', fam: 'posture', label: 'Riposte armée' });
     if (u.block) s.push({ key: 'block', fam: 'bonus', label: `Bloqué — immunité totale aux dégâts (${u.block.expiresIn} t.)` });
     if (u.vendetta) s.push({ key: 'vendetta', fam: 'bonus', label: `Vendetta — +${u.vendetta} à sa prochaine attaque` });
-    if (u.elan) s.push({ key: 'elan', fam: 'bonus', label: `Élan (Némésis) — +${u.elan} PA au prochain tour` });
     if (u.cover) s.push({ key: 'cover', fam: 'bonus', label: `Couverture — +${u.cover.amount} PA/tour (${u.cover.expiresIn} t.)` });
     if (u.appui) s.push({ key: 'appui', fam: 'bonus', label: `Appui-feu — +${u.appui.amount} dégâts (${u.appui.expiresIn} t.)` });
     if (u.haste) s.push({ key: 'charge', fam: 'bonus', label: `Chargé — +${u.haste.amount} déplacement (${u.haste.expiresIn} t.)` });
@@ -335,8 +334,6 @@
 
   const champ = $derived(winner(combat));
   const over = $derived(champ !== null);
-  // Némésis = ennemi(s) du MÊME archétype présent(s) sur le plateau (rivalité automatique).
-  const nemesisOf = (u: Unit): Unit[] => combat.units.filter((x) => x.kind === u.kind && x.owner !== u.owner);
   const selected = $derived(combat.units.find((u) => u.id === selectedId && u.owner === combat.active));
   const reach = $derived(over || aiThinking || !selected ? new Map<string, number>() : reachable(combat, selected.id, moveBudget(selected)));
 
@@ -765,8 +762,6 @@
     {:else if key === 'vendetta'}
       <path d="M12 3 V14 M8.4 14 H15.6 M12 14 V18" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
       <circle cx="12" cy="19.6" r="1.7" fill="#fff" />
-    {:else if key === 'elan'}
-      <path d="M13 2 L5 13 H10.5 L9 22 L18.5 10 H12 Z" fill="#fff" />
     {:else if key === 'cover'}
       <rect x="4" y="8" width="13.5" height="8" rx="1.6" fill="none" stroke="#fff" stroke-width="2" />
       <rect x="18.4" y="10.4" width="2.6" height="3.2" rx="0.6" fill="#fff" />
@@ -988,7 +983,7 @@
                 {:else if rx.kind === 'ruee'}
                   <div class="amt">le possesseur avance de {rx.amount ?? 1} case vers la cible</div>
                 {:else if rx.kind === 'silence'}
-                  <div class="amt">silence la cible : déplacement uniquement (ni attaque/verbe/Résonance/élan) · {rx.duration ?? 2} tours</div>
+                  <div class="amt">silence la cible : déplacement uniquement (ni attaque/verbe/Résonance) · {rx.duration ?? 2} tours</div>
                 {:else if rx.kind === 'racine'}
                   <div class="amt">enracine la cible : déplacement → 0 (attaques/verbes intacts) · {rx.duration ?? 2} tours</div>
                 {:else if rx.kind === 'couverture'}
@@ -1015,8 +1010,6 @@
       <div class="panel ally" style="--c:{COLORS[combat.active]}">
         {#if selected}
           <div class="phead"><span class="pdot"></span>{selected.name ?? KIND_NAME[selected.kind]} <span class="powner">· {KIND_NAME[selected.kind]} · {NAMES[selected.owner]}</span></div>
-          {@const nem = nemesisOf(selected)}
-          <div class="nemesis small">⚔ Némésis : <b>{nem.length ? nem.map((n) => n.name ?? KIND_NAME[n.kind]).join(', ') : '—'}</b></div>
           <div class="pv">PV <b>{selected.hp}/{selected.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * selected.hp / selected.maxHp)}%; background:{selected.hp / selected.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -1042,9 +1035,6 @@
           {/if}
           {#if selected.stun}
             <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
-          {/if}
-          {#if selected.elan}
-            <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{selected.elan} PA au prochain tour</span></div>
           {/if}
           {#if selected.silence}
             <div class="ptags"><span class="tag s">🔇 Silencé — déplacement uniquement (⏳{selected.silence.expiresIn})</span></div>
@@ -1090,8 +1080,6 @@
       <div class="panel foe" style="--c:{foe ? COLORS[foe.owner] : '#3a4150'}">
         {#if foe}
           <div class="phead"><span class="pdot"></span>{foe.name ?? KIND_NAME[foe.kind]} <span class="powner">· {KIND_NAME[foe.kind]} · {NAMES[foe.owner]}</span></div>
-          {@const nem = nemesisOf(foe)}
-          <div class="nemesis small">⚔ Némésis : <b>{nem.length ? nem.map((n) => n.name ?? KIND_NAME[n.kind]).join(', ') : '—'}</b></div>
           <div class="pv">PV <b>{foe.hp}/{foe.maxHp}</b>
             <span class="bar"><span style="width:{Math.max(0, 100 * foe.hp / foe.maxHp)}%; background:{foe.hp / foe.maxHp > 0.4 ? '#5ab0a0' : '#e0604a'}"></span></span>
           </div>
@@ -1117,9 +1105,6 @@
           {/if}
           {#if foe.stun}
             <div class="ptags"><span class="tag k">😵 Étourdi — ne joue pas ce tour</span></div>
-          {/if}
-          {#if foe.elan}
-            <div class="ptags"><span class="tag e">⚡ Élan (Némésis) — +{foe.elan} PA au prochain tour</span></div>
           {/if}
           {#if foe.silence}
             <div class="ptags"><span class="tag s">🔇 Silencé — déplacement uniquement (⏳{foe.silence.expiresIn})</span></div>
@@ -1205,11 +1190,9 @@
                 <th class="rowhead" title={KIND_NAME[row.archetype]}><span class="mk">{KIND_GLYPH[row.archetype]}</span> {row.name}</th>
                 {#each HEROES as col}
                   {@const duo = row.id === col.id ? undefined : row.reactions?.find((r) => r.fromCharacter === col.id)}
-                  {@const nemesis = row.id !== col.id && row.archetype === col.archetype}
-                  <td class:self={row.id === col.id} class:has={!!duo} class:nemcell={nemesis}>
+                  <td class:self={row.id === col.id} class:has={!!duo}>
                     {#if row.id === col.id}<span class="diag">·</span>
-                    {:else if duo}<svg class="cellico" viewBox="0 0 24 24" width="22" height="22" role="img" aria-label={RESON_LABEL[duo.kind] ?? duo.kind}><title>{`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}</title><circle cx="12" cy="12" r="11.5" fill={EFFECT_COLOR[duo.kind] ?? '#3a8a76'} stroke="#0e1015" stroke-width="1" />{@render stateGlyph(EFFECT_GLYPH[duo.kind] ?? duo.kind)}</svg>
-                    {:else if nemesis}<span class="nemmark" title={`${row.name} × ${col.name} — Némésis (même archétype : ennemis, jamais coéquipiers)`}>N</span>{/if}
+                    {:else if duo}<svg class="cellico" viewBox="0 0 24 24" width="22" height="22" role="img" aria-label={RESON_LABEL[duo.kind] ?? duo.kind}><title>{`${row.name} × ${col.name} — ${RESON_LABEL[duo.kind] ?? duo.kind}\nsur « ${SIGNAL_LABEL[duo.on] ?? duo.on} » · ${'radius' in duo.scope ? `rayon ${duo.scope.radius}` : 'escouade'} · CD ${duo.cooldown}`}</title><circle cx="12" cy="12" r="11.5" fill={EFFECT_COLOR[duo.kind] ?? '#3a8a76'} stroke="#0e1015" stroke-width="1" />{@render stateGlyph(EFFECT_GLYPH[duo.kind] ?? duo.kind)}</svg>{/if}
                   </td>
                 {/each}
               </tr>
@@ -1220,7 +1203,6 @@
           {#each Object.entries(EFFECT_GLYPH) as [kind, gk]}
             <span class="legico"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="11.5" fill={EFFECT_COLOR[kind] ?? '#3a8a76'} />{@render stateGlyph(gk)}</svg> {RESON_LABEL[kind] ?? kind}</span>
           {/each}
-          <span class="legico"><b class="nemmark">N</b> Némésis (même archétype)</span>
         </div>
       </div>
     {/if}
@@ -1338,10 +1320,9 @@
       </ul>
       <p class="muted small">Le détail d'un verbe s'affiche en <b>survolant son bouton</b> dans le panneau.</p>
 
-      <h3>✦ Résonance &amp; Némésis</h3>
+      <h3>✦ Résonance</h3>
       <ul>
         <li><b>Résonance</b> : des <b>synergies entre alliés</b> se déclenchent automatiquement (panneau <b>✦ Matrice</b> en bas).</li>
-        <li><b>Némésis</b> : tuer l'ennemi du <b>même archétype</b> (le <b>N</b> de la matrice) donne un <b>élan de PA</b> à ton équipe.</li>
       </ul>
 
       <h3>🔍 Repères</h3>
@@ -1524,8 +1505,6 @@
   .resdetail .amt { color: #8d84a8; margin-top: .1rem; }
   .muted { color: #7a8294; }
   .small { font-size: .78rem; }
-  .nemesis { color: #c98a8a; margin: .15rem 0 .35rem; }
-  .nemesis b { color: #e0a0a0; }
   .hint { padding: 0 .2rem; }
 
   /* Matrice de Résonance (panneau dépliable, pleine largeur) */
@@ -1558,8 +1537,6 @@
   table.matrix .mk { color: #8a93a6; font-size: .72rem; }
   table.matrix td.self { background: #0e1015; }
   table.matrix td.has { background: #221d33; }
-  table.matrix td.nemcell { background: #2a1a1e; }
-  .nemmark { color: #e0a0a0; font-weight: 700; cursor: help; }
   .cellico { display: block; margin: 0 auto; cursor: help; }
   table.matrix .diag { color: #3a4150; }
   .matrix-legend { display: flex; flex-wrap: wrap; gap: .2rem 1rem; margin-top: .5rem; }

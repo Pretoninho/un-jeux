@@ -936,7 +936,7 @@ describe('combat — Résonance Fil × Orso (ruée — inverse de la provocation
   });
 });
 
-describe('combat — attribution du kill (lastHitBy, fondation Némésis)', () => {
+describe('combat — attribution du kill (lastHitBy)', () => {
   it('une attaque marque la cible comme touchée par l\'attaquant', () => {
     const s = attack(fresh('A', 'B', 4), 'a', 'b');
     expect(unitById(s, 'b')!.lastHitBy).toBe('a');
@@ -982,55 +982,6 @@ describe('combat — attribution du kill (lastHitBy, fondation Némésis)', () =
     const s = attack(base, 'a', 'b');
     expect(unitById(s, 'b')!.hp).toBe(10);          // immunité : 0 dégât
     expect(unitById(s, 'b')!.lastHitBy).toBe('x');  // inchangé
-  });
-});
-
-describe('combat — Némésis (tuer un ennemi du même archétype → élan d\'équipe)', () => {
-  it('tuer son Némésis donne un élan de PA à toute l\'équipe du tueur (+ CD sur le tueur)', () => {
-    const base = makeCombatState(LINE, [
-      u({ id: 'k', owner: 'alice', hex: 'B', kind: 'duelliste', ap: 4, damage: 9 }),  // tueur
-      u({ id: 'mate', owner: 'alice', hex: 'A', kind: 'tireur' }),                     // coéquipier
-      u({ id: 'v', owner: 'bob', hex: 'C', kind: 'duelliste', hp: 9, maxHp: 9 }),      // Némésis (même archétype)
-    ], 'alice');
-    const s = attack(base, 'k', 'v');
-    expect(unitById(s, 'v')).toBeUndefined();              // tué
-    expect(unitById(s, 'k')!.elan).toBe(1);               // Duelliste (9 PV) → +1
-    expect(unitById(s, 'mate')!.elan).toBe(1);            // toute l'escouade
-    expect(unitById(s, 'k')!.cooldowns!.nemesis).toBe(2); // CD sur le tueur (revival-ready)
-  });
-
-  it('échelonné sur la robustesse : tuer une Lourde Némésis donne +2', () => {
-    const base = makeCombatState(LINE, [
-      u({ id: 'k', owner: 'alice', hex: 'B', kind: 'lourde', ap: 4, damage: 16 }),
-      u({ id: 'v', owner: 'bob', hex: 'C', kind: 'lourde', hp: 16, maxHp: 16 }),
-    ], 'alice');
-    expect(unitById(attack(base, 'k', 'v'), 'k')!.elan).toBe(2);
-  });
-
-  it('tuer un ennemi d\'un AUTRE archétype ne donne aucun élan (pas un Némésis)', () => {
-    const base = makeCombatState(LINE, [
-      u({ id: 'k', owner: 'alice', hex: 'B', kind: 'duelliste', ap: 4, damage: 9 }),
-      u({ id: 'v', owner: 'bob', hex: 'C', kind: 'tireur', hp: 7, maxHp: 7 }),
-    ], 'alice');
-    expect(unitById(attack(base, 'k', 'v'), 'k')!.elan ?? 0).toBe(0);
-  });
-
-  it('récompense en cooldown → pas de nouvel élan', () => {
-    const base = makeCombatState(LINE, [
-      u({ id: 'k', owner: 'alice', hex: 'B', kind: 'duelliste', ap: 4, damage: 9, cooldowns: { nemesis: 1 } }),
-      u({ id: 'v', owner: 'bob', hex: 'C', kind: 'duelliste', hp: 9, maxHp: 9 }),
-    ], 'alice');
-    expect(unitById(attack(base, 'k', 'v'), 'k')!.elan ?? 0).toBe(0);
-  });
-
-  it('l\'élan ajoute des PA au prochain rechargement, puis se consomme', () => {
-    const st = makeCombatState(LINE, [
-      u({ id: 'a', owner: 'alice', hex: 'A', ap: 1, elan: 2 }),
-      u({ id: 'b', owner: 'bob', hex: 'E' }),
-    ], 'bob');
-    const aliceTurn = endTurn(st, 4);                       // → alice : 4 + 2 = 6
-    expect(unitById(aliceTurn, 'a')!.ap).toBe(6);
-    expect(unitById(aliceTurn, 'a')!.elan).toBeUndefined(); // consommé
   });
 });
 
@@ -1517,22 +1468,6 @@ describe('combat — Résonance Mélisse × Bastion (soin instantané — pur so
     ], 'bob');
     const s = attack(st, 'foe', 'bastion');           // 15 − 1 = 14, soin +4 → cap 16
     expect(unitById(s, 'bastion')!.hp).toBe(16);
-  });
-});
-
-describe('combat — Némésis Soigneur↔Soigneur (Baume ↔ Mélisse)', () => {
-  const hero = (id: string, owner: string, hex: string, over: Partial<Unit> = {}): Unit =>
-    ({ ...makeUnitFromCharacter(id, owner, hex, CHARACTERS[id]!, 4), ...over });
-
-  it('Némésis : Baume achève Mélisse (camps opposés, même archétype) → élan au tueur', () => {
-    const st = makeCombatState(LINE, [
-      hero('baume', 'alice', 'B', { damage: 20 }),       // tueur (force l'élimination)
-      hero('melisse', 'bob', 'C', { hp: 4, maxHp: 10 }), // sa Némésis (Soigneur adverse)
-    ], 'alice');
-    const s = attack(st, 'baume', 'melisse');
-    expect(unitAt(s, 'C')).toBeUndefined();         // Mélisse retirée
-    expect(unitById(s, 'baume')!.elan).toBe(1);     // round(10/8) = 1
-    expect(unitById(s, 'baume')!.cooldowns!.nemesis).toBe(2);
   });
 });
 

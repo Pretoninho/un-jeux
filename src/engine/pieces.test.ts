@@ -176,7 +176,7 @@ describe('pieces/Soigneur — 4e archétype, support « pur soin » (en réserve
       .toEqual(['bastion', 'rempart', 'mireille', 'orso', 'fleche', 'estoc', 'fil']);
   });
 
-  it('Baume & Mélisse sont deux Soigneurs (paire d\'archétype → Némésis mutuelle)', () => {
+  it('Baume & Mélisse sont deux Soigneurs (même archétype)', () => {
     expect(CHARACTERS.baume!.archetype).toBe('soigneur');
     expect(CHARACTERS.melisse!.archetype).toBe('soigneur');
   });

@@ -24,12 +24,10 @@ export const OBJECTIVES: Objective[] = [
   { id: 'm_riposte', cat: 'Mécanique', label: 'Armer une Riposte (Duelliste)' },
   { id: 'm_status', cat: 'Mécanique', label: 'Infliger un statut (marque/estropié/silence/étourdi)' },
   { id: 'm_resonance', cat: 'Mécanique', label: 'Déclencher une Résonance' },
-  { id: 'm_nemesis', cat: 'Mécanique', label: 'Tuer un Némésis' },
   { id: 'm_win', cat: 'Mécanique', label: 'Gagner une partie' },
   { id: 'h_estoc_bastion', cat: 'Duos & héros', label: 'Résonance Estoc × Bastion (épines)' },
   { id: 'h_mireille', cat: 'Duos & héros', label: 'Déclencher une Résonance de Mireille' },
   { id: 'h_bastion3', cat: 'Duos & héros', label: 'Frapper 3 fois avec Bastion' },
-  { id: 'h_fil_nemesis', cat: 'Duos & héros', label: 'Tuer son Némésis avec Fil' },
 ];
 
 export const OBJ_CATS = ['Mécanique', 'Duos & héros'] as const;
@@ -40,7 +38,6 @@ export const OBJ_CATS = ['Mécanique', 'Duos & héros'] as const;
  *  - postures armées (garde / tir réservé / riposte) ;
  *  - statut subi (marque / estropié / silence / étourdi) ;
  *  - Résonance partie (un cooldown qui saute de 0 → >0) + duos signature (Estoc×Bastion, Mireille) ;
- *  - kill de Némésis (mort dont `lastHitBy` = même archétype, camp adverse) + Fil ;
  *  - victoire.
  * `m_move`/`m_attack`/`h_bastion3` sont volontairement ABSENTS (déclenchés côté joueur).
  */
@@ -61,16 +58,6 @@ export function detectUnlocks(prev: CombatState, cur: CombatState, alreadyUnlock
         if (rid === 'epines_estoc_bastion') add('h_estoc_bastion');
         if (u.characterId === 'mireille') add('h_mireille');
       }
-    }
-  }
-
-  // Morts → kills de Némésis (le tueur = lastHitBy, même archétype, camp adverse).
-  for (const dead of prev.units) {
-    if (cur.units.some((u) => u.id === dead.id)) continue;
-    const killer = dead.lastHitBy ? prev.units.find((u) => u.id === dead.lastHitBy) : undefined;
-    if (killer && killer.kind === dead.kind && killer.owner !== dead.owner) {
-      add('m_nemesis');
-      if (killer.characterId === 'fil') add('h_fil_nemesis');
     }
   }
 

@@ -150,9 +150,8 @@ export interface Unit {
   block?: { owner: string; expiresIn: number }; // immunité TOTALE aux dégâts, bornée (ex. Fil × Mireille)
   stunCharge?: { owner: string; expiresIn: number; stun: number }; // « Coup étourdissant » armé : SA prochaine attaque étourdit `stun` tour(s) (ex. Fil × Rempart)
   stun?: { owner: string; expiresIn: number };  // étourdi : PA forcés à 0 + Résonances silencées tant qu'actif
-  lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (Némésis, primes…)
-  elan?: number;                       // bonus de PA en attente, appliqué au PROCHAIN rechargement (récompense Némésis)
-  silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance, ni élan)
+  lastHitBy?: string;                  // qui a infligé les DERNIERS dégâts → attribution du kill (primes, futures mécaniques…)
+  silence?: { owner: string; expiresIn: number }; // silencé : ne peut QUE se déplacer (ni attaque, ni verbe, ni Résonance)
   cover?: { owner: string; expiresIn: number; amount: number }; // « couverture » : +amount PA à chaque rechargement, borné (ex. Mireille × Rempart)
   appui?: { owner: string; expiresIn: number; amount: number }; // « appui-feu » : +amount dégâts à SES attaques, borné (ex. Mireille × Fil)
   root?: { owner: string; expiresIn: number }; // « enraciné » : déplacement → 0 (attaques/verbes intacts), borné (ex. Orso × Bastion)
@@ -283,7 +282,7 @@ export function graphDistance(map: GameMap, from: HexId, to: HexId): number {
  * `attackerId` (du camp actif) peut-il attaquer `targetId` ? Cible adverse, dans la portée
  * DE L'ATTAQUANT, et assez de PA pour son coût d'attaque.
  */
-/** Silencée ? — ne peut QUE se déplacer (attaque, verbes, Résonances, élan Némésis coupés). */
+/** Silencée ? — ne peut QUE se déplacer (attaque, verbes, Résonances coupés). */
 export function isSilenced(u: Unit): boolean {
   return (u.silence?.expiresIn ?? 0) > 0;
 }
@@ -399,31 +398,9 @@ function reap(state: CombatState): CombatState {
     s = { ...s, units: s.units.filter((u) => u.hp > 0) };
     for (const d of dead) {
       s = resolveReactions(s, { type: 'rale', sourceId: d.id, sourceUnit: d }); // Résonances ALLIÉES (synergie)
-      s = resolveNemesis(s, d);                                                 // récompense NÉMÉSIS (vise le tueur)
     }
   }
   return s;
-}
-
-const NEMESIS_CD = 2; // cooldown de la récompense Némésis (revival-ready : anti-farm quand la résurrection arrivera)
-
-/**
- * NÉMÉSIS — sens *antagoniste* de la Résonance. Si le défunt `dead` a été achevé par son Némésis —
- * un ENNEMI du MÊME archétype (`lastHitBy`) —, l'ÉQUIPE du tueur gagne un **élan** (bonus de PA au
- * prochain tour), échelonné sur la robustesse du tué (`maxHp`). CD sur le tueur. Némésis = automatique.
- */
-function resolveNemesis(state: CombatState, dead: Unit): CombatState {
-  const killer = dead.lastHitBy ? unitById(state, dead.lastHitBy) : undefined;
-  if (!killer || killer.kind !== dead.kind || killer.owner === dead.owner) return state; // pas son Némésis
-  if (isSilenced(killer)) return state;                                                   // silencé : pas d'élan
-  if ((killer.cooldowns?.['nemesis'] ?? 0) > 0) return state;                              // récompense en CD
-  const bonus = Math.max(1, Math.round(dead.maxHp / 8)); // Lourde 16→+2, Duelliste 9→+1, Tireur 7→+1
-  const units = state.units.map((u) => {
-    if (u.id === killer.id) return { ...u, elan: (u.elan ?? 0) + bonus, cooldowns: { ...(u.cooldowns ?? {}), nemesis: NEMESIS_CD } };
-    if (u.owner === killer.owner) return { ...u, elan: (u.elan ?? 0) + bonus }; // toute l'escouade
-    return u;
-  });
-  return { ...state, units };
 }
 
 function inScope(map: GameMap, source: Unit, listener: Unit, scope: Scope): boolean {
@@ -857,9 +834,9 @@ export function endTurn(state: CombatState, apPerTurn: number): CombatState {
       const regen = tickStatus(u.regen, state.active);
       let out =
         u.owner === next
-          // recharge SES PA (+ élan Némésis consommé + couverture persistante) et applique la régénération
+          // recharge SES PA (+ couverture persistante) et applique la régénération
           // (+regen PV plafonnés) — sauf si étourdie : PA forcés à 0 (gel). Le soin, lui, opère toujours.
-          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.elan ?? 0) + (u.cover?.amount ?? 0), moved: 0, elan: undefined, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns), ...(u.regen ? { hp: Math.min(u.maxHp, u.hp + u.regen.amount) } : {}) }
+          ? { ...u, ap: (u.stun?.expiresIn ?? 0) > 0 ? 0 : apPerTurn + (u.cover?.amount ?? 0), moved: 0, guarding: false, watching: false, riposting: false, cooldowns: tickCooldowns(u.cooldowns), ...(u.regen ? { hp: Math.min(u.maxHp, u.hp + u.regen.amount) } : {}) }
           : u;
       if (mark !== u.mark) out = { ...out, mark };
       if (cripple !== u.cripple) out = { ...out, cripple };

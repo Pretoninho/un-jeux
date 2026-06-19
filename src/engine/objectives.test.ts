@@ -41,21 +41,6 @@ describe('objectives/detectUnlocks — détection pure par diff d\'état', () =>
     expect(got.filter((x) => x === 'm_resonance')).toHaveLength(1); // dédupliqué
   });
 
-  it('kill de Némésis (lastHitBy même archétype, camp adverse) → m_nemesis + h_fil_nemesis', () => {
-    const prev = st([
-      u({ id: 'k', owner: 'alice', hex: 'A', kind: 'duelliste', characterId: 'fil' }),
-      u({ id: 'v', owner: 'bob', hex: 'B', kind: 'duelliste', lastHitBy: 'k' }),
-      u({ id: 'o', owner: 'bob', hex: 'D' }), // un autre bob survit → pas de victoire
-    ]);
-    const cur = st([
-      u({ id: 'k', owner: 'alice', hex: 'A', kind: 'duelliste', characterId: 'fil' }),
-      u({ id: 'o', owner: 'bob', hex: 'D' }),
-    ]);
-    const got = detectUnlocks(prev, cur, new Set());
-    expect(got).toContain('m_nemesis');
-    expect(got).toContain('h_fil_nemesis');
-  });
-
   it('victoire (un seul camp survit) → m_win', () => {
     const prev = st([u({ id: 'a', owner: 'alice', hex: 'A' }), u({ id: 'b', owner: 'bob', hex: 'C' })]);
     const cur = st([u({ id: 'a', owner: 'alice', hex: 'A' })]); // bob éliminé
