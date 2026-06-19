@@ -130,3 +130,26 @@ describe('ai/robustesse — terminaison, déterminisme, intégrité', () => {
     }
   });
 });
+
+describe('ai/soin — le Soigneur soigne un allié entamé', () => {
+  it('avec un allié blessé à portée et rien de mieux, l\'IA choisit de soigner', () => {
+    // Soigneur alice en P2 (heal portée 2), allié blessé en P3 ; aucun ennemi à portée d'attaque.
+    const s = makeCombatState(LINE, [
+      u({ id: 'med', owner: 'alice', hex: 'P2', ap: 4, heal: { cost: 3, amount: 4, range: 2 } }),
+      u({ id: 'hurt', owner: 'alice', hex: 'P3', hp: 4, maxHp: 16 }),
+      u({ id: 'foe', owner: 'bob', hex: 'P5', hp: 10, damage: 0 }),
+    ], 'alice');
+    const plan = planTurn(s, 'normal');
+    expect(plan.some((a) => a.type === 'heal' && a.targetId === 'hurt')).toBe(true);
+    const healed = playTurn(s, 4, 'normal');
+    expect(unitById(healed, 'hurt')!.hp).toBe(8); // 4 + 4
+  });
+
+  it('ne soigne pas un allié déjà à PV pleins', () => {
+    const s = makeCombatState(LINE, [
+      u({ id: 'med', owner: 'alice', hex: 'P2', ap: 4, heal: { cost: 3, amount: 4, range: 2 } }),
+      u({ id: 'full', owner: 'alice', hex: 'P3', hp: 16, maxHp: 16 }),
+    ], 'alice');
+    expect(planTurn(s, 'normal').some((a) => a.type === 'heal')).toBe(false);
+  });
+});

@@ -13,7 +13,7 @@
   import { makeSquareBoard } from './engine/squareboard';
   import {
     makeCombatState, reachable, moveBudget, moveUnit, attack, canAttack, defend, canDefend,
-    reserve, canReserve, resolveOverwatch, riposte, canRiposte, previewReactions, endTurn, winner,
+    reserve, canReserve, resolveOverwatch, riposte, canRiposte, canHeal, healUnit, previewReactions, endTurn, winner,
     type Unit,
     unitAt, type CombatState,
   } from './engine/combat';
@@ -50,7 +50,7 @@
   const EFFECT_COLOR: Record<string, string> = { epines: '#c9543a', marquage: '#c9543a', estropier: '#c9543a', etourdir: '#c9543a', silence: '#c9543a', racine: '#c9543a', vendetta: '#2a9d76', ralliement: '#2a9d76', couverture: '#2a9d76', appui: '#2a9d76', charge: '#2a9d76', provocation: '#3266ad', ruee: '#3266ad', regen: '#2a9d76', soin: '#2a9d76' };
   const HEROES = Object.values(CHARACTERS);
   // ── Pré-partie : composition d'escouade (1 héros par archétype) + adversaire (hotseat / IA) ──
-  const SLOTS = ['lourde', 'tireur', 'duelliste'] as const; // une escouade = 1 de chaque archétype
+  const SLOTS = ['lourde', 'tireur', 'duelliste', 'soigneur'] as const; // une escouade = 1 de chaque archétype
   type Slot = (typeof SLOTS)[number];
   type Opponent = 'hotseat' | 'ia';
   const heroesOf = (arch: string) => HEROES.filter((h) => h.archetype === arch);
@@ -58,7 +58,7 @@
   const lineupOf = (p: Record<Slot, string>) => SLOTS.map((s) => p[s]);
   const complementOf = (p: Record<Slot, string>) =>
     SLOTS.map((s) => (heroesOf(s).find((h) => h.id !== p[s]) ?? heroesOf(s)[0]!).id);
-  const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc' };
+  const DEFAULT_PICK: Record<Slot, string> = { lourde: 'bastion', tireur: 'mireille', duelliste: 'estoc', soigneur: 'baume' };
   const LEVEL_LABEL: Record<Difficulty, string> = { facile: 'Facile', normal: 'Normal', difficile: 'Difficile' };
   const AI_STEP_MS = 480; // délai entre deux actions de l'IA (auto-play animé)
   let showMatrix = $state(false);
@@ -135,31 +135,39 @@
     return { map, corners, tiles, bounds: { x: b.minX, y: b.minY, w: b.w, h: b.h } };
   }
 
-  // Chaque camp aligne Lourde (mêlée-tank) + Tireur (distance-verre) + Duelliste (escarmouche).
-  // Pièces 2 et 3 sur des voisins « salle » distincts (on évite les carrés-carrefours exigus).
-  // (Le Soigneur — 4ᵉ pièce — arrive au Lot 1, avec son verbe de soin.)
-  // Déploie deux escouades choisies au setup : `alice`/`bob` = [idLourde, idTireur, idDuelliste].
-  // Lourde au coin, Tireur puis Duelliste autour. Alice joue toujours en premier.
+  // Chaque camp aligne Lourde + Tireur + Duelliste + Soigneur (4 pièces). La 1ʳᵉ est au coin,
+  // les suivantes sur les cases libres les plus proches (salles d'abord, on évite les carrefours `s:`).
+  // Déploie deux escouades choisies au setup : `alice`/`bob` = [Lourde, Tireur, Duelliste, Soigneur].
+  // Alice joue toujours en premier.
   function initialFor(geo: Geo, alice: string[], bob: string[]): CombatState {
     const [c0, c1] = geo.corners;
     const nbOf = (id: string) => geo.map.hexes.find((h) => h.id === id)!.neighbors;
-    // Deux emplacements de départ distincts autour d'un coin (salles d'abord, sinon repli).
-    const spots = (id: string) => {
-      const rooms = nbOf(id).filter((x) => !x.startsWith('s:'));
-      const pool = rooms.length >= 2 ? rooms : nbOf(id);
-      return [pool[0]!, pool[1] ?? pool[0]!] as const;
+    // `n` cases de départ proches d'un coin (BFS, salles d'abord), distinctes du coin et des autres camps.
+    const spots = (corner: string, n: number, taken: Set<string>): string[] => {
+      const out: string[] = [];
+      const seen = new Set<string>([corner, ...taken]);
+      let frontier = [corner];
+      while (frontier.length && out.length < n) {
+        const next: string[] = [];
+        for (const f of frontier) for (const nb of nbOf(f)) {
+          if (seen.has(nb)) continue;
+          seen.add(nb); next.push(nb);
+          if (!nb.startsWith('s:')) out.push(nb);   // préfère les salles
+        }
+        frontier = next;
+      }
+      while (out.length < n) out.push(corner);       // repli (très petit plateau) : empilable
+      return out.slice(0, n);
     };
-    const [a2, a3] = spots(c0);
-    const [b2, b3] = spots(c1);
     const ch = (id: string) => CHARACTERS[id]!;
-    return makeCombatState(geo.map, [
-      makeUnitFromCharacter('a1', 'alice', c0, ch(alice[0]!), AP_PER_TURN),
-      makeUnitFromCharacter('a2', 'alice', a2, ch(alice[1]!), AP_PER_TURN),
-      makeUnitFromCharacter('a3', 'alice', a3, ch(alice[2]!), AP_PER_TURN),
-      makeUnitFromCharacter('b1', 'bob', c1, ch(bob[0]!), AP_PER_TURN),
-      makeUnitFromCharacter('b2', 'bob', b2, ch(bob[1]!), AP_PER_TURN),
-      makeUnitFromCharacter('b3', 'bob', b3, ch(bob[2]!), AP_PER_TURN),
-    ], 'alice');
+    const taken = new Set<string>([c0, c1]);
+    const place = (camp: string, corner: string, lineup: string[]): Unit[] => {
+      const rest = spots(corner, lineup.length - 1, taken);
+      rest.forEach((h) => taken.add(h));
+      const cells = [corner, ...rest];
+      return lineup.map((id, i) => makeUnitFromCharacter(`${camp[0]}${i + 1}`, camp, cells[i]!, ch(id), AP_PER_TURN));
+    };
+    return makeCombatState(geo.map, [...place('alice', c0, alice), ...place('bob', c1, bob)], 'alice');
   }
 
   const startGeo = buildBoard('octa', SIZE.octa.entrainement); // démarrage sur l'Entraînement (petit octogone)
@@ -179,6 +187,7 @@
   let inspectedId = $state<string>('');   // pièce adverse inspectée (panneau adverse + sa portée)
   let resonAlly = $state(false);          // détail « Résonance » déplié (panneau allié)
   let resonFoe = $state(false);           // détail « Résonance » déplié (panneau adverse)
+  let healMode = $state(false);           // Soigneur : ciblage d'un allié à soigner (clic = soigne)
   const acted = $derived(history.length > 0);
 
   // ── Journal des actions + flash d'attaque sur le board ──────────────────────
@@ -186,8 +195,8 @@
   let log = $state<LogEntry[]>([]);
   let logMarks: number[] = [];              // longueur du journal à chaque coup (pour l'annulation)
   let logBox = $state<HTMLDivElement>();
-  interface AttackFx { x1: number; y1: number; x2: number; y2: number; owner: string; n: number }
-  let attacks = $state<AttackFx[]>([]);     // flèches d'attaque transitoires (origine → cible)
+  interface AttackFx { x1: number; y1: number; x2: number; y2: number; color: string; marker: string; n: number }
+  let attacks = $state<AttackFx[]>([]);     // flèches transitoires (attaque rouge/teal · soin vert)
   let atkSeq = 0;
   const tileById = $derived(new Map(geo.tiles.map((t) => [t.id, t] as const)));
   const unitName = (un: Unit) => un.name ?? KIND_NAME[un.kind] ?? un.kind;
@@ -207,13 +216,15 @@
       else if (d > 0) pushLog(`${unitName(a)} +${d} PV`, a.owner, { sub: true });
     }
   }
-  function flashAttack(fromHex: string, toHex: string, owner: string) {
+  function flashFx(fromHex: string, toHex: string, color: string, marker: string) {
     const f = tileById.get(fromHex), t = tileById.get(toHex);
     if (!f || !t) return;
     const n = ++atkSeq;
-    attacks = [...attacks, { x1: f.cx, y1: f.cy, x2: t.cx, y2: t.cy, owner, n }];
+    attacks = [...attacks, { x1: f.cx, y1: f.cy, x2: t.cx, y2: t.cy, color, marker, n }];
     setTimeout(() => { attacks = attacks.filter((a) => a.n !== n); }, 1500);
   }
+  const flashAttack = (fromHex: string, toHex: string, owner: string) => flashFx(fromHex, toHex, COLORS[owner] ?? '#888', `atkhead-${owner}`);
+  const flashHeal = (fromHex: string, toHex: string) => flashFx(fromHex, toHex, '#2a9d76', 'atkhead-heal');
   // Tirs réservés déclenchés par un déplacement : flèche de chaque guetteur qui a tiré → la cible.
   function flashOverwatch(before: CombatState, after: CombatState, targetHex: string) {
     for (const b of before.units) {
@@ -240,12 +251,19 @@
       const u = before.units.find((x) => x.id === act.unitId); if (u) pushLog(`🛡 ${unitName(u)} se met en garde`, u.owner);
     } else if (act.type === 'reserve') {
       const u = before.units.find((x) => x.id === act.unitId); if (u) pushLog(`🎯 ${unitName(u)} réserve son tir`, u.owner);
+    } else if (act.type === 'heal') {
+      const h = before.units.find((x) => x.id === act.healerId);
+      const tg = before.units.find((x) => x.id === act.targetId);
+      if (h && tg) { flashHeal(h.hex, tg.hex); pushLog(`✚ ${unitName(h)} soigne ${unitName(tg)}`, h.owner); }
+      diffLog(before, after);
     } else if (act.type === 'endTurn') {
       pushLog(`— Tour de ${NAMES[after.active]} —`, after.active, { sep: true });
     }
   }
   // Auto-scroll du journal vers le bas à chaque nouvelle ligne.
   $effect(() => { void log.length; if (logBox) logBox.scrollTop = logBox.scrollHeight; });
+  // Sort du mode soin dès qu'il n'est plus pertinent (sélection changée, tour passé, plus de cible).
+  $effect(() => { if (healMode && !canHealVerb) healMode = false; });
 
   // ── Navigation de la carte (zoom + pan) — pur SVG via le viewBox, sans dépendance ──
   const MAXZOOM = 8;
@@ -370,6 +388,32 @@
   const allyRange = $derived(selected && !over ? rangeSet(selected.hex, selected.range) : new Set<string>());
   const foeRange = $derived(foe && !over ? rangeSet(foe.hex, foe.range) : new Set<string>());
 
+  // SOIN : la pièce sélectionnée peut-elle soigner (verbe Soigneur) ? + cibles alliées valides.
+  const canHealVerb = $derived(!!selected && !over && !aiThinking && !!selected.heal
+    && combat.units.some((a) => canHeal(combat, selected!.id, a.id)));
+  const healReach = $derived.by(() => {
+    const set = new Set<string>();
+    if (!healMode || !selected) return set;
+    for (const a of combat.units) if (canHeal(combat, selected.id, a.id)) set.add(a.hex);
+    return set;
+  });
+
+  function toggleHeal() { if (canHealVerb) healMode = !healMode; }
+
+  function healAlly(targetHex: string) {
+    const target = unitAt(combat, targetHex);
+    if (!selected || !target || !canHeal(combat, selected.id, target.id)) return;
+    snapshot();
+    const before = combat;
+    const healerHex = selected.hex, owner = selected.owner;
+    const healerName = unitName(selected), targetName = unitName(target);
+    combat = healUnit(combat, selected.id, target.id);
+    flashHeal(healerHex, targetHex);
+    pushLog(`✚ ${healerName} soigne ${targetName}`, owner);
+    diffLog(before, combat);
+    healMode = false;
+  }
+
   function attackFoe() {
     if (!selected || !foe || !canAttack(combat, selected.id, foe.id)) return;
     snapshot();
@@ -392,6 +436,11 @@
   function onHex(hexId: string) {
     if (dragMoved) { dragMoved = false; return; } // glissé en cours → on n'interprète pas le clic
     if (over || aiThinking) return;
+    // MODE SOIN (Soigneur) : un clic sur un allié à portée le soigne ; ailleurs → annule le mode.
+    if (healMode) {
+      if (selected && healReach.has(hexId)) { healAlly(hexId); return; }
+      healMode = false;
+    }
     const occ = unitAt(combat, hexId);
     // Clic sur une de mes pièces → la sélectionner.
     if (occ && occ.owner === combat.active) { selectedId = occ.id; return; }
@@ -894,6 +943,8 @@
         <path d="M0,0 L10,5 L0,10 Z" fill={COLORS.alice} /></marker>
       <marker id="atkhead-bob" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="7" refY="5" orient="auto">
         <path d="M0,0 L10,5 L0,10 Z" fill={COLORS.bob} /></marker>
+      <marker id="atkhead-heal" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="7" refY="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="#2a9d76" /></marker>
     </defs>
     {#each geo.tiles as t (t.id)}
       {@const occ = unitAt(combat, t.id)}
@@ -915,6 +966,7 @@
         {#if tutoFocus.has(t.id)}<polygon points={t.points} class="tutoring" />{/if}
         {#if inAlly}<polygon points={t.points} class="rng-ally" />{/if}
         {#if inFoe}<polygon points={t.points} class="rng-foe" />{/if}
+        {#if healReach.has(t.id)}<polygon points={t.points} class="heal-target" />{/if}
         {#if occ}
           {@const isSel = occ.id === selectedId && occ.owner === combat.active && !over}
           {@const frac = occ.hp / occ.maxHp}
@@ -959,8 +1011,8 @@
     {/each}
     <!-- OVERLAY : flèches d'attaque transitoires (origine → cible) + halo sur la victime. -->
     {#each attacks as a (a.n)}
-      <line class="atkfx" x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={COLORS[a.owner]} marker-end="url(#atkhead-{a.owner})" />
-      <circle class="atkpulse" cx={a.x2} cy={a.y2} stroke={COLORS[a.owner]} />
+      <line class="atkfx" x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={a.color} marker-end="url(#{a.marker})" />
+      <circle class="atkpulse" cx={a.x2} cy={a.y2} stroke={a.color} />
     {/each}
   </svg>
     </div>
@@ -1083,6 +1135,12 @@
               <button class="riposte" class:on={selected.riposting} onclick={riposteSelected} disabled={!canParry}
                 title={`RIPOSTE (${selected.riposte.cost} PA) : arme un contre jusqu'à ton prochain tour ou ton 1ᵉʳ contre — si un ennemi adjacent t'attaque et que tu survis, tu le frappes en retour. Déclenche les Résonances « riposte ».`}>
                 {selected.riposting ? '🗡 Riposte armée' : `🗡 Riposter (${selected.riposte.cost})`}
+              </button>
+            {/if}
+            {#if selected.heal}
+              <button class="heal" class:on={healMode} onclick={toggleHeal} disabled={!canHealVerb}
+                title={`SOIN (${selected.heal.cost} PA) : rend ${selected.heal.amount} PV à un allié à ≤${selected.heal.range} cases (plafonné). Clique le bouton puis une case verte.`}>
+                {healMode ? '✚ Choisis un allié…' : `✚ Soigner (${selected.heal.cost})`}
               </button>
             {/if}
           </div>
@@ -1387,6 +1445,10 @@
   .riposte:hover:not(:disabled) { border-color: #9a7cc8; }
   .riposte.on { background: #342a4a; border-color: #9a7cc8; color: #e2d6ff; font-weight: 600; }
   .riposte:disabled { opacity: .4; cursor: not-allowed; }
+  .heal { background: #1c2e26; border: 1px solid #2a7d5e; color: #9fe0c4; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
+  .heal:hover:not(:disabled) { border-color: #3fae84; }
+  .heal.on { background: #234e3c; border-color: #3fae84; color: #d6ffec; font-weight: 600; }
+  .heal:disabled { opacity: .4; cursor: not-allowed; }
   .undo { background: #2a2030; border: 1px solid #5a4055; color: #d0a0b0; border-radius: 5px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; }
   .undo:hover:not(:disabled) { border-color: #8a6075; }
   .undo:disabled { opacity: .35; cursor: not-allowed; }
@@ -1464,6 +1526,8 @@
   .pname { fill: #e8ecf2; font-size: 7px; font-weight: 600; text-anchor: middle; pointer-events: none; }
   .rng-ally { fill: none; stroke: #5ab0a0; stroke-width: 2; stroke-dasharray: 4 3; opacity: .5; pointer-events: none; }
   .rng-foe { fill: none; stroke: #e0604a; stroke-width: 2; opacity: .5; pointer-events: none; }
+  .heal-target { fill: #1d3a2e; stroke: #3fae84; stroke-width: 3; pointer-events: none; animation: healpulse 1.1s ease-in-out infinite; }
+  @keyframes healpulse { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
   /* Panneaux d'info — pièce alliée sélectionnée (gauche) et pièce adverse inspectée (droite). */
   /* Flèches d'attaque transitoires sur le board (origine → cible). */
   .atkfx { stroke-width: 3.5; stroke-linecap: round; pointer-events: none; animation: atkfade 1.5s ease-out forwards; }

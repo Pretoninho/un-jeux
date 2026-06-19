@@ -127,17 +127,19 @@
   (burst payé) ; (2) effet réactif **`regen`** = statut `Unit.regen` (HoT) qui rend `+amount` PV **au
   rechargement** pendant `duration` tours (plafonné, tické à `endTurn`) ; (3) effet réactif **`soin`** =
   soin **instantané** (+amount PV plafonné, posé tout de suite) — (2) et (3) visent l'allié **SOURCE** du
-  signal. **EN RÉSERVE** : présent dans `CHARACTERS`/`ARCHETYPES` mais **PAS dans les `SLOTS`** de
-  l'escouade par défaut (non fieldable, IA/fielding différés ; libellés/glyphe UI `regen`/`soin` posés).
+  signal. **FIELDÉ (2026-06-19)** : escouade passée à **4** (`SLOTS` = Lourde+Tireur+Duelliste+**Soigneur**,
+  `DEFAULT_PICK.soigneur = baume`). **UI Soin** = bouton `✚ Soigner` au panneau allié → **mode ciblage**
+  (`healMode` : clic sur une case verte = soigne l'allié ; `canHeal`/`healUnit` ; flash vert origine→cible).
+  **IA-soin** câblée (`ai.ts` : action `heal`, gated `useVerbs`, scorée par gain de PV). Déploiement
+  `initialFor` généralisé à 4 (BFS de cases libres au coin). Némésis Baume↔Mélisse **active en jeu**.
   **2 héros (paire), rangées PLEINES + DISTINCTES** : **Baume** = **`regen`** × 7 (régén étalée, +2×2) ;
   **Mélisse** = **`soin`** × 7 (burst instantané, +4) — *Baume soigne dans la durée, Mélisse recolle d'un
   coup* (miroir burst/sustain, comme Bastion/Rempart pour la charge). → **Némésis Soigneur↔Soigneur
   (Baume↔Mélisse) ACTIVE** automatiquement (déclencheur `kind===kind` déjà générique, 0 code ; élan = `round(10/8)=1`).
   *Stats/nombres à affiner au playtest.*
-- **Effectif** : escouade par défaut = Lourde + Tireur + **Duelliste** (3/camp). Le **Soigneur** (4ᵉ
-  archétype) est **créé mais en réserve** (pas encore dans l'escouade — passage à 4 = lot ultérieur).
-  Exotiques (Hallebardier/Saboteur) toujours en réserve. Le **Duelliste** est hors-droite (PV 9,
-  dégâts 2, **attaque 1 PA** → frappe deux fois/tour).
+- **Effectif (LIVRÉ 4/camp, 2026-06-19)** : escouade = Lourde + Tireur + Duelliste + **Soigneur**
+  (le Soigneur est désormais **fieldé** ; cf. ci-dessus). Exotiques (Hallebardier/Saboteur) toujours
+  en réserve. Le **Duelliste** est hors-droite (PV 9, dégâts 2, **attaque 1 PA** → frappe deux fois/tour).
 - **Couche PERSONNAGE** (`Character`/`CHARACTERS`, `makeUnitFromCharacter`) : une pièce déployée
   = **socle de classe** (archétype) + **calque perso** (nom, override de stats, **Résonance
   signature**). Fusion des Résonances **par `id`** (signature étend/écrase le socle). Les deux

@@ -9,7 +9,7 @@
 import type { HexId } from './types';
 import {
   type CombatState, type Unit,
-  reachable, moveBudget, moveUnit, attack, canAttack, canDefend, defend, canReserve, reserve,
+  reachable, moveBudget, moveUnit, attack, canAttack, canDefend, defend, canReserve, reserve, canHeal, healUnit,
   resolveOverwatch, endTurn, winner, unitById, graphDistance, previewReactions,
 } from './combat';
 
@@ -22,6 +22,7 @@ export type AiAction =
   | { type: 'attack'; attackerId: string; targetId: string }
   | { type: 'guard'; unitId: string }      // Lourde : se mettre en garde
   | { type: 'reserve'; unitId: string }    // Tireur : réserver son tir
+  | { type: 'heal'; healerId: string; targetId: string }  // Soigneur : soigner un allié
   | { type: 'endTurn' };
 
 // ─────────────────────── Réglages (calibrage = terrain de PLAYTEST) ───────────
@@ -131,6 +132,7 @@ export function applyAction(state: CombatState, action: AiAction, apPerTurn = 0)
     case 'attack':  return attack(state, action.attackerId, action.targetId);
     case 'guard':   return defend(state, action.unitId);
     case 'reserve': return reserve(state, action.unitId);
+    case 'heal':    return healUnit(state, action.healerId, action.targetId);
     case 'endTurn': return endTurn(state, apPerTurn);
   }
 }
@@ -149,6 +151,8 @@ function candidates(state: CombatState, brain: Brain): AiAction[] {
     if (brain.useVerbs) {
       if (canDefend(state, u.id)) out.push({ type: 'guard', unitId: u.id });
       if (canReserve(state, u.id)) out.push({ type: 'reserve', unitId: u.id });
+      if (u.heal) for (const a of state.units)
+        if (a.owner === u.owner && canHeal(state, u.id, a.id)) out.push({ type: 'heal', healerId: u.id, targetId: a.id });
     }
   }
   return out;
@@ -184,6 +188,11 @@ function score(state: CombatState, action: AiAction, efield: Map<HexId, number>,
       const after = foreseeMove(state, action.unitId, action.dest, brain);
       return evalState(after, me, efield, brain) - evalState(state, me, efield, brain);
     }
+    case 'heal': {
+      // Le soin rend des PV à un allié → matériel propre en hausse (capté par evalState).
+      const after = healUnit(state, action.healerId, action.targetId);
+      return evalState(after, me, efield, brain) - evalState(state, me, efield, brain);
+    }
     case 'endTurn':
       return -Infinity;
   }
@@ -195,6 +204,7 @@ function tieKey(a: AiAction): string {
     case 'move':    return `1:${a.unitId}:${a.dest}`;
     case 'guard':   return `2:${a.unitId}:`;
     case 'reserve': return `3:${a.unitId}:`;
+    case 'heal':    return `4:${a.healerId}:${a.targetId}`;
     case 'endTurn': return `9::`;
   }
 }
