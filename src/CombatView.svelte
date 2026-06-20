@@ -1308,8 +1308,8 @@
 
       <h3>🕹 Le tour de jeu</h3>
       <ul>
-        <li><b>Déplacer OU agir</b> — pas les deux : à son tour, une pièce <b>se déplace</b> (jusqu'à son plafond de pas) <b>ou</b> <b>agit</b> (attaque / verbe), mais doit <b>choisir</b>. Engager, c'est s'engager.</li>
-        <li>Se <b>déplacer est gratuit</b> (borné par la <i>mobilité</i>, indépendante des PA) ; les <b>PA</b> paient les <b>actions</b> : attaquer et les verbes (Garde, Tir réservé, Riposte). Tu joues tes pièces dans <b>l'ordre que tu veux</b>.</li>
+        <li>Les <b>PA</b> paient <b>tout</b> : chaque <b>pas</b> coûte 1 PA, et les <b>actions</b> (attaquer, verbes Garde / Tir réservé / Riposte) coûtent des PA. <b>Bouger et agir puisent au même pool</b> → tu arbitres entre te déplacer et frapper.</li>
+        <li>Chaque pièce garde aussi un <b>plafond de pas</b> (sa <i>mobilité</i> — ex. la Lourde est lente). Tu joues tes pièces dans <b>l'ordre que tu veux</b>.</li>
         <li>Les <b>pièces sont des obstacles</b> — on ne les traverse pas.</li>
         <li><b>Finir le tour</b> passe la main à l'autre joueur ; les PA <b>rechargent</b> et les pas se <b>remettent à zéro</b>.</li>
       </ul>

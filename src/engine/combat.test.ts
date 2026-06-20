@@ -53,19 +53,21 @@ describe('combat/déplacement — portée', () => {
   });
 });
 
-describe('combat/déplacement — appliquer (DÉCOUPLÉ des PA)', () => {
-  it('moveUnit déplace et NE touche PAS aux PA (compte les pas dans `moved`)', () => {
+describe('combat/déplacement — appliquer (PA PARTAGÉS : 1 pas = 1 PA)', () => {
+  it('moveUnit déplace, DÉPENSE 1 PA par pas, et compte les pas dans `moved`', () => {
     const s = moveUnit(fresh('A', 'E', 4), 'a', 'C'); // distance 2
     expect(unitAt(s, 'C')?.id).toBe('a');
     expect(unitAt(s, 'A')).toBeUndefined();
-    expect(unitById(s, 'a')!.ap).toBe(4);    // PA inchangés (marcher est gratuit)
+    expect(unitById(s, 'a')!.ap).toBe(2);    // 4 − 2 pas : marcher coûte des PA
     expect(unitById(s, 'a')!.moved).toBe(2); // 2 pas comptés sur le plafond de mobilité
   });
 
-  it('le déplacement N’est PAS bridé par des PA bas (gated par moveCap seul)', () => {
-    const s = moveUnit(fresh('A', 'E', 1), 'a', 'C'); // 1 PA mais C (distance 2) reste atteignable
-    expect(unitAt(s, 'C')?.id).toBe('a');
-    expect(unitById(s, 'a')!.ap).toBe(1);    // PA intacts
+  it('le déplacement EST borné par les PA disponibles', () => {
+    const s0 = fresh('A', 'E', 1);            // 1 seul PA
+    expect(moveBudget(unitById(s0, 'a')!)).toBe(1);
+    expect(moveUnit(s0, 'a', 'C')).toBe(s0);  // C (distance 2) hors budget PA → no-op
+    const s1 = moveUnit(s0, 'a', 'B');        // B (distance 1) ok
+    expect(unitById(s1, 'a')!.ap).toBe(0);    // PA épuisés
   });
 
   it('moveUnit sans effet au-delà du plafond moveCap', () => {
@@ -83,37 +85,27 @@ describe('combat/déplacement — appliquer (DÉCOUPLÉ des PA)', () => {
     expect(moveUnit(s0, 'b', 'D')).toBe(s0); // bob n'est pas actif
   });
 
-  it('« déplacer OU agir » : avoir bougé interdit d\'attaquer ce tour', () => {
+  it('bouger PUIS attaquer puise au MÊME pool de PA', () => {
     const s0 = makeCombatState(LINE, [
       u({ id: 'a', owner: 'alice', hex: 'A', ap: 4, damage: 4, attackCost: 2 }),
       u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
     ], 'alice');
-    const s1 = moveUnit(s0, 'a', 'B');          // A→B (1 pas), PA intacts…
-    expect(unitById(s1, 'a')!.ap).toBe(4);
-    expect(canAttack(s1, 'a', 'b')).toBe(false); // …mais avoir bougé verrouille l'action
+    const s1 = moveUnit(s0, 'a', 'B');          // A→B (1 pas) : 4 − 1 = 3 PA
+    expect(unitById(s1, 'a')!.ap).toBe(3);
+    expect(canAttack(s1, 'a', 'b')).toBe(true); // B adjacent à C, 3 PA ≥ coût 2
+    const s2 = attack(s1, 'a', 'b');
+    expect(unitById(s2, 'a')!.ap).toBe(1);      // 3 − 2 : le pool est partagé
+    expect(unitById(s2, 'b')!.hp).toBe(6);      // 10 − 4
   });
 
-  it('« déplacer OU agir » : avoir agi (attaque/verbe) interdit de bouger ce tour', () => {
+  it('plus de PA pour l\'attaque après avoir trop marché', () => {
     const s0 = makeCombatState(LINE, [
-      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4, damage: 4, attackCost: 2 }),
-      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
+      u({ id: 'a', owner: 'alice', hex: 'A', ap: 3, damage: 4, attackCost: 2, moveCap: 4 }),
+      u({ id: 'b', owner: 'bob', hex: 'E', hp: 10 }),
     ], 'alice');
-    const s1 = attack(s0, 'a', 'b');            // l'attaque marque `acted`
-    expect(unitById(s1, 'a')!.acted).toBe(true);
-    expect(moveBudget(unitById(s1, 'a')!)).toBe(0); // plus aucun pas après avoir agi
-    expect(moveUnit(s1, 'a', 'A')).toBe(s1);        // le déplacement est refusé (no-op)
-  });
-
-  it('le verrou se lève au tour suivant (acted/moved remis à 0 par endTurn)', () => {
-    const s0 = makeCombatState(LINE, [
-      u({ id: 'a', owner: 'alice', hex: 'B', ap: 4, damage: 4, attackCost: 2 }),
-      u({ id: 'b', owner: 'bob', hex: 'C', hp: 10 }),
-    ], 'alice');
-    const s1 = attack(s0, 'a', 'b');
-    const s2 = endTurn(s1, 4);   // → bob
-    const s3 = endTurn(s2, 4);   // → alice : a est rechargée
-    expect(unitById(s3, 'a')!.acted).toBe(false);
-    expect(moveBudget(unitById(s3, 'a')!)).toBeGreaterThan(0);
+    const s1 = moveUnit(s0, 'a', 'D');          // 3 pas → 0 PA
+    expect(unitById(s1, 'a')!.ap).toBe(0);
+    expect(canAttack(s1, 'a', 'b')).toBe(false); // plus de PA pour frapper
   });
 });
 
